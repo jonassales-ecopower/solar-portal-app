@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar Portal — Painel do Integrador</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; color: #333; }
+
+        header {
+            background: linear-gradient(135deg, #1e293b, #334155);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        header h1 { font-size: 20px; }
+        header p { font-size: 13px; opacity: 0.7; }
+
+        .container { max-width: 1000px; margin: 30px auto; padding: 0 20px; }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .card h2 { font-size: 16px; color: #666; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
+
+        #tela-login { max-width: 400px; margin: 80px auto; }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #1e293b, #334155);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 5px;
+        }
+        button:hover { opacity: 0.9; }
+        button.secundario {
+            background: white;
+            color: #333;
+            border: 1px solid #ddd;
+            margin-top: 0;
+        }
+        button.verde { background: linear-gradient(135deg, #16a34a, #15803d); }
+        button.azul { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
+        button.pequeno {
+            width: auto;
+            padding: 8px 16px;
+            font-size: 13px;
+            margin-top: 0;
+        }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f8fafc; padding: 12px; text-align: left; font-size: 13px; color: #666; border-bottom: 1px solid #eee; }
+        td { padding: 12px; font-size: 14px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+        tr:hover td { background: #fafafa; }
+
+        .erro { color: #dc2626; font-size: 13px; margin-top: 8px; }
+        .sucesso { color: #16a34a; font-size: 13px; margin-top: 8px; }
+
+        #tela-painel { display: none; }
+
+        .acoes { display: flex; gap: 8px; }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.ativo { display: flex; }
+        .modal {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+        }
+        .modal h3 { margin-bottom: 15px; font-size: 18px; }
+
+        .link-box {
+            background: #f1f5f9;
+            border-radius: 8px;
+            padding: 12px 14px;
+            font-size: 12px;
+            color: #475569;
+            word-break: break-all;
+            margin-top: 8px;
+            font-family: monospace;
+        }
+
+        .modal-acoes { display: flex; gap: 10px; margin-top: 15px; }
+    </style>
+</head>
+<body>
+
+<!-- Tela de Login -->
+<div id="tela-login">
+    <div class="card">
+        <div style="text-align:center; margin-bottom:20px;">
+            <div style="font-size:40px;">☀️</div>
+            <h1 style="font-size:20px; margin-top:8px;">Solar Portal</h1>
+            <p style="color:#888; font-size:13px;">Painel do Integrador</p>
+        </div>
+        <input type="email" id="login-email" placeholder="Seu e-mail">
+        <input type="password" id="login-senha" placeholder="Sua senha">
+        <button onclick="fazerLogin()">Entrar</button>
+        <p class="erro" id="erro-login"></p>
+    </div>
+</div>
+
+<!-- Tela do Painel -->
+<div id="tela-painel">
+    <header>
+        <div>
+            <h1>☀️ Solar Portal</h1>
+            <p>Painel do Integrador</p>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:13px; opacity:0.8;" id="nome-usuario"></span>
+            <button class="secundario pequeno" onclick="sair()">Sair</button>
+        </div>
+    </header>
+
+    <div class="container">
+
+        <!-- Cadastrar Cliente -->
+        <div class="card">
+            <h2>➕ Cadastrar Novo Cliente</h2>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                <input type="text" id="novo-nome" placeholder="Nome do cliente">
+                <input type="email" id="novo-email" placeholder="E-mail">
+                <input type="text" id="novo-telefone" placeholder="Telefone">
+                <input type="text" id="novo-uc" placeholder="Número da UC">
+                <input type="text" id="novo-distribuidora" placeholder="Distribuidora">
+                <input type="text" id="novo-tipo-gd" placeholder="Tipo GD (ex: GD_II)">
+            </div>
+            <button class="verde" style="margin-top:15px;" onclick="cadastrarCliente()">✅ Cadastrar Cliente</button>
+            <p class="erro" id="erro-cadastro"></p>
+            <p class="sucesso" id="sucesso-cadastro"></p>
+        </div>
+
+        <!-- Lista de Clientes -->
+        <div class="card">
+            <h2>👥 Minha Carteira de Clientes</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>UC</th>
+                        <th>Distribuidora</th>
+                        <th>Tipo GD</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="tabela-clientes">
+                    <tr><td colspan="5" style="text-align:center; color:#888;">Carregando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
+
+<!-- Modal Link do Cliente -->
+<div class="modal-overlay" id="modal-link">
+    <div class="modal">
+        <h3>🔗 Link do Portal do Cliente</h3>
+        <p style="font-size:14px; color:#666; margin-bottom:5px;">Compartilhe este link com o cliente:</p>
+        <div class="link-box" id="link-cliente"></div>
+        <div class="modal-acoes">
+            <button class="azul pequeno" onclick="copiarLink()">📋 Copiar Link</button>
+            <button class="secundario pequeno" onclick="fecharModal()">Fechar</button>
+        </div>
+        <p class="sucesso" id="copiado" style="display:none; margin-top:8px;">✅ Link copiado!</p>
+    </div>
+</div>
+
+<script>
+    const API = "http://127.0.0.1:8000";
+    let token = localStorage.getItem("token");
+    let nomeUsuario = localStorage.getItem("nome");
+
+    if (token) {
+        mostrarPainel();
+        carregarClientes();
+    }
+
+    async function fazerLogin() {
+        const email = document.getElementById("login-email").value;
+        const senha = document.getElementById("login-senha").value;
+
+        try {
+            const resp = await fetch(`${API}/auth/login`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({email, senha})
+            });
+            const data = await resp.json();
+
+            if (resp.ok) {
+                token = data.token;
+                nomeUsuario = data.nome;
+                localStorage.setItem("token", token);
+                localStorage.setItem("nome", nomeUsuario);
+                mostrarPainel();
+                carregarClientes();
+            } else {
+                document.getElementById("erro-login").textContent = data.detail || "Erro ao fazer login";
+            }
+        } catch(e) {
+            document.getElementById("erro-login").textContent = "Erro de conexão com a API";
+        }
+    }
+
+    function mostrarPainel() {
+        document.getElementById("tela-login").style.display = "none";
+        document.getElementById("tela-painel").style.display = "block";
+        document.getElementById("nome-usuario").textContent = nomeUsuario || "";
+    }
+
+    function sair() {
+        localStorage.removeItem("token");
+        localStorage.removeItem("nome");
+        location.reload();
+    }
+
+    async function carregarClientes() {
+        try {
+            const resp = await fetch(`${API}/clientes`, {
+                headers: {"Authorization": `Bearer ${token}`}
+            });
+            const clientes = await resp.json();
+            const tbody = document.getElementById("tabela-clientes");
+
+            if (clientes.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#888;">Nenhum cliente cadastrado ainda</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = clientes.map(c => `
+                <tr>
+                    <td><strong>${c.nome}</strong></td>
+                    <td>${c.numero_uc || "—"}</td>
+                    <td>${c.distribuidora || "—"}</td>
+                    <td>${c.tipo_gd || "—"}</td>
+                    <td>
+                        <div class="acoes">
+                            <button class="pequeno" onclick="verContas(${c.id}, '${c.nome}')">Ver Contas</button>
+                            <button class="azul pequeno" onclick="obterLink(${c.id}, '${c.nome}')">🔗 Link</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join("");
+        } catch(e) {
+            console.error(e);
+        }
+    }
+
+    async function cadastrarCliente() {
+        const dados = {
+            nome: document.getElementById("novo-nome").value,
+            email: document.getElementById("novo-email").value,
+            telefone: document.getElementById("novo-telefone").value,
+            numero_uc: document.getElementById("novo-uc").value,
+            distribuidora: document.getElementById("novo-distribuidora").value,
+            tipo_gd: document.getElementById("novo-tipo-gd").value
+        };
+
+        if (!dados.nome) {
+            document.getElementById("erro-cadastro").textContent = "Nome é obrigatório";
+            return;
+        }
+
+        try {
+            const resp = await fetch(`${API}/clientes`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify(dados)
+            });
+
+            if (resp.ok) {
+                document.getElementById("erro-cadastro").textContent = "";
+                document.getElementById("sucesso-cadastro").textContent = "✅ Cliente cadastrado com sucesso!";
+                document.getElementById("novo-nome").value = "";
+                document.getElementById("novo-email").value = "";
+                document.getElementById("novo-telefone").value = "";
+                document.getElementById("novo-uc").value = "";
+                document.getElementById("novo-distribuidora").value = "";
+                document.getElementById("novo-tipo-gd").value = "";
+                carregarClientes();
+                setTimeout(() => document.getElementById("sucesso-cadastro").textContent = "", 3000);
+            } else {
+                const data = await resp.json();
+                document.getElementById("erro-cadastro").textContent = data.detail || "Erro ao cadastrar";
+            }
+        } catch(e) {
+            document.getElementById("erro-cadastro").textContent = "Erro de conexão";
+        }
+    }
+
+    function verContas(clienteId, nomeCliente) {
+        window.open(`portal.html?cliente_id=${clienteId}&nome=${encodeURIComponent(nomeCliente)}`, '_blank');
+    }
+
+    async function obterLink(clienteId, nomeCliente) {
+        try {
+            const resp = await fetch(`${API}/clientes/${clienteId}/obter-token`, {
+                headers: {"Authorization": `Bearer ${token}`}
+            });
+            const data = await resp.json();
+            const base = window.location.href.replace("painel.html", "");
+            const link = `${base}portal.html?token_acesso=${data.token_acesso}&nome=${encodeURIComponent(nomeCliente)}`;
+            document.getElementById("link-cliente").textContent = link;
+            document.getElementById("modal-link").classList.add("ativo");
+        } catch(e) {
+            alert("Erro ao obter link do cliente");
+        }
+    }
+
+    function copiarLink() {
+        const link = document.getElementById("link-cliente").textContent;
+        navigator.clipboard.writeText(link);
+        document.getElementById("copiado").style.display = "block";
+        setTimeout(() => document.getElementById("copiado").style.display = "none", 2000);
+    }
+
+    function fecharModal() {
+        document.getElementById("modal-link").classList.remove("ativo");
+    }
+</script>
+</body>
+</html>

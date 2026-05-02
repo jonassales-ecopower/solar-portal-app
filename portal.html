@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar Portal — Minha Conta</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #f0f4f8;
+            color: #333;
+        }
+
+        header {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+        }
+
+        header h1 { font-size: 22px; }
+        header p { font-size: 13px; opacity: 0.85; }
+
+        .sol { font-size: 36px; }
+
+        .container {
+            max-width: 900px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .card h2 {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+        }
+
+        .metric {
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 18px;
+            text-align: center;
+            border-left: 4px solid #f59e0b;
+        }
+
+        .metric .valor {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .metric .label {
+            font-size: 12px;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        .metric.verde { border-left-color: #22c55e; }
+        .metric.verde .valor { color: #16a34a; }
+        .metric.azul { border-left-color: #3b82f6; }
+        .metric.azul .valor { color: #2563eb; }
+        .metric.laranja { border-left-color: #f59e0b; }
+
+        .status {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .status.super { background: #dcfce7; color: #16a34a; }
+        .status.defi { background: #fee2e2; color: #dc2626; }
+
+        .mensagem {
+            background: linear-gradient(135deg, #fffbeb, #fef3c7);
+            border-left: 4px solid #f59e0b;
+            border-radius: 8px;
+            padding: 16px 20px;
+            font-size: 14px;
+            line-height: 1.7;
+            color: #78350f;
+        }
+
+        .upload-area {
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .upload-area:hover { border-color: #f59e0b; background: #fffbeb; }
+        .upload-area .icone { font-size: 40px; margin-bottom: 10px; }
+        .upload-area p { color: #666; font-size: 14px; }
+
+        button {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 15px;
+            width: 100%;
+            transition: opacity 0.2s;
+        }
+
+        button:hover { opacity: 0.9; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            display: none;
+        }
+
+        .loading .spinner {
+            font-size: 30px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        #resultado { display: none; }
+
+        .alerta {
+            background: #fef3c7;
+            border: 1px solid #fbbf24;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 13px;
+            color: #92400e;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="sol">☀️</div>
+    <div>
+        <h1>Solar Portal</h1>
+        <p>Acompanhe sua geração de energia</p>
+    </div>
+</header>
+
+<div class="container">
+
+    <!-- Upload -->
+    <div class="card">
+        <h2>📄 Enviar Conta de Energia</h2>
+        <div class="upload-area" onclick="document.getElementById('arquivo').click()">
+            <div class="icone">📁</div>
+            <p id="nome-arquivo">Clique para selecionar o PDF da sua conta de energia</p>
+        </div>
+        <input type="file" id="arquivo" accept=".pdf" style="display:none" onchange="arquivoSelecionado(this)">
+        <button onclick="enviarConta()" id="btn-enviar" disabled>⚡ Analisar Conta</button>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading" id="loading">
+        <div class="spinner">⚙️</div>
+        <p style="margin-top:10px">Analisando sua conta com IA...<br><small>Isso pode levar alguns segundos</small></p>
+    </div>
+
+    <!-- Resultado -->
+    <div id="resultado">
+
+        <div class="card">
+            <h2>📊 Resumo da Conta</h2>
+            <div id="alerta-media" class="alerta" style="display:none">
+                ⚠️ <strong>Atenção:</strong> Esta conta possui leitura acumulada de mais de um mês.
+            </div>
+            <div class="grid">
+                <div class="metric laranja">
+                    <div class="valor" id="val-mes">—</div>
+                    <div class="label">Mês de Referência</div>
+                </div>
+                <div class="metric">
+                    <div class="valor" id="val-fatura">—</div>
+                    <div class="label">Valor da Fatura</div>
+                </div>
+                <div class="metric azul">
+                    <div class="valor" id="val-consumo-bruto">—</div>
+                    <div class="label">Consumo Bruto</div>
+                </div>
+                <div class="metric azul">
+                    <div class="valor" id="val-consumo">—</div>
+                    <div class="label">Consumo Faturado</div>
+                </div>
+                <div class="metric verde">
+                    <div class="valor" id="val-injetado">—</div>
+                    <div class="label">Energia Injetada</div>
+                </div>
+                <div class="metric">
+                    <div class="valor" id="val-saldo">—</div>
+                    <div class="label">Saldo Acumulado</div>
+                </div>
+                <div class="metric verde">
+                    <div class="valor" id="val-percentual">—</div>
+                    <div class="label">Gerado vs Consumido</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>⚡ Status do Sistema</h2>
+            <div id="val-status"></div>
+        </div>
+
+        <div class="card">
+            <h2>💬 Análise da sua Conta</h2>
+            <div class="mensagem" id="val-mensagem"></div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    const API = "http://127.0.0.1:8000";
+    const CLIENTE_ID = 1; // fixo por enquanto
+
+    function arquivoSelecionado(input) {
+        if (input.files[0]) {
+            document.getElementById("nome-arquivo").textContent = "✅ " + input.files[0].name;
+            document.getElementById("btn-enviar").disabled = false;
+        }
+    }
+
+    async function enviarConta() {
+        const arquivo = document.getElementById("arquivo").files[0];
+        if (!arquivo) return;
+
+        document.getElementById("loading").style.display = "block";
+        document.getElementById("resultado").style.display = "none";
+        document.getElementById("btn-enviar").disabled = true;
+
+        const form = new FormData();
+        form.append("arquivo", arquivo);
+
+        try {
+            const resp = await fetch(`${API}/contas/upload/${CLIENTE_ID}`, {
+                method: "POST",
+                body: form
+            });
+
+            const data = await resp.json();
+            const conta = data.conta;
+
+            // Preencher dados
+            document.getElementById("val-mes").textContent = conta.mes_referencia || "—";
+            document.getElementById("val-fatura").textContent = "R$ " + (conta.valor_fatura || 0).toFixed(2);
+            document.getElementById("val-consumo-bruto").textContent = (conta.consumo_bruto_kwh || 0).toFixed(2) + " kWh";
+            document.getElementById("val-consumo").textContent = (conta.consumo_kwh || 0).toFixed(2) + " kWh";
+            document.getElementById("val-injetado").textContent = (conta.energia_injetada_kwh || 0).toFixed(2) + " kWh";
+            document.getElementById("val-saldo").textContent = (conta.saldo_acumulado_kwh || 0).toFixed(2) + " kWh";
+            document.getElementById("val-percentual").textContent = (conta.percentual_gerado || 0).toFixed(1) + "%";
+            document.getElementById("val-mensagem").textContent = conta.mensagem_cliente || "—";
+
+            // Status
+            const status = conta.status_sistema || "";
+            const statusEl = document.getElementById("val-status");
+            if (status === "SUPERAVITÁRIO") {
+                statusEl.innerHTML = '<span class="status super">✅ SUPERAVITÁRIO — seu sistema gerou mais do que consumiu!</span>';
+            } else {
+                statusEl.innerHTML = '<span class="status defi">⚠️ DEFICITÁRIO — seu sistema consumiu mais do que gerou.</span>';
+            }
+
+            // Alerta média
+            if (conta.leitura_por_media) {
+                document.getElementById("alerta-media").style.display = "block";
+            }
+
+            document.getElementById("resultado").style.display = "block";
+
+        } catch (e) {
+            alert("Erro ao processar a conta. Tente novamente.");
+            console.error(e);
+        } finally {
+            document.getElementById("loading").style.display = "none";
+            document.getElementById("btn-enviar").disabled = false;
+        }
+    }
+</script>
+
+</body>
+</html>
