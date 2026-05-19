@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar Portal — Minha Conta</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; color: #333; }
+
+        header {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+        }
+        header h1 { font-size: 22px; }
+        header p { font-size: 13px; opacity: 0.85; }
+        .sol { font-size: 36px; }
+
+        .container { max-width: 900px; margin: 30px auto; padding: 0 20px; }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .card h2 {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; }
+
+        .metric {
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 18px;
+            text-align: center;
+            border-left: 4px solid #f59e0b;
+        }
+        .metric .valor { font-size: 26px; font-weight: 700; color: #1e293b; }
+        .metric .label { font-size: 12px; color: #888; margin-top: 4px; }
+        .metric.verde { border-left-color: #22c55e; }
+        .metric.verde .valor { color: #16a34a; }
+        .metric.azul { border-left-color: #3b82f6; }
+        .metric.azul .valor { color: #2563eb; }
+        .metric.laranja { border-left-color: #f59e0b; }
+        .metric.amarelo-vivo { border-left-color: #eab308; background: #fefce8; }
+        .metric.amarelo-vivo .valor { color: #ca8a04; }
+
+        .status { display: inline-block; padding: 6px 16px; border-radius: 20px; font-weight: 600; font-size: 14px; }
+        .status.super { background: #dcfce7; color: #16a34a; }
+        .status.defi { background: #fee2e2; color: #dc2626; }
+
+        .mensagem {
+            background: linear-gradient(135deg, #fffbeb, #fef3c7);
+            border-left: 4px solid #f59e0b;
+            border-radius: 8px;
+            padding: 16px 20px;
+            font-size: 14px;
+            line-height: 1.7;
+            color: #78350f;
+        }
+
+        .upload-area {
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .upload-area:hover { border-color: #f59e0b; background: #fffbeb; }
+        .upload-area .icone { font-size: 40px; margin-bottom: 10px; }
+        .upload-area p { color: #666; font-size: 14px; }
+
+        button {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 15px;
+            width: 100%;
+            transition: opacity 0.2s;
+        }
+        button:hover { opacity: 0.9; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .loading { text-align: center; padding: 20px; color: #666; display: none; }
+        .loading .spinner { font-size: 30px; animation: spin 1s linear infinite; display: inline-block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        #resultado { display: none; }
+        #secao-geracao { display: none; }
+        #secao-monitoramento { display: none; }
+
+        .alerta {
+            background: #fef3c7;
+            border: 1px solid #fbbf24;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 13px;
+            color: #92400e;
+            margin-bottom: 15px;
+        }
+
+        /* Painel tempo real */
+        .painel-realtime {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .geracao-destaque {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            border-radius: 16px;
+            padding: 30px 40px;
+            text-align: center;
+            color: white;
+            width: 100%;
+        }
+        .geracao-destaque .kw-valor {
+            font-size: 56px;
+            font-weight: 800;
+            line-height: 1;
+        }
+        .geracao-destaque .kw-label {
+            font-size: 16px;
+            opacity: 0.85;
+            margin-top: 8px;
+        }
+        .geracao-destaque .kw-sub {
+            font-size: 13px;
+            opacity: 0.7;
+            margin-top: 6px;
+        }
+
+        .status-inversor {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            margin-top: 10px;
+            background: rgba(255,255,255,0.2);
+            padding: 4px 12px;
+            border-radius: 20px;
+        }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .dot.offline { background: #f87171; animation: none; }
+
+        .atualizacao {
+            font-size: 12px;
+            color: #94a3b8;
+            text-align: center;
+            margin-top: 5px;
+        }
+
+        /* Gráfico geração */
+        .legenda-grafico {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 15px;
+            font-size: 13px;
+        }
+        .legenda-item { display: flex; align-items: center; gap: 6px; }
+        .legenda-cor { width: 14px; height: 14px; border-radius: 3px; }
+        .legenda-cor.esperado { background: #93c5fd; }
+        .legenda-cor.real { background: #4ade80; }
+
+        .tabela-geracao { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+        .tabela-geracao th { background: #f8fafc; padding: 10px; text-align: center; color: #666; border-bottom: 1px solid #eee; }
+        .tabela-geracao td { padding: 10px; text-align: center; border-bottom: 1px solid #f0f0f0; }
+        .badge-ok { background: #dcfce7; color: #16a34a; padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+        .badge-alerta { background: #fef3c7; color: #d97706; padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+        .badge-critico { background: #fee2e2; color: #dc2626; padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+        .badge-sem { background: #f1f5f9; color: #64748b; padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="sol">☀️</div>
+    <div>
+        <h1>Solar Portal</h1>
+        <p id="subtitulo-header">Acompanhe sua geração de energia</p>
+    </div>
+</header>
+
+<div class="container">
+
+    <!-- Painel monitoramento tempo real -->
+    <div id="secao-monitoramento" class="card">
+        <h2>⚡ Geração em Tempo Real</h2>
+        <div class="painel-realtime">
+            <div class="geracao-destaque">
+                <div class="kw-valor" id="pv-power">--</div>
+                <div class="kw-label">kW sendo gerados agora</div>
+                <div class="kw-sub" id="pv-status-texto">Verificando inversor...</div>
+                <div class="status-inversor">
+                    <div class="dot" id="dot-status"></div>
+                    <span id="inversor-status">Conectando...</span>
+                </div>
+            </div>
+            <p class="atualizacao" id="ultima-atualizacao">Atualizando a cada 30 segundos</p>
+        </div>
+    </div>
+
+    <!-- Upload -->
+    <div class="card">
+        <h2>📄 Enviar Conta de Energia</h2>
+        <div class="upload-area" onclick="document.getElementById('arquivo').click()">
+            <div class="icone">📁</div>
+            <p id="nome-arquivo">Clique para selecionar o PDF da sua conta de energia</p>
+        </div>
+        <input type="file" id="arquivo" accept=".pdf" style="display:none" onchange="arquivoSelecionado(this)">
+        <button onclick="enviarConta()" id="btn-enviar" disabled>⚡ Analisar Conta</button>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading" id="loading">
+        <div class="spinner">⚙️</div>
+        <p style="margin-top:10px">Analisando sua conta com IA...<br><small>Isso pode levar alguns segundos</small></p>
+    </div>
+
+    <!-- Resultado da conta -->
+    <div id="resultado">
+        <div class="card">
+            <h2>📊 Resumo da Conta</h2>
+            <div id="alerta-media" class="alerta" style="display:none">
+                ⚠️ <strong>Atenção:</strong> Esta conta possui leitura acumulada de mais de um mês.
+            </div>
+            <div class="grid">
+                <div class="metric laranja">
+                    <div class="valor" id="val-mes">—</div>
+                    <div class="label">Mês de Referência</div>
+                </div>
+                <div class="metric">
+                    <div class="valor" id="val-fatura">—</div>
+                    <div class="label">Valor da Fatura</div>
+                </div>
+                <div class="metric azul">
+                    <div class="valor" id="val-consumo-bruto">—</div>
+                    <div class="label">Consumo Bruto</div>
+                </div>
+                <div class="metric azul">
+                    <div class="valor" id="val-consumo">—</div>
+                    <div class="label">Consumo Faturado</div>
+                </div>
+                <div class="metric verde">
+                    <div class="valor" id="val-injetado">—</div>
+                    <div class="label">Energia Injetada</div>
+                </div>
+                <div class="metric">
+                    <div class="valor" id="val-saldo">—</div>
+                    <div class="label">Saldo Acumulado</div>
+                </div>
+                <div class="metric verde">
+                    <div class="valor" id="val-percentual">—</div>
+                    <div class="label">Injetado vs Consumido</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>⚡ Status do Sistema</h2>
+            <div id="val-status"></div>
+        </div>
+
+        <div class="card">
+            <h2>💬 Análise da sua Conta</h2>
+            <div class="mensagem" id="val-mensagem"></div>
+        </div>
+    </div>
+
+    <!-- Gráfico geração esperada vs real -->
+    <div id="secao-geracao" class="card">
+        <h2>📈 Geração Esperada vs Injetada</h2>
+        <canvas id="grafico-geracao" height="120"></canvas>
+        <div class="legenda-grafico">
+            <div class="legenda-item"><div class="legenda-cor esperado"></div><span>Geração Esperada (kWh)</span></div>
+            <div class="legenda-item"><div class="legenda-cor real"></div><span>Energia Injetada Real (kWh)</span></div>
+        </div>
+        <p style="font-size:11px; color:#94a3b8; text-align:center; margin-top:10px;">
+            * Energia injetada = geração total - consumo instantâneo. O dado de geração total real será disponibilizado via monitoramento do inversor.
+        </p>
+        <table class="tabela-geracao" id="tabela-geracao" style="margin-top:20px;">
+            <thead>
+                <tr>
+                    <th>Mês</th>
+                    <th>Esperado (kWh)</th>
+                    <th>Injetado (kWh)</th>
+                    <th>Diferença</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="tbody-geracao"></tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+    const API = "http://127.0.0.1:8000";
+    const params = new URLSearchParams(window.location.search);
+    const clienteId = params.get("cliente_id");
+    const nomeCliente = params.get("nome");
+    const tokenAcesso = params.get("token_acesso");
+
+    let graficoInstance = null;
+    let dadosGeracao = [];
+    let idClienteAtual = clienteId;
+    let intervaloMonitoramento = null;
+
+    if (nomeCliente) {
+        document.getElementById("subtitulo-header").textContent = `Olá, ${decodeURIComponent(nomeCliente)}!`;
+    }
+
+    async function inicializar() {
+        // Se veio por token, buscar dados do cliente
+        if (!idClienteAtual && tokenAcesso) {
+            try {
+                const resp = await fetch(`${API}/portal/${tokenAcesso}`);
+                const data = await resp.json();
+                idClienteAtual = data.id;
+                if (data.nome) {
+                    document.getElementById("subtitulo-header").textContent = `Olá, ${data.nome}!`;
+                }
+            } catch(e) { return; }
+        }
+
+        if (idClienteAtual) {
+            await carregarGeracaoEsperada(idClienteAtual);
+            await iniciarMonitoramento(idClienteAtual);
+        }
+    }
+
+    async function iniciarMonitoramento(idCliente) {
+        await buscarMonitoramento(idCliente);
+        // Atualizar a cada 30 segundos
+        intervaloMonitoramento = setInterval(() => buscarMonitoramento(idCliente), 30000);
+    }
+
+    async function buscarMonitoramento(idCliente) {
+        try {
+            const resp = await fetch(`${API}/clientes/${idCliente}/monitoramento`);
+
+            if (!resp.ok) {
+                // Inversor não configurado — não mostrar a seção
+                return;
+            }
+
+            const data = await resp.json();
+            const pvPower = data.geracao_atual_kw || 0;
+
+            // Mostrar seção
+            document.getElementById("secao-monitoramento").style.display = "block";
+
+            // Atualizar valor
+            document.getElementById("pv-power").textContent = pvPower.toFixed(2);
+
+            // Status baseado na geração
+            const agora = new Date();
+            const hora = agora.getHours();
+            const dot = document.getElementById("dot-status");
+            const statusTexto = document.getElementById("pv-status-texto");
+            const inversorStatus = document.getElementById("inversor-status");
+
+            if (hora < 6 || hora >= 19) {
+                // Noturno — normal não gerar
+                dot.className = "dot";
+                inversorStatus.textContent = "Online — Período noturno";
+                statusTexto.textContent = "Sistema aguardando amanhecer ☾";
+            } else if (pvPower > 0) {
+                // Gerando
+                dot.className = "dot";
+                inversorStatus.textContent = "Online — Gerando energia";
+                statusTexto.textContent = `Sistema operando normalmente ✅`;
+            } else {
+                // Deveria estar gerando mas não está
+                dot.className = "dot offline";
+                inversorStatus.textContent = "Atenção — Sem geração";
+                statusTexto.textContent = "Sistema não está gerando no momento ⚠️";
+            }
+
+            // Última atualização
+            const hora_fmt = agora.toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit", second: "2-digit"});
+            document.getElementById("ultima-atualizacao").textContent = `Última atualização: ${hora_fmt} — Atualiza a cada 30s`;
+
+        } catch(e) {
+            console.log("Monitoramento não disponível:", e);
+        }
+    }
+
+    async function carregarGeracaoEsperada(idCliente) {
+        try {
+            const resp = await fetch(`${API}/clientes/${idCliente}/geracao-esperada`);
+            if (!resp.ok) return;
+            const data = await resp.json();
+            dadosGeracao = data.geracao_mensal;
+            renderizarGrafico([]);
+            document.getElementById("secao-geracao").style.display = "block";
+        } catch(e) {}
+    }
+
+    function renderizarGrafico(injetadosPorMes) {
+        const labels = dadosGeracao.map(d => d.mes);
+        const esperados = dadosGeracao.map(d => d.kwh_esperado);
+        const reais = dadosGeracao.map(d => {
+            const encontrado = injetadosPorMes.find(i => i.mes_num === d.mes_num);
+            return encontrado ? encontrado.kwh_injetado : null;
+        });
+
+        if (graficoInstance) graficoInstance.destroy();
+
+        const ctx = document.getElementById("grafico-geracao").getContext("2d");
+        graficoInstance = new Chart(ctx, {
+            type: "bar",
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: "Esperado (kWh)",
+                        data: esperados,
+                        backgroundColor: "rgba(147, 197, 253, 0.8)",
+                        borderColor: "#3b82f6",
+                        borderWidth: 1,
+                        borderRadius: 4
+                    },
+                    {
+                        label: "Injetado (kWh)",
+                        data: reais,
+                        backgroundColor: "rgba(74, 222, 128, 0.8)",
+                        borderColor: "#16a34a",
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: "kWh" }
+                    }
+                }
+            }
+        });
+
+        // Tabela
+        const tbody = document.getElementById("tbody-geracao");
+        tbody.innerHTML = dadosGeracao.map(d => {
+            const real = injetadosPorMes.find(i => i.mes_num === d.mes_num);
+            const kwh_real = real ? real.kwh_injetado : null;
+            const diff = kwh_real !== null ? (kwh_real - d.kwh_esperado).toFixed(1) : null;
+            const pct = kwh_real !== null ? (kwh_real / d.kwh_esperado * 100) : null;
+
+            let badge = '<span class="badge-sem">Aguardando</span>';
+            let diffTexto = "—";
+
+            if (kwh_real !== null) {
+                diffTexto = (diff > 0 ? "+" : "") + diff + " kWh";
+                if (pct >= 90) badge = '<span class="badge-ok">✅ Normal</span>';
+                else if (pct >= 70) badge = '<span class="badge-alerta">⚠️ Abaixo</span>';
+                else badge = '<span class="badge-critico">🔴 Crítico</span>';
+            }
+
+            return `
+                <tr>
+                    <td><strong>${d.mes}</strong></td>
+                    <td>${d.kwh_esperado}</td>
+                    <td>${kwh_real !== null ? kwh_real : "—"}</td>
+                    <td>${diffTexto}</td>
+                    <td>${badge}</td>
+                </tr>
+            `;
+        }).join("");
+    }
+
+    async function enviarConta() {
+        const arquivo = document.getElementById("arquivo").files[0];
+        if (!arquivo) return;
+
+        if (!idClienteAtual) { alert("Cliente não identificado."); return; }
+
+        document.getElementById("loading").style.display = "block";
+        document.getElementById("resultado").style.display = "none";
+        document.getElementById("btn-enviar").disabled = true;
+
+        const form = new FormData();
+        form.append("arquivo", arquivo);
+
+        try {
+            const resp = await fetch(`${API}/contas/upload/${idClienteAtual}`, { method: "POST", body: form });
+            const data = await resp.json();
+            const conta = data.conta;
+
+            document.getElementById("val-mes").textContent = conta.mes_referencia || "—";
+            document.getElementById("val-fatura").textContent = "R$ " + (conta.valor_fatura || 0).toFixed(2);
+            document.getElementById("val-consumo-bruto").textContent = (conta.consumo_bruto_kwh || 0).toFixed(2) + " kWh";
+            document.getElementById("val-consumo").textContent = (conta.consumo_kwh || 0).toFixed(2) + " kWh";
+            document.getElementById("val-injetado").textContent = (conta.energia_injetada_kwh || 0).toFixed(2) + " kWh";
+            document.getElementById("val-saldo").textContent = (conta.saldo_acumulado_kwh || 0).toFixed(2) + " kWh";
+            document.getElementById("val-percentual").textContent = (conta.percentual_gerado || 0).toFixed(1) + "%";
+            document.getElementById("val-mensagem").textContent = conta.mensagem_cliente || "—";
+
+            const status = conta.status_sistema || "";
+            const statusEl = document.getElementById("val-status");
+            if (status === "SUPERAVITÁRIO") {
+                statusEl.innerHTML = '<span class="status super">✅ SUPERAVITÁRIO — seu sistema injetou mais do que consumiu!</span>';
+            } else {
+                statusEl.innerHTML = '<span class="status defi">⚠️ DEFICITÁRIO — seu sistema consumiu mais do que injetou.</span>';
+            }
+
+            if (conta.leitura_por_media) {
+                document.getElementById("alerta-media").style.display = "block";
+            }
+
+            document.getElementById("resultado").style.display = "block";
+
+            // Atualizar gráfico
+            if (dadosGeracao.length > 0 && conta.energia_injetada_kwh) {
+                const mesNum = obterMesNumDaReferencia(conta.mes_referencia);
+                renderizarGrafico([{ mes_num: mesNum, kwh_injetado: conta.energia_injetada_kwh }]);
+            }
+
+        } catch(e) {
+            alert("Erro ao processar a conta. Tente novamente.");
+        } finally {
+            document.getElementById("loading").style.display = "none";
+            document.getElementById("btn-enviar").disabled = false;
+        }
+    }
+
+    function obterMesNumDaReferencia(mesReferencia) {
+        const meses = { "jan": 1, "fev": 2, "mar": 3, "abr": 4, "mai": 5, "jun": 6, "jul": 7, "ago": 8, "set": 9, "out": 10, "nov": 11, "dez": 12 };
+        if (!mesReferencia) return new Date().getMonth() + 1;
+        const lower = mesReferencia.toLowerCase();
+        for (const [nome, num] of Object.entries(meses)) {
+            if (lower.includes(nome)) return num;
+        }
+        return new Date().getMonth() + 1;
+    }
+
+    function arquivoSelecionado(input) {
+        if (input.files[0]) {
+            document.getElementById("nome-arquivo").textContent = "✅ " + input.files[0].name;
+            document.getElementById("btn-enviar").disabled = false;
+        }
+    }
+
+    inicializar();
+</script>
+</body>
+</html>

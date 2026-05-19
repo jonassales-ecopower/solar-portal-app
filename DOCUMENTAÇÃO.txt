@@ -1,0 +1,11 @@
+Chave API - FOXCLOUD
+b7b6946e-786d-40d5-a366-8ea95d57d0ea
+
+Serial do innversor da Graciana
+serial_inversor = 'J0MF502043LK010',
+
+
+COMANDOS:
+abrir venv:venv\Scripts\activate.bat
+rodar api:uvicorn api:app --reload
+rodar servidor: python -m http.server 3000

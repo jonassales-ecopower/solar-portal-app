@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar Portal — Minha Conta</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; color: #333; }
+
+        header {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+        }
+        header h1 { font-size: 22px; }
+        header p { font-size: 13px; opacity: 0.85; }
+        .sol { font-size: 36px; }
+
+        .container { max-width: 900px; margin: 30px auto; padding: 0 20px; }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .card h2 {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; }
+
+        .metric {
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 18px;
+            text-align: center;
+            border-left: 4px solid #f59e0b;
+        }
+        .metric .valor { font-size: 26px; font-weight: 700; color: #1e293b; }
+        .metric .label { font-size: 12px; color: #888; margin-top: 4px; }
+        .metric.verde { border-left-color: #22c55e; }
+        .metric.verde .valor { color: #16a34a; }
+        .metric.azul { border-left-color: #3b82f6; }
+        .metric.azul .valor { color: #2563eb; }
+        .metric.laranja { border-left-color: #f59e0b; }
+
+        .status { display: inline-block; padding: 6px 16px; border-radius: 20px; font-weight: 600; font-size: 14px; }
+        .status.super { background: #dcfce7; color: #16a34a; }
+        .status.defi { background: #fee2e2; color: #dc2626; }
+
+        .mensagem {
+            background: linear-gradient(135deg, #fffbeb, #fef3c7);
+            border-left: 4px solid #f59e0b;
+            border-radius: 8px;
+            padding: 16px 20px;
+            font-size: 14px;
+            line-height: 1.7;
+            color: #78350f;
+        }
+
+        .info-box {
+            background: #e0f2fe;
+            border-left: 4px solid #0284c7;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 13px;
+            color: #0369a1;
+            margin-bottom: 15px;
+        }
+
+        .upload-area {
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .upload-area:hover { border-color: #f59e0b; background: #fffbeb; }
+        .upload-area .icone { font-size: 40px; margin-bottom: 10px; }
+        .upload-area p { color: #666; font-size: 14px; }
+
+        button {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 15px;
+            width: 100%;
+            transition: opacity 0.2s;
+        }
+        button:hover { opacity: 0.9; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .loading { text-align: center; padding: 20px; color: #666; display: none; }
+        .loading .spinner { font-size: 30px; animation: spin 1s linear infinite; display: inline-block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        #resultado { display: none; }
+        #secao-geracao { display: none; }
+        #secao-monitoramento { display: none; }
+        #secao-alertas { display: none; }
+
+        .alerta-card {
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 10px;
+        }
+        .alerta-urgente { background: #fee2e2; border-left: 4px solid #dc2626; }
+        .alerta-atencao { background: #fef3c7; border-left: 4px solid #f59e0b; }
+        .alerta-informativo { background: #dbeafe; border-left: 4px solid #3b82f6; }
+        .alerta-normal { background: #dcfce7; border-left: 4px solid #16a34a; }
+
+        .painel-realtime {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .geracao-destaque {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            border-radius: 16px;
+            padding: 30px 40px;
+            text-align: center;
+            color: white;
+            width: 100%;
+        }
+        .geracao-destaque .kw-valor {
+            font-size: 56px;
+            font-weight: 800;
+            line-height: 1;
+        }
+        .geracao-destaque .kw-label {
+            font-size: 16px;
+            opacity: 0.85;
+            margin-top: 8px;
+        }
+        .geracao-destaque .kw-sub {
+            font-size: 13px;
+            opacity: 0.7;
+            margin-top: 6px;
+        }
+
+        .status-inversor {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            margin-top: 10px;
+            background: rgba(255,255,255,0.2);
+            padding: 4px 12px;
+            border-radius: 20px;
+        }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .dot.offline { background: #f87171; animation: none; }
+
+        .atualizacao {
+            font-size: 12px;
+            color: #94a3b8;
+            text-align: center;
+            margin-top: 5px;
+        }
+
+        .legenda-grafico {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 15px;
+            font-size: 13px;
+        }
+        .legenda-item { display: flex; align-items: center; gap: 6px; }
+        .legenda-cor { width: 14px; height: 14px; border-radius: 3px; }
+        .legenda-cor.esperado { background: #93c5fd; }
+        .legenda-cor.gerado { background: #4ade80; }
+
+        .tabela-geracao { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+        .tabela-geracao th { background: #f8fafc; padding: 10px; text-align: center; color: #666; border-bottom: 1px solid #eee; }
+        .tabela-geracao td { padding: 10px; text-align: center; border-bottom: 1px solid #f0f0f0; }
+        .badge-ok { background: #dcfce7; color: #16a34a; padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+        .badge-alerta { background: #fef3c7; color: #d97706; padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+        .badge-critico { background: #fee2e2; color: #dc2626; padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+        .badge-sem { background: #f1f5f9; color: #64748b; padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+        .badge-info { background: #dbeafe; color: #1d4ed8; padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="sol">☀️</div>
+    <div>
+        <h1>Solar Portal</h1>
+        <p id="subtitulo-header">Acompanhe sua geração de energia</p>
+    </div>
+</header>
+
+<div class="container">
+
+    <!-- Card de Alertas Inteligentes -->
+    <div id="secao-alertas" class="card">
+        <h2>🔔 Alertas do Sistema</h2>
+        <div id="alertas-container"></div>
+        <p class="atualizacao" id="alerta-atualizacao">Carregando alertas...</p>
+    </div>
+
+    <!-- Painel monitoramento tempo real -->
+    <div id="secao-monitoramento" class="card">
+        <h2>⚡ Geração em Tempo Real</h2>
+        <div class="painel-realtime">
+            <div class="geracao-destaque">
+                <div class="kw-valor" id="pv-power">--</div>
+                <div class="kw-label">kW sendo gerados agora</div>
+                <div class="kw-sub" id="pv-status-texto">Verificando inversor...</div>
+                <div class="status-inversor">
+                    <div class="dot" id="dot-status"></div>
+                    <span id="inversor-status">Conectando...</span>
+                </div>
+            </div>
+            <p class="atualizacao" id="ultima-atualizacao">Atualizando a cada 30 segundos</p>
+        </div>
+    </div>
+
+    <!-- Upload da Conta de Energia -->
+    <div class="card">
+        <h2>📄 Análise da Conta de Energia</h2>
+        <div class="upload-area" onclick="document.getElementById('arquivo').click()">
+            <div class="icone">📁</div>
+            <p id="nome-arquivo">Clique para selecionar o PDF da sua conta de energia</p>
+        </div>
+        <input type="file" id="arquivo" accept=".pdf" style="display:none" onchange="arquivoSelecionado(this)">
+        <button onclick="enviarConta()" id="btn-enviar" disabled>⚡ Analisar Conta</button>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading" id="loading">
+        <div class="spinner">⚙️</div>
+        <p style="margin-top:10px">Analisando sua conta com IA...<br><small>Isso pode levar alguns segundos</small></p>
+    </div>
+
+    <!-- Resultado da conta -->
+    <div id="resultado">
+        <div class="card">
+            <h2>📊 Resumo da Conta</h2>
+            <div id="alerta-media" class="alerta-card alerta-informativo" style="display:none">
+                ⚠️ <strong>Atenção:</strong> Esta conta possui leitura acumulada de mais de um mês.
+            </div>
+            <div class="grid">
+                <div class="metric laranja">
+                    <div class="valor" id="val-mes">—</div>
+                    <div class="label">Mês de Referência</div>
+                </div>
+                <div class="metric">
+                    <div class="valor" id="val-fatura">—</div>
+                    <div class="label">Valor da Fatura</div>
+                </div>
+                <div class="metric azul">
+                    <div class="valor" id="val-consumo-bruto">—</div>
+                    <div class="label">Consumo Bruto</div>
+                </div>
+                <div class="metric azul">
+                    <div class="valor" id="val-consumo">—</div>
+                    <div class="label">Consumo Faturado</div>
+                </div>
+                <div class="metric verde">
+                    <div class="valor" id="val-injetado">—</div>
+                    <div class="label">Energia Injetada</div>
+                </div>
+                <div class="metric">
+                    <div class="valor" id="val-saldo">—</div>
+                    <div class="label">Saldo Acumulado</div>
+                </div>
+                <div class="metric verde">
+                    <div class="valor" id="val-percentual">—</div>
+                    <div class="label">Injetado vs Consumido</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>⚡ Status do Sistema</h2>
+            <div id="val-status"></div>
+        </div>
+
+        <div class="card">
+            <h2>💬 Análise da sua Conta</h2>
+            <div class="mensagem" id="val-mensagem"></div>
+        </div>
+    </div>
+
+    <!-- Gráfico Geração Esperada vs Geração Real do Inversor -->
+    <div id="secao-geracao" class="card">
+        <h2>📈 Energia: Esperada vs Gerada</h2>
+        
+        <div id="info-historico" class="info-box" style="display: none;">
+            💡 <strong>Aguardando dados históricos:</strong> O gráfico abaixo mostrará a comparação entre a geração esperada (azul) e a geração real do seu inversor (verde) assim que houver histórico disponível.
+        </div>
+        
+        <canvas id="grafico-geracao" height="120"></canvas>
+        <div class="legenda-grafico">
+            <div class="legenda-item"><div class="legenda-cor esperado"></div><span>Geração Esperada (kWh)</span></div>
+            <div class="legenda-item"><div class="legenda-cor gerado"></div><span>Geração Real do Inversor (kWh)</span></div>
+        </div>
+        
+        <table class="tabela-geracao" id="tabela-geracao" style="margin-top:20px;">
+            <thead>
+                <tr>
+                    <th>Mês/Ano</th>
+                    <th>Esperado (kWh)</th>
+                    <th>Gerado Real (kWh)</th>
+                    <th>Diferença</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="tbody-geracao"></tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+    const API = "http://127.0.0.1:8000";
+    const params = new URLSearchParams(window.location.search);
+    const clienteId = params.get("cliente_id");
+    const nomeCliente = params.get("nome");
+    const tokenAcesso = params.get("token_acesso");
+
+    let graficoInstance = null;
+    let dadosGeracao = [];
+    let dadosGeracaoReal = [];
+    let idClienteAtual = clienteId;
+    let intervaloMonitoramento = null;
+
+    if (nomeCliente) {
+        document.getElementById("subtitulo-header").textContent = `Olá, ${decodeURIComponent(nomeCliente)}!`;
+    }
+
+    async function inicializar() {
+        if (!idClienteAtual && tokenAcesso) {
+            try {
+                const resp = await fetch(`${API}/portal/${tokenAcesso}`);
+                const data = await resp.json();
+                idClienteAtual = data.id;
+                if (data.nome) {
+                    document.getElementById("subtitulo-header").textContent = `Olá, ${data.nome}!`;
+                }
+            } catch(e) { return; }
+        }
+
+        if (idClienteAtual) {
+            await carregarGeracaoEsperada(idClienteAtual);
+            await carregarHistoricoReal(idClienteAtual);
+            await carregarAlertas();
+            await iniciarMonitoramento(idClienteAtual);
+        }
+    }
+
+    // ========== SISTEMA DE ALERTAS ==========
+    
+    async function carregarAlertas() {
+        try {
+            const resp = await fetch(`${API}/clientes/${idClienteAtual}/verificar-anomalias`);
+            if (!resp.ok) return;
+            
+            const dados = await resp.json();
+            const alertas = dados.alertas;
+            const alertasDiv = document.getElementById("alertas-container");
+            const secaoAlertas = document.getElementById("secao-alertas");
+            
+            if (alertas && alertas.length > 0) {
+                secaoAlertas.style.display = "block";
+                
+                const classeTipo = {
+                    "urgente": "alerta-urgente",
+                    "atencao": "alerta-atencao",
+                    "informativo": "alerta-informativo",
+                    "normal": "alerta-normal"
+                };
+                
+                alertasDiv.innerHTML = alertas.map(alerta => `
+                    <div class="alerta-card ${classeTipo[alerta.tipo] || 'alerta-informativo'}">
+                        <strong style="font-size: 14px;">${alerta.icone} ${alerta.titulo}</strong>
+                        <p style="margin: 6px 0; font-size: 13px;">${alerta.mensagem}</p>
+                        <p style="margin: 6px 0 0 0; font-size: 12px; color: #666;">
+                            <strong>🔧 Ação sugerida:</strong> ${alerta.acao}
+                        </p>
+                    </div>
+                `).join("");
+                
+                document.getElementById("alerta-atualizacao").textContent = 
+                    `Última análise: ${new Date(dados.data_analise).toLocaleDateString('pt-BR')} | Geração ontem: ${dados.geracao_ontem_kwh} kWh | Média 7 dias: ${dados.media_7_dias_kwh} kWh`;
+            }
+        } catch(e) {
+            console.log("Erro ao carregar alertas:", e);
+        }
+    }
+
+    async function carregarHistoricoReal(idCliente) {
+        try {
+            const resp = await fetch(`${API}/clientes/${idCliente}/monitoramento/mensal`);
+            
+            if (!resp.ok) {
+                console.log("Endpoint de histórico não disponível");
+                exibirSemHistorico();
+                return;
+            }
+            
+            const data = await resp.json();
+            
+            if (data.mensal && data.mensal.length > 0) {
+                dadosGeracaoReal = data.mensal;
+                document.getElementById("info-historico").style.display = "none";
+                console.log("📊 Dados reais carregados:", dadosGeracaoReal);
+            } else {
+                exibirSemHistorico();
+            }
+            
+            renderizarGrafico();
+            
+        } catch(e) {
+            console.log("Erro ao carregar histórico real:", e);
+            exibirSemHistorico();
+            renderizarGrafico();
+        }
+    }
+    
+    function exibirSemHistorico() {
+        document.getElementById("info-historico").style.display = "block";
+        document.getElementById("info-historico").innerHTML = `
+            💡 <strong>Aguardando dados históricos do inversor:</strong> 
+            O gráfico abaixo mostrará a comparação entre a geração esperada (azul) e a geração real do seu inversor (verde) 
+            assim que o sistema coletar os dados. Enquanto isso, você pode acompanhar a geração em tempo real no painel acima.
+        `;
+    }
+
+    async function iniciarMonitoramento(idCliente) {
+        await buscarMonitoramento(idCliente);
+        intervaloMonitoramento = setInterval(() => buscarMonitoramento(idCliente), 30000);
+    }
+
+    async function buscarMonitoramento(idCliente) {
+        try {
+            const resp = await fetch(`${API}/clientes/${idCliente}/monitoramento`);
+
+            if (!resp.ok) {
+                document.getElementById("secao-monitoramento").style.display = "block";
+                document.getElementById("pv-power").textContent = "--";
+                document.getElementById("pv-status-texto").textContent = "Monitoramento disponível em breve";
+                document.getElementById("inversor-status").textContent = "Aguardando configuração";
+                return;
+            }
+
+            const data = await resp.json();
+            const pvPower = data.geracao_atual_kw || 0;
+
+            document.getElementById("secao-monitoramento").style.display = "block";
+            document.getElementById("pv-power").textContent = pvPower.toFixed(2);
+
+            const agora = new Date();
+            const hora = agora.getHours();
+            const dot = document.getElementById("dot-status");
+            const statusTexto = document.getElementById("pv-status-texto");
+            const inversorStatus = document.getElementById("inversor-status");
+
+            if (hora < 6 || hora >= 19) {
+                dot.className = "dot";
+                inversorStatus.textContent = "Online — Período noturno";
+                statusTexto.textContent = "Sistema aguardando amanhecer ☾";
+            } else if (pvPower > 0.05) {
+                dot.className = "dot";
+                inversorStatus.textContent = "Online — Gerando energia";
+                statusTexto.textContent = "Sistema operando normalmente ✅";
+            } else if (pvPower > 0) {
+                dot.className = "dot offline";
+                inversorStatus.textContent = "Atenção — Geração baixa";
+                statusTexto.textContent = "Sistema está gerando pouco. Verifique se há sombra ou sujeira nos painéis ⚠️";
+            } else {
+                dot.className = "dot offline";
+                inversorStatus.textContent = "Atenção — Sem geração";
+                statusTexto.textContent = "Sistema não está gerando no momento. Possível problema técnico ⚠️";
+            }
+
+            const hora_fmt = agora.toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit", second: "2-digit"});
+            document.getElementById("ultima-atualizacao").textContent = `Última atualização: ${hora_fmt} — Atualiza a cada 30s`;
+
+        } catch(e) {
+            console.log("Monitoramento não disponível:", e);
+        }
+    }
+
+    async function carregarGeracaoEsperada(idCliente) {
+        try {
+            const resp = await fetch(`${API}/clientes/${idCliente}/geracao-esperada`);
+            if (!resp.ok) return;
+            const data = await resp.json();
+            dadosGeracao = data.geracao_mensal;
+            // Adicionar ano aos dados de geração esperada
+            const anoAtual = new Date().getFullYear();
+            dadosGeracao = dadosGeracao.map((item, index) => {
+                let ano = anoAtual;
+                if (index >= 5) ano = anoAtual - 1; // Ajuste simples para anos anteriores
+                return { ...item, ano: ano };
+            });
+            document.getElementById("secao-geracao").style.display = "block";
+            console.log("📊 Dados esperados carregados:", dadosGeracao);
+        } catch(e) {
+            console.log("Erro ao carregar geração esperada:", e);
+        }
+    }
+
+    function renderizarGrafico() {
+        if (!dadosGeracao.length) {
+            console.log("Sem dados de geração esperada");
+            return;
+        }
+        
+        console.log("Renderizando gráfico...");
+        console.log("Esperados:", dadosGeracao);
+        console.log("Reais:", dadosGeracaoReal);
+        
+        // Criar mapa de dados reais por mês/ano
+        const realMap = {};
+        dadosGeracaoReal.forEach(r => {
+            const chave = `${r.mes_num}/${r.ano}`;
+            realMap[chave] = r.geracao_kwh;
+        });
+        
+        // Ordenar dados esperados por mês (Janeiro a Dezembro)
+        const esperadosOrdenados = [...dadosGeracao].sort((a, b) => a.mes_num - b.mes_num);
+        
+        // Pegar últimos 12 meses disponíveis nos dados reais
+        let mesesExibir = [];
+        
+        if (dadosGeracaoReal.length > 0) {
+            // Usar os meses dos dados reais (já ordenados pelo backend)
+            const reaisOrdenados = [...dadosGeracaoReal].sort((a, b) => {
+                if (a.ano !== b.ano) return a.ano - b.ano;
+                return a.mes_num - b.mes_num;
+            });
+            mesesExibir = reaisOrdenados.slice(-12);
+        } else {
+            // Fallback: usar últimos 12 meses do esperado
+            mesesExibir = esperadosOrdenados.slice(-12);
+        }
+        
+        const labels = mesesExibir.map(m => {
+            const esperado = dadosGeracao.find(e => e.mes_num === m.mes_num);
+            return `${esperado?.mes || m.mes}/${m.ano}`;
+        });
+        
+        const esperados = mesesExibir.map(m => {
+            const esperado = dadosGeracao.find(e => e.mes_num === m.mes_num);
+            return esperado ? esperado.kwh_esperado : 0;
+        });
+        
+        const gerados = mesesExibir.map(m => {
+            const chave = `${m.mes_num}/${m.ano}`;
+            return realMap[chave] || null;
+        });
+
+        if (graficoInstance) graficoInstance.destroy();
+
+        const ctx = document.getElementById("grafico-geracao").getContext("2d");
+        graficoInstance = new Chart(ctx, {
+            type: "bar",
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: "Geração Esperada (kWh)",
+                        data: esperados,
+                        backgroundColor: "rgba(147, 197, 253, 0.8)",
+                        borderColor: "#3b82f6",
+                        borderWidth: 1,
+                        borderRadius: 4
+                    },
+                    {
+                        label: "Geração Real do Inversor (kWh)",
+                        data: gerados,
+                        backgroundColor: "rgba(74, 222, 128, 0.8)",
+                        borderColor: "#16a34a",
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: "kWh" }
+                    }
+                }
+            }
+        });
+
+        // Tabela
+        const tbody = document.getElementById("tbody-geracao");
+        tbody.innerHTML = mesesExibir.map(m => {
+            const esperado = dadosGeracao.find(e => e.mes_num === m.mes_num);
+            const kwhEsperado = esperado ? esperado.kwh_esperado : 0;
+            const gerado = realMap[`${m.mes_num}/${m.ano}`];
+            const diff = gerado !== undefined && gerado !== null ? (gerado - kwhEsperado).toFixed(1) : null;
+            const pct = gerado !== undefined && gerado !== null ? (gerado / kwhEsperado * 100) : null;
+
+            let badge = '<span class="badge-info">⏳ Aguardando dados</span>';
+            let diffTexto = "—";
+
+            if (gerado !== undefined && gerado !== null && gerado > 0) {
+                diffTexto = (diff > 0 ? "+" : "") + diff + " kWh";
+                if (pct >= 95) badge = '<span class="badge-ok">✅ Excelente</span>';
+                else if (pct >= 80) badge = '<span class="badge-ok">✅ Bom</span>';
+                else if (pct >= 70) badge = '<span class="badge-alerta">⚠️ Abaixo do esperado</span>';
+                else if (pct >= 50) badge = '<span class="badge-alerta">⚠️ Muito abaixo</span>';
+                else badge = '<span class="badge-critico">🔴 Crítico - Verificar sistema</span>';
+            }
+
+            const nomeMes = esperado ? esperado.mes : m.mes;
+            
+            return `
+                <tr>
+                    <td><strong>${nomeMes}/${m.ano}</strong></td>
+                    <td>${kwhEsperado}</td>
+                    <td>${gerado !== undefined && gerado !== null ? gerado : "—"}</td>
+                    <td>${diffTexto}</td>
+                    <td>${badge}</td>
+                </tr>
+            `;
+        }).join("");
+    }
+
+    async function enviarConta() {
+        const arquivo = document.getElementById("arquivo").files[0];
+        if (!arquivo) return;
+
+        if (!idClienteAtual) { alert("Cliente não identificado."); return; }
+
+        document.getElementById("loading").style.display = "block";
+        document.getElementById("resultado").style.display = "none";
+        document.getElementById("btn-enviar").disabled = true;
+
+        const form = new FormData();
+        form.append("arquivo", arquivo);
+
+        try {
+            const resp = await fetch(`${API}/contas/upload/${idClienteAtual}`, { method: "POST", body: form });
+            const data = await resp.json();
+            const conta = data.conta;
+
+            document.getElementById("val-mes").textContent = conta.mes_referencia || "—";
+            document.getElementById("val-fatura").textContent = "R$ " + (conta.valor_fatura || 0).toFixed(2);
+            document.getElementById("val-consumo-bruto").textContent = (conta.consumo_bruto_kwh || 0).toFixed(2) + " kWh";
+            document.getElementById("val-consumo").textContent = (conta.consumo_kwh || 0).toFixed(2) + " kWh";
+            document.getElementById("val-injetado").textContent = (conta.energia_injetada_kwh || 0).toFixed(2) + " kWh";
+            document.getElementById("val-saldo").textContent = (conta.saldo_acumulado_kwh || 0).toFixed(2) + " kWh";
+            document.getElementById("val-percentual").textContent = (conta.percentual_gerado || 0).toFixed(1) + "%";
+            document.getElementById("val-mensagem").textContent = conta.mensagem_cliente || "—";
+
+            const status = conta.status_sistema || "";
+            const statusEl = document.getElementById("val-status");
+            if (status === "SUPERAVITÁRIO") {
+                statusEl.innerHTML = '<span class="status super">✅ SUPERAVITÁRIO — seu sistema injetou mais do que consumiu!</span>';
+            } else {
+                statusEl.innerHTML = '<span class="status defi">⚠️ DEFICITÁRIO — seu sistema consumiu mais do que injetou.</span>';
+            }
+
+            if (conta.leitura_por_media) {
+                document.getElementById("alerta-media").style.display = "block";
+            }
+
+            document.getElementById("resultado").style.display = "block";
+
+        } catch(e) {
+            alert("Erro ao processar a conta. Tente novamente.");
+        } finally {
+            document.getElementById("loading").style.display = "none";
+            document.getElementById("btn-enviar").disabled = false;
+        }
+    }
+
+    function arquivoSelecionado(input) {
+        if (input.files[0]) {
+            document.getElementById("nome-arquivo").textContent = "✅ " + input.files[0].name;
+            document.getElementById("btn-enviar").disabled = false;
+        }
+    }
+
+    inicializar();
+</script>
+</body>
+</html>

@@ -19,7 +19,7 @@
         header h1 { font-size: 20px; }
         header p { font-size: 13px; opacity: 0.7; }
 
-        .container { max-width: 1200px; margin: 30px auto; padding: 0 20px; }
+        .container { max-width: 1000px; margin: 30px auto; padding: 0 20px; }
 
         .card {
             background: white;
@@ -60,7 +60,6 @@
         button.verde { background: linear-gradient(135deg, #16a34a, #15803d); }
         button.azul { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
         button.amarelo { background: linear-gradient(135deg, #d97706, #b45309); }
-        button.vermelho { background: linear-gradient(135deg, #dc2626, #b91c1c); }
         button.pequeno { width: auto; padding: 8px 16px; font-size: 13px; margin-top: 0; }
 
         table { width: 100%; border-collapse: collapse; }
@@ -140,38 +139,6 @@
         }
 
         #campos-manuais { display: none; margin-top: 12px; }
-
-        /* Card de monitoramento */
-        .card-monitoramento {
-            background: linear-gradient(135deg, #1e293b, #334155);
-            color: white;
-        }
-        .card-monitoramento h3 { font-size: 16px; margin-bottom: 5px; }
-        .card-monitoramento .stats {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 15px;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-        .card-monitoramento .stat-item {
-            text-align: center;
-            flex: 1;
-            min-width: 80px;
-        }
-        .card-monitoramento .stat-number {
-            font-size: 28px;
-            font-weight: bold;
-            display: block;
-        }
-        .card-monitoramento .stat-label {
-            font-size: 12px;
-            opacity: 0.8;
-        }
-        .status-normal { color: #4ade80; }
-        .status-alerta { color: #fbbf24; }
-        .status-problema { color: #f87171; }
-        .status-offline { color: #9ca3af; }
     </style>
 </head>
 <body>
@@ -212,39 +179,6 @@
 
     <div class="container">
 
-        <!-- NOVO: Card de Monitoramento em Tempo Real -->
-        <div class="card card-monitoramento">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-                <div>
-                    <h3>📡 Monitoramento em Tempo Real</h3>
-                    <p style="font-size: 12px; opacity: 0.8;">Atualização automática a cada 1 minuto</p>
-                </div>
-                <button class="secundario pequeno" onclick="carregarMonitoramento()" style="background: rgba(255,255,255,0.2); color: white; border-color: rgba(255,255,255,0.3);">🔄 Atualizar agora</button>
-            </div>
-            <div class="stats">
-                <div class="stat-item">
-                    <span class="stat-number" id="total-usinas">0</span>
-                    <span class="stat-label">Usinas</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number status-normal" id="usinas-normais">0</span>
-                    <span class="stat-label">🟢 Gerando</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number status-alerta" id="usinas-alerta">0</span>
-                    <span class="stat-label">🟡 Geração Baixa</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number status-problema" id="usinas-problema">0</span>
-                    <span class="stat-label">🔴 Parado/Offline</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number status-offline" id="usinas-sem-config">0</span>
-                    <span class="stat-label">⚙️ Sem Configuração</span>
-                </div>
-            </div>
-        </div>
-
         <div class="card">
             <h2>➕ Cadastrar Novo Cliente</h2>
             <div class="grid-2">
@@ -264,10 +198,10 @@
             <h2>👥 Minha Carteira de Clientes</h2>
             <table>
                 <thead>
-                    <tr><th>Nome</th><th>UC</th><th>Distribuidora</th><th>Tipo GD</th><th>📡 Monitoramento</th><th>Ações</th></tr>
+                    <tr><th>Nome</th><th>UC</th><th>Distribuidora</th><th>Tipo GD</th><th>Ações</th></tr>
                 </thead>
                 <tbody id="tabela-clientes">
-                    <tr><td colspan="6" style="text-align:center; color:#888;">Carregando...</td></tr>
+                    <tr><td colspan="5" style="text-align:center; color:#888;">Carregando...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -362,9 +296,8 @@
     let nomeUsuario = localStorage.getItem("nome");
     let clienteProjetoId = null;
     let modoManual = false;
-    let intervaloMonitoramento = null;
 
-    if (token) { mostrarPainel(); }
+    if (token) { mostrarPainel(); carregarClientes(); }
 
     async function fazerLogin() {
         const email = document.getElementById("login-email").value;
@@ -380,7 +313,7 @@
                 token = data.token; nomeUsuario = data.nome;
                 localStorage.setItem("token", token);
                 localStorage.setItem("nome", nomeUsuario);
-                mostrarPainel();
+                mostrarPainel(); carregarClientes();
             } else {
                 document.getElementById("erro-login").textContent = data.detail || "Erro ao fazer login";
             }
@@ -393,19 +326,37 @@
         document.getElementById("tela-login").style.display = "none";
         document.getElementById("tela-painel").style.display = "block";
         document.getElementById("nome-usuario").textContent = nomeUsuario || "";
-        iniciarMonitoramentoAutomatico();
     }
 
     function sair() {
-        if (intervaloMonitoramento) clearInterval(intervaloMonitoramento);
         localStorage.removeItem("token");
         localStorage.removeItem("nome");
         location.reload();
     }
 
     async function carregarClientes() {
-        // Mantido para compatibilidade, mas o monitoramento que preenche a tabela
-        console.log("Clientes carregados via monitoramento");
+        try {
+            const resp = await fetch(`${API}/clientes`, { headers: {"Authorization": `Bearer ${token}`} });
+            const clientes = await resp.json();
+            const tbody = document.getElementById("tabela-clientes");
+            if (clientes.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#888;">Nenhum cliente cadastrado ainda</td></tr>';
+                return;
+            }
+            tbody.innerHTML = clientes.map(c => `
+                <tr>
+                    <td><strong>${c.nome}</strong></td>
+                    <td>${c.numero_uc || "—"}</td>
+                    <td>${c.distribuidora || "—"}</td>
+                    <td>${c.tipo_gd || "—"}</td>
+                    <td><div class="acoes">
+                        <button class="pequeno" onclick="verContas(${c.id}, '${c.nome}')">Ver Contas</button>
+                        <button class="azul pequeno" onclick="obterLink(${c.id}, '${c.nome}')">🔗 Link</button>
+                        <button class="amarelo pequeno" onclick="cadastrarProjeto(${c.id}, '${c.nome}')">☀️ Projeto</button>
+                    </div></td>
+                </tr>
+            `).join("");
+        } catch(e) { console.error(e); }
     }
 
     async function cadastrarCliente() {
@@ -427,7 +378,7 @@
             if (resp.ok) {
                 document.getElementById("sucesso-cadastro").textContent = "✅ Cliente cadastrado!";
                 ["novo-nome","novo-email","novo-telefone","novo-uc","novo-distribuidora","novo-tipo-gd"].forEach(id => document.getElementById(id).value = "");
-                carregarMonitoramento();
+                carregarClientes();
                 setTimeout(() => document.getElementById("sucesso-cadastro").textContent = "", 3000);
             } else {
                 const data = await resp.json();
@@ -542,198 +493,6 @@
             document.getElementById("campos-manuais").style.display = "none";
             modoManual = false;
         }
-    }
-
-    // ========== MÓDULO 3 - MONITORAMENTO EM TEMPO REAL ==========
-
-    async function carregarMonitoramento() {
-        try {
-            console.log("🔄 Carregando monitoramento...");
-            
-            const resp = await fetch(`${API}/clientes`, { 
-                headers: {"Authorization": `Bearer ${token}`} 
-            });
-            const clientes = await resp.json();
-            
-            // Buscar monitoramento para cada cliente
-            const clientesComMonitoramento = await Promise.all(
-                clientes.map(async (cliente) => {
-                    try {
-                        const monitorResp = await fetch(`${API}/clientes/${cliente.id}/monitoramento`, {
-                            headers: {"Authorization": `Bearer ${token}`}
-                        });
-                        if (monitorResp.ok) {
-                            const dados = await monitorResp.json();
-                            return { ...cliente, monitoramento: dados, erro: null };
-                        } else {
-                            return { ...cliente, monitoramento: null, erro: "sem_config" };
-                        }
-                    } catch(e) {
-                        return { ...cliente, monitoramento: null, erro: "erro_conexao" };
-                    }
-                })
-            );
-            
-            atualizarTabelaComMonitoramento(clientesComMonitoramento);
-            atualizarCardResumo(clientesComMonitoramento);
-            
-        } catch(e) {
-            console.error("Erro ao carregar monitoramento:", e);
-        }
-    }
-
-    function atualizarTabelaComMonitoramento(clientes) {
-        const tbody = document.getElementById("tabela-clientes");
-        
-        if (clientes.length === 0) {
-            tbody.innerHTML = '<td><td colspan="6" style="text-align:center; color:#888;">Nenhum cliente cadastrado</td></tr>';
-            return;
-        }
-        
-        tbody.innerHTML = clientes.map(c => {
-            let statusHtml = '';
-            let hasMonitoramento = c.monitoramento && c.monitoramento.status;
-            
-            if (!hasMonitoramento) {
-                statusHtml = '<span style="color:#9ca3af;">⚙️ Inversor não configurado</span>';
-            } else if (c.monitoramento.status === 'online') {
-                const geracao = c.monitoramento.geracao_atual_kw;
-                if (geracao > 0.1) {
-                    statusHtml = `<span style="color:#16a34a;">🟢 Gerando ${geracao.toFixed(2)} kW</span>`;
-                } else if (geracao > 0) {
-                    statusHtml = `<span style="color:#d97706;">🟡 Geração baixa (${geracao.toFixed(2)} kW)</span>`;
-                } else {
-                    statusHtml = '<span style="color:#dc2626;">🔴 Parado/Offline</span>';
-                }
-            } else {
-                statusHtml = '<span style="color:#dc2626;">🔴 Erro na comunicação</span>';
-            }
-            
-            return `
-                <tr>
-                    <td><strong>${c.nome}</strong></td>
-                    <td>${c.numero_uc || "—"}</td>
-                    <td>${c.distribuidora || "—"}</td>
-                    <td>${c.tipo_gd || "—"}</td>
-                    <td>${statusHtml}</td>
-                    <td>
-                        <div class="acoes">
-                            <button class="pequeno" onclick="verContas(${c.id}, '${c.nome}')">Ver Contas</button>
-                            <button class="azul pequeno" onclick="obterLink(${c.id}, '${c.nome}')">🔗 Link</button>
-                            <button class="amarelo pequeno" onclick="cadastrarProjeto(${c.id}, '${c.nome}')">☀️ Projeto</button>
-                            ${hasMonitoramento ? `<button class="verde pequeno" onclick="verMonitoramentoAoVivo(${c.id}, '${c.nome}')">📡 Ver Ao Vivo</button>` : ''}
-                        </div>
-                    </td>
-                </tr>
-            `;
-        }).join("");
-    }
-
-    function atualizarCardResumo(clientes) {
-        const comInversor = clientes.filter(c => c.monitoramento && c.monitoramento.status);
-        const semInversor = clientes.filter(c => !c.monitoramento || !c.monitoramento.status);
-        
-        const totais = { normal: 0, alerta: 0, problema: 0 };
-        
-        comInversor.forEach(c => {
-            const geracao = c.monitoramento?.geracao_atual_kw || 0;
-            if (geracao > 0.1) totais.normal++;
-            else if (geracao > 0) totais.alerta++;
-            else totais.problema++;
-        });
-        
-        document.getElementById("total-usinas").textContent = comInversor.length;
-        document.getElementById("usinas-normais").textContent = totais.normal;
-        document.getElementById("usinas-alerta").textContent = totais.alerta;
-        document.getElementById("usinas-problema").textContent = totais.problema;
-        document.getElementById("usinas-sem-config").textContent = semInversor.length;
-    }
-
-    async function verMonitoramentoAoVivo(clienteId, nomeCliente) {
-        try {
-            const resp = await fetch(`${API}/clientes/${clienteId}/monitoramento`, {
-                headers: {"Authorization": `Bearer ${token}`}
-            });
-            const dados = await resp.json();
-            
-            let modal = document.getElementById("modal-monitoramento");
-            if (!modal) {
-                modal = document.createElement('div');
-                modal.id = "modal-monitoramento";
-                modal.className = "modal-overlay";
-                modal.innerHTML = `
-                    <div class="modal" style="max-width: 500px;">
-                        <h3 id="modal-monitoramento-titulo">📡 Monitoramento em Tempo Real</h3>
-                        <div id="modal-monitoramento-conteudo"></div>
-                        <div class="modal-acoes">
-                            <button class="azul pequeno" onclick="atualizarModalMonitoramento(${clienteId})">🔄 Atualizar</button>
-                            <button class="secundario pequeno" onclick="fecharModalMonitoramento()">Fechar</button>
-                        </div>
-                    </div>
-                `;
-                document.body.appendChild(modal);
-            }
-            
-            const conteudo = document.getElementById("modal-monitoramento-conteudo");
-            document.getElementById("modal-monitoramento-titulo").innerHTML = `📡 Monitoramento - ${nomeCliente}`;
-            
-            conteudo.innerHTML = `
-                <div style="margin: 15px 0;">
-                    <div style="background: #f0fdf4; padding: 10px; border-radius: 8px; margin-bottom: 10px;">
-                        <p><strong>⚡ Geração atual:</strong> <span style="font-size: 24px; font-weight: bold;">${dados.geracao_atual_kw}</span> kW</p>
-                    </div>
-                    <p><strong>📤 Injetando na rede:</strong> ${dados.injetado_rede_kw} kW</p>
-                    <p><strong>🏠 Consumo da casa:</strong> ${dados.consumo_casa_kw} kW</p>
-                    <p><strong>🔌 Consumo da rede:</strong> ${dados.consumo_rede_kw} kW</p>
-                    <p><strong>📟 Status:</strong> ${dados.status === 'online' ? '🟢 Online' : '🔴 Offline'}</p>
-                    <p><strong>🔢 Serial:</strong> ${dados.serial}</p>
-                    <p><strong>🕐 Última leitura:</strong> ${new Date(dados.timestamp).toLocaleString('pt-BR')}</p>
-                </div>
-            `;
-            
-            modal.classList.add("ativo");
-            
-        } catch(e) {
-            alert("Erro ao buscar dados de monitoramento: " + e.message);
-        }
-    }
-    
-    async function atualizarModalMonitoramento(clienteId) {
-        try {
-            const resp = await fetch(`${API}/clientes/${clienteId}/monitoramento`, {
-                headers: {"Authorization": `Bearer ${token}`}
-            });
-            const dados = await resp.json();
-            const conteudo = document.getElementById("modal-monitoramento-conteudo");
-            
-            conteudo.innerHTML = `
-                <div style="margin: 15px 0;">
-                    <div style="background: #f0fdf4; padding: 10px; border-radius: 8px; margin-bottom: 10px;">
-                        <p><strong>⚡ Geração atual:</strong> <span style="font-size: 24px; font-weight: bold;">${dados.geracao_atual_kw}</span> kW</p>
-                    </div>
-                    <p><strong>📤 Injetando na rede:</strong> ${dados.injetado_rede_kw} kW</p>
-                    <p><strong>🏠 Consumo da casa:</strong> ${dados.consumo_casa_kw} kW</p>
-                    <p><strong>🔌 Consumo da rede:</strong> ${dados.consumo_rede_kw} kW</p>
-                    <p><strong>📟 Status:</strong> ${dados.status === 'online' ? '🟢 Online' : '🔴 Offline'}</p>
-                    <p><strong>🔢 Serial:</strong> ${dados.serial}</p>
-                    <p><strong>🕐 Última leitura:</strong> ${new Date(dados.timestamp).toLocaleString('pt-BR')}</p>
-                </div>
-            `;
-        } catch(e) {
-            alert("Erro ao atualizar: " + e.message);
-        }
-    }
-    
-    function fecharModalMonitoramento() {
-        const modal = document.getElementById("modal-monitoramento");
-        if (modal) modal.classList.remove("ativo");
-    }
-    
-    function iniciarMonitoramentoAutomatico() {
-        if (intervaloMonitoramento) clearInterval(intervaloMonitoramento);
-        carregarMonitoramento();
-        intervaloMonitoramento = setInterval(carregarMonitoramento, 60000);
-        console.log("✅ Monitoramento automático iniciado (a cada 1 minuto)");
     }
 </script>
 </body>

@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solar Portal — Minha Conta</title>
+    <title>Solar Portal — Meu Sistema Solar</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -11,304 +12,889 @@
             font-family: 'Segoe UI', sans-serif;
             background: #f0f4f8;
             color: #333;
+            min-height: 100vh;
         }
 
+        /* ===== HEADER ===== */
         header {
-            background: linear-gradient(135deg, #f59e0b, #d97706);
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
             color: white;
-            padding: 20px 30px;
+            padding: 0 24px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+        }
+
+        .header-top {
             display: flex;
             align-items: center;
-            gap: 15px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+            justify-content: space-between;
+            padding: 16px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
         }
 
-        header h1 { font-size: 22px; }
-        header p { font-size: 13px; opacity: 0.85; }
+        .header-brand { display: flex; align-items: center; gap: 12px; }
+        .header-brand .sol { font-size: 28px; }
+        .header-brand h1 { font-size: 18px; font-weight: 700; }
+        .header-brand p { font-size: 12px; opacity: 0.7; }
 
-        .sol { font-size: 36px; }
+        .header-cliente {
+            text-align: right;
+            font-size: 13px;
+        }
+        .header-cliente .nome { font-weight: 600; font-size: 15px; }
+        .header-cliente .sub { opacity: 0.6; font-size: 12px; }
 
-        .container {
-            max-width: 900px;
-            margin: 30px auto;
-            padding: 0 20px;
+        /* ===== NAVEGAÇÃO POR ABAS ===== */
+        .nav-abas {
+            display: flex;
+            gap: 0;
+            overflow-x: auto;
         }
 
+        .aba {
+            padding: 14px 20px;
+            font-size: 13px;
+            font-weight: 600;
+            color: rgba(255,255,255,0.6);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+        .aba:hover { color: white; background: rgba(255,255,255,0.05); }
+        .aba.ativa { color: #f59e0b; border-bottom-color: #f59e0b; }
+
+        /* ===== CONTEÚDO ===== */
+        .container { max-width: 920px; margin: 0 auto; padding: 24px 20px; }
+
+        .pagina { display: none; }
+        .pagina.ativa { display: block; }
+
+        /* ===== CARDS ===== */
         .card {
             background: white;
-            border-radius: 12px;
-            padding: 25px;
+            border-radius: 14px;
+            padding: 24px;
             margin-bottom: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
         }
 
-        .card h2 {
-            font-size: 16px;
-            color: #666;
-            margin-bottom: 15px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 15px;
-        }
-
-        .metric {
-            background: #f8fafc;
-            border-radius: 10px;
-            padding: 18px;
-            text-align: center;
-            border-left: 4px solid #f59e0b;
-        }
-
-        .metric .valor {
-            font-size: 28px;
+        .card-titulo {
+            font-size: 14px;
             font-weight: 700;
-            color: #1e293b;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
-        .metric .label {
-            font-size: 12px;
-            color: #888;
-            margin-top: 4px;
+        /* ===== PAINEL TEMPO REAL ===== */
+        .geracao-hero {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            border-radius: 16px;
+            padding: 32px;
+            text-align: center;
+            color: white;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
         }
 
-        .metric.verde { border-left-color: #22c55e; }
-        .metric.verde .valor { color: #16a34a; }
-        .metric.azul { border-left-color: #3b82f6; }
-        .metric.azul .valor { color: #2563eb; }
-        .metric.laranja { border-left-color: #f59e0b; }
+        .geracao-hero::before {
+            content: "☀️";
+            position: absolute;
+            font-size: 120px;
+            opacity: 0.08;
+            right: -10px;
+            top: -10px;
+        }
 
-        .status {
-            display: inline-block;
-            padding: 6px 16px;
+        .geracao-hero .kw-num {
+            font-size: 64px;
+            font-weight: 800;
+            line-height: 1;
+            letter-spacing: -2px;
+        }
+
+        .geracao-hero .kw-unidade { font-size: 24px; font-weight: 400; opacity: 0.8; }
+        .geracao-hero .kw-label { font-size: 16px; opacity: 0.85; margin-top: 6px; }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255,255,255,0.2);
+            padding: 6px 14px;
             border-radius: 20px;
-            font-weight: 600;
-            font-size: 14px;
+            font-size: 13px;
+            margin-top: 12px;
         }
 
-        .status.super { background: #dcfce7; color: #16a34a; }
-        .status.defi { background: #fee2e2; color: #dc2626; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; }
+        .dot.pulsando { animation: pulse 2s infinite; }
+        .dot.vermelho { background: #f87171; }
+        .dot.cinza { background: rgba(255,255,255,0.4); }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
-        .mensagem {
-            background: linear-gradient(135deg, #fffbeb, #fef3c7);
-            border-left: 4px solid #f59e0b;
-            border-radius: 8px;
-            padding: 16px 20px;
-            font-size: 14px;
-            line-height: 1.7;
-            color: #78350f;
+        .atualizacao-txt {
+            font-size: 11px;
+            color: #94a3b8;
+            text-align: center;
+            margin-top: 8px;
         }
 
-        .upload-area {
+        /* ===== MÉTRICAS GRID ===== */
+        .metricas { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+
+        .metrica {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            border-top: 3px solid #e2e8f0;
+        }
+        .metrica.amarela { border-top-color: #f59e0b; }
+        .metrica.verde { border-top-color: #22c55e; }
+        .metrica.azul { border-top-color: #3b82f6; }
+        .metrica.roxa { border-top-color: #8b5cf6; }
+        .metrica.vermelha { border-top-color: #ef4444; }
+
+        .metrica .val {
+            font-size: 22px;
+            font-weight: 800;
+            color: #1e293b;
+            line-height: 1.1;
+        }
+        .metrica.verde .val { color: #16a34a; }
+        .metrica.azul .val { color: #2563eb; }
+        .metrica.roxa .val { color: #7c3aed; }
+        .metrica.vermelha .val { color: #dc2626; }
+
+        .metrica .lbl {
+            font-size: 11px;
+            color: #94a3b8;
+            margin-top: 4px;
+            font-weight: 500;
+        }
+
+        /* ===== ALERTAS ===== */
+        .alerta-item {
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-bottom: 10px;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+        .alerta-item.urgente { background: #fef2f2; border-left: 4px solid #ef4444; }
+        .alerta-item.atencao { background: #fffbeb; border-left: 4px solid #f59e0b; }
+        .alerta-item.informativo { background: #eff6ff; border-left: 4px solid #3b82f6; }
+        .alerta-item.normal { background: #f0fdf4; border-left: 4px solid #22c55e; }
+
+        .alerta-icone { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+        .alerta-titulo { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+        .alerta-msg { font-size: 13px; color: #555; line-height: 1.5; }
+        .alerta-acao { font-size: 12px; color: #888; margin-top: 6px; }
+
+        /* ===== CONTA / UPLOAD ===== */
+        .upload-zone {
             border: 2px dashed #cbd5e1;
             border-radius: 12px;
-            padding: 30px;
+            padding: 36px 20px;
             text-align: center;
             cursor: pointer;
             transition: all 0.2s;
+            background: #fafbfc;
         }
+        .upload-zone:hover { border-color: #f59e0b; background: #fffbeb; }
+        .upload-zone .icone-upload { font-size: 44px; margin-bottom: 10px; }
+        .upload-zone p { color: #64748b; font-size: 14px; }
+        .upload-zone .hint { font-size: 12px; color: #94a3b8; margin-top: 6px; }
 
-        .upload-area:hover { border-color: #f59e0b; background: #fffbeb; }
-        .upload-area .icone { font-size: 40px; margin-bottom: 10px; }
-        .upload-area p { color: #666; font-size: 14px; }
-
-        button {
+        .btn {
             background: linear-gradient(135deg, #f59e0b, #d97706);
             color: white;
             border: none;
-            padding: 12px 30px;
-            border-radius: 8px;
+            padding: 13px 24px;
+            border-radius: 10px;
             font-size: 15px;
-            font-weight: 600;
+            font-weight: 700;
             cursor: pointer;
-            margin-top: 15px;
             width: 100%;
+            margin-top: 14px;
             transition: opacity 0.2s;
+            letter-spacing: 0.3px;
         }
+        .btn:hover { opacity: 0.9; }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-        button:hover { opacity: 0.9; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
-
-        .loading {
+        .loading-ia {
             text-align: center;
-            padding: 20px;
-            color: #666;
+            padding: 30px;
             display: none;
         }
+        .loading-ia .spinner { font-size: 36px; animation: spin 1s linear infinite; display: inline-block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-ia p { color: #64748b; margin-top: 12px; font-size: 14px; }
 
-        .loading .spinner {
-            font-size: 30px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
+        /* ===== RESULTADO DA CONTA ===== */
+        #resultado-conta { display: none; }
+
+        .conta-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 18px;
+            border-radius: 24px;
+            font-weight: 700;
+            font-size: 14px;
+        }
+        .conta-status.super { background: #dcfce7; color: #16a34a; }
+        .conta-status.defi { background: #fee2e2; color: #dc2626; }
+
+        .ia-analise {
+            background: linear-gradient(135deg, #fffbeb, #fef3c7);
+            border-left: 4px solid #f59e0b;
+            border-radius: 10px;
+            padding: 16px 20px;
+            font-size: 14px;
+            line-height: 1.8;
+            color: #78350f;
+            margin-top: 14px;
         }
 
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        #resultado { display: none; }
-
-        .alerta {
+        .badge-media {
             background: #fef3c7;
             border: 1px solid #fbbf24;
             border-radius: 8px;
-            padding: 12px 16px;
+            padding: 10px 14px;
             font-size: 13px;
             color: #92400e;
-            margin-bottom: 15px;
+            margin-bottom: 14px;
+            display: none;
+        }
+
+        /* ===== HISTÓRICO DE CONTAS ===== */
+        .historico-lista { display: flex; flex-direction: column; gap: 10px; }
+
+        .historico-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 14px 16px;
+            border-left: 4px solid #e2e8f0;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .historico-item:hover { background: #f1f5f9; border-left-color: #f59e0b; }
+        .historico-item.super { border-left-color: #22c55e; }
+        .historico-item.defi { border-left-color: #ef4444; }
+
+        .hist-mes { font-weight: 700; font-size: 14px; }
+        .hist-valor { font-size: 13px; color: #64748b; margin-top: 2px; }
+        .hist-badge { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 10px; }
+        .hist-badge.super { background: #dcfce7; color: #16a34a; }
+        .hist-badge.defi { background: #fee2e2; color: #dc2626; }
+
+        /* ===== GRÁFICO ===== */
+        .legenda-graf {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 14px;
+            flex-wrap: wrap;
+        }
+        .legenda-graf-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #64748b; }
+        .legenda-cor { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+
+        .tabela-ger { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+        .tabela-ger th { background: #f8fafc; padding: 10px 12px; text-align: center; color: #64748b; border-bottom: 2px solid #e2e8f0; font-weight: 600; }
+        .tabela-ger td { padding: 10px 12px; text-align: center; border-bottom: 1px solid #f1f5f9; }
+        .tabela-ger tr:last-child td { border-bottom: none; }
+
+        .badge { padding: 3px 10px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+        .badge.excelente { background: #dcfce7; color: #16a34a; }
+        .badge.bom { background: #d1fae5; color: #059669; }
+        .badge.abaixo { background: #fef3c7; color: #d97706; }
+        .badge.critico { background: #fee2e2; color: #dc2626; }
+        .badge.aguardando { background: #f1f5f9; color: #64748b; }
+
+        /* ===== EMPTY STATE ===== */
+        .empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: #94a3b8;
+        }
+        .empty .icone { font-size: 48px; margin-bottom: 12px; }
+        .empty p { font-size: 14px; }
+
+        /* ===== RESPONSIVO ===== */
+        @media (max-width: 600px) {
+            .geracao-hero .kw-num { font-size: 48px; }
+            .metricas { grid-template-columns: repeat(2, 1fr); }
+            .header-cliente { display: none; }
         }
     </style>
 </head>
 <body>
 
+<!-- ===== HEADER ===== -->
 <header>
-    <div class="sol">☀️</div>
-    <div>
-        <h1>Solar Portal</h1>
-        <p>Acompanhe sua geração de energia</p>
+    <div class="header-top">
+        <div class="header-brand">
+            <div class="sol">☀️</div>
+            <div>
+                <h1>Solar Portal</h1>
+                <p id="subtitulo-nome">Meu Sistema Solar</p>
+            </div>
+        </div>
+        <div class="header-cliente">
+            <div class="nome" id="header-nome-cliente">—</div>
+            <div class="sub" id="header-distribuidora">—</div>
+        </div>
     </div>
+    <nav class="nav-abas">
+        <div class="aba ativa" onclick="irPara('inicio')">🏠 Início</div>
+        <div class="aba" onclick="irPara('geracao')">📈 Geração</div>
+        <div class="aba" onclick="irPara('conta')">📄 Conta de Energia</div>
+        <div class="aba" onclick="irPara('alertas')">🔔 Alertas</div>
+    </nav>
 </header>
 
+<!-- ===== PÁGINA: INÍCIO ===== -->
 <div class="container">
 
-    <!-- Upload -->
-    <div class="card">
-        <h2>📄 Enviar Conta de Energia</h2>
-        <div class="upload-area" onclick="document.getElementById('arquivo').click()">
-            <div class="icone">📁</div>
-            <p id="nome-arquivo">Clique para selecionar o PDF da sua conta de energia</p>
-        </div>
-        <input type="file" id="arquivo" accept=".pdf" style="display:none" onchange="arquivoSelecionado(this)">
-        <button onclick="enviarConta()" id="btn-enviar" disabled>⚡ Analisar Conta</button>
-    </div>
+    <div class="pagina ativa" id="pag-inicio">
 
-    <!-- Loading -->
-    <div class="loading" id="loading">
-        <div class="spinner">⚙️</div>
-        <p style="margin-top:10px">Analisando sua conta com IA...<br><small>Isso pode levar alguns segundos</small></p>
-    </div>
-
-    <!-- Resultado -->
-    <div id="resultado">
-
-        <div class="card">
-            <h2>📊 Resumo da Conta</h2>
-            <div id="alerta-media" class="alerta" style="display:none">
-                ⚠️ <strong>Atenção:</strong> Esta conta possui leitura acumulada de mais de um mês.
+        <!-- Monitoramento tempo real -->
+        <div class="geracao-hero" id="hero-geracao">
+            <div class="kw-num" id="pv-power">--</div>
+            <div class="kw-label">kW gerados agora pelos painéis</div>
+            <div class="status-pill">
+                <div class="dot cinza" id="dot-status"></div>
+                <span id="status-txt">Conectando ao inversor...</span>
             </div>
-            <div class="grid">
-                <div class="metric laranja">
-                    <div class="valor" id="val-mes">—</div>
-                    <div class="label">Mês de Referência</div>
-                </div>
-                <div class="metric">
-                    <div class="valor" id="val-fatura">—</div>
-                    <div class="label">Valor da Fatura</div>
-                </div>
-                <div class="metric azul">
-                    <div class="valor" id="val-consumo-bruto">—</div>
-                    <div class="label">Consumo Bruto</div>
-                </div>
-                <div class="metric azul">
-                    <div class="valor" id="val-consumo">—</div>
-                    <div class="label">Consumo Faturado</div>
-                </div>
-                <div class="metric verde">
-                    <div class="valor" id="val-injetado">—</div>
-                    <div class="label">Energia Injetada</div>
-                </div>
-                <div class="metric">
-                    <div class="valor" id="val-saldo">—</div>
-                    <div class="label">Saldo Acumulado</div>
-                </div>
-                <div class="metric verde">
-                    <div class="valor" id="val-percentual">—</div>
-                    <div class="label">Gerado vs Consumido</div>
-                </div>
+        </div>
+        <p class="atualizacao-txt" id="txt-atualizacao">Atualizando a cada 30 segundos</p>
+
+        <!-- Resumo do mês atual -->
+        <div class="card" id="card-resumo-mes" style="display:none;">
+            <div class="card-titulo">📊 Última Conta Analisada</div>
+            <div id="resumo-mes-content"></div>
+        </div>
+
+        <!-- Alertas resumidos -->
+        <div class="card" id="card-alertas-resumo" style="display:none;">
+            <div class="card-titulo">🔔 Notificações</div>
+            <div id="alertas-resumo-content"></div>
+            <p style="font-size:12px; color:#94a3b8; margin-top:10px; text-align:right; cursor:pointer;" onclick="irPara('alertas')">Ver todos os alertas →</p>
+        </div>
+
+        <!-- Sem inversor configurado -->
+        <div class="card" id="card-sem-inversor" style="display:none;">
+            <div class="empty">
+                <div class="icone">🔌</div>
+                <p>Monitoramento em tempo real será ativado em breve.<br>Entre em contato com seu integrador.</p>
             </div>
         </div>
 
-        <div class="card">
-            <h2>⚡ Status do Sistema</h2>
-            <div id="val-status"></div>
+    </div>
+
+    <!-- ===== PÁGINA: GERAÇÃO ===== -->
+    <div class="pagina" id="pag-geracao">
+
+        <div class="card" id="card-grafico" style="display:none;">
+            <div class="card-titulo">📈 Geração Esperada vs Real (12 meses)</div>
+            <canvas id="grafico-geracao" height="130"></canvas>
+            <div class="legenda-graf">
+                <div class="legenda-graf-item"><div class="legenda-cor" style="background:#93c5fd;"></div> Esperado (kWh)</div>
+                <div class="legenda-graf-item"><div class="legenda-cor" style="background:#4ade80;"></div> Gerado Real (kWh)</div>
+            </div>
+            <table class="tabela-ger">
+                <thead>
+                    <tr>
+                        <th>Mês</th>
+                        <th>Esperado (kWh)</th>
+                        <th>Gerado Real (kWh)</th>
+                        <th>Diferença</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-geracao"></tbody>
+            </table>
         </div>
 
-        <div class="card">
-            <h2>💬 Análise da sua Conta</h2>
-            <div class="mensagem" id="val-mensagem"></div>
+        <div class="card" id="card-sem-projeto">
+            <div class="empty">
+                <div class="icone">📐</div>
+                <p>Os dados do seu projeto solar ainda estão sendo configurados.<br>Em breve o gráfico de geração estará disponível aqui.</p>
+            </div>
         </div>
 
     </div>
+
+    <!-- ===== PÁGINA: CONTA DE ENERGIA ===== -->
+    <div class="pagina" id="pag-conta">
+
+        <!-- Upload -->
+        <div class="card">
+            <div class="card-titulo">📤 Enviar Nova Conta</div>
+            <div class="upload-zone" onclick="document.getElementById('arquivo').click()">
+                <div class="icone-upload">📁</div>
+                <p id="txt-arquivo">Clique aqui para selecionar o PDF da sua conta de energia</p>
+                <p class="hint">Apenas arquivos PDF • A IA analisa automaticamente</p>
+            </div>
+            <input type="file" id="arquivo" accept=".pdf" style="display:none" onchange="arquivoSelecionado(this)">
+            <button class="btn" id="btn-enviar" onclick="enviarConta()" disabled>⚡ Analisar com Inteligência Artificial</button>
+        </div>
+
+        <!-- Loading IA -->
+        <div class="loading-ia" id="loading-ia">
+            <div class="spinner">🤖</div>
+            <p>Analisando sua conta com Inteligência Artificial...<br><small>Isso pode levar alguns segundos</small></p>
+        </div>
+
+        <!-- Resultado -->
+        <div id="resultado-conta">
+            <div class="card">
+                <div class="card-titulo">📊 Resultado da Análise</div>
+                <div class="badge-media" id="badge-media">⚠️ <strong>Atenção:</strong> Esta conta possui leitura acumulada de mais de um mês.</div>
+
+                <div style="margin-bottom: 16px;">
+                    <div id="conta-status-badge"></div>
+                </div>
+
+                <div class="metricas">
+                    <div class="metrica amarela">
+                        <div class="val" id="val-mes">—</div>
+                        <div class="lbl">Mês de Referência</div>
+                    </div>
+                    <div class="metrica vermelha">
+                        <div class="val" id="val-fatura">—</div>
+                        <div class="lbl">Valor da Fatura</div>
+                    </div>
+                    <div class="metrica azul">
+                        <div class="val" id="val-consumo-bruto">—</div>
+                        <div class="lbl">Consumo Bruto</div>
+                    </div>
+                    <div class="metrica azul">
+                        <div class="val" id="val-consumo">—</div>
+                        <div class="lbl">Consumo Faturado</div>
+                    </div>
+                    <div class="metrica verde">
+                        <div class="val" id="val-injetado">—</div>
+                        <div class="lbl">Energia Injetada</div>
+                    </div>
+                    <div class="metrica">
+                        <div class="val" id="val-saldo">—</div>
+                        <div class="lbl">Saldo Acumulado</div>
+                    </div>
+                    <div class="metrica verde">
+                        <div class="val" id="val-percentual">—</div>
+                        <div class="lbl">Injetado vs Consumido</div>
+                    </div>
+                </div>
+
+                <div class="ia-analise" id="val-mensagem"></div>
+            </div>
+        </div>
+
+        <!-- Histórico de contas -->
+        <div class="card" id="card-historico-contas" style="display:none;">
+            <div class="card-titulo">🗂️ Histórico de Contas</div>
+            <div class="historico-lista" id="lista-historico"></div>
+        </div>
+
+    </div>
+
+    <!-- ===== PÁGINA: ALERTAS ===== -->
+    <div class="pagina" id="pag-alertas">
+
+        <div class="card" id="card-alertas-full">
+            <div class="card-titulo">🔔 Alertas Inteligentes do Sistema</div>
+            <div id="alertas-full-content">
+                <div class="empty">
+                    <div class="icone">📡</div>
+                    <p>Carregando alertas...</p>
+                </div>
+            </div>
+            <p class="atualizacao-txt" id="alertas-data" style="margin-top:12px;"></p>
+        </div>
+
+        <div class="card">
+            <div class="card-titulo">ℹ️ Como funcionam os alertas</div>
+            <div style="font-size: 13px; color: #64748b; line-height: 1.8;">
+                <p>🔴 <strong>Urgente</strong> — Sistema parado ou com falha grave. Ação imediata necessária.</p>
+                <p style="margin-top:8px;">⚠️ <strong>Atenção</strong> — Geração muito abaixo do normal. Verificar o sistema.</p>
+                <p style="margin-top:8px;">📉 <strong>Informativo</strong> — Queda moderada. Monitorar nos próximos dias.</p>
+                <p style="margin-top:8px;">✅ <strong>Normal</strong> — Sistema operando dentro do esperado.</p>
+            </div>
+        </div>
+
+    </div>
+
 </div>
 
 <script>
     const API = "http://127.0.0.1:8000";
-    const CLIENTE_ID = 1; // fixo por enquanto
+    const params = new URLSearchParams(window.location.search);
+    const tokenAcesso = params.get("token_acesso");
+    const clienteIdParam = params.get("cliente_id");
+    const nomeParam = params.get("nome");
 
+    let idCliente = clienteIdParam;
+    let dadosGeracao = [];
+    let dadosGeracaoReal = [];
+    let graficoInstance = null;
+    let intervaloMon = null;
+    let dadosAlertas = null;
+    let ultimaConta = null;
+
+    // ===== NAVEGAÇÃO POR ABAS =====
+    function irPara(aba) {
+        document.querySelectorAll(".aba").forEach(a => a.classList.remove("ativa"));
+        document.querySelectorAll(".pagina").forEach(p => p.classList.remove("ativa"));
+
+        const mapa = { inicio: 0, geracao: 1, conta: 2, alertas: 3 };
+        document.querySelectorAll(".aba")[mapa[aba]].classList.add("ativa");
+        document.getElementById(`pag-${aba}`).classList.add("ativa");
+    }
+
+    // ===== INICIALIZAÇÃO =====
+    async function inicializar() {
+        // Resolver cliente via token ou ID direto
+        if (!idCliente && tokenAcesso) {
+            try {
+                const resp = await fetch(`${API}/portal/${tokenAcesso}`);
+                if (!resp.ok) { mostrarErroAcesso(); return; }
+                const data = await resp.json();
+                idCliente = data.id;
+                atualizarHeader(data.nome, data.distribuidora, data.numero_uc);
+            } catch(e) { mostrarErroAcesso(); return; }
+        } else if (nomeParam) {
+            document.getElementById("header-nome-cliente").textContent = decodeURIComponent(nomeParam);
+            document.getElementById("subtitulo-nome").textContent = "Meu Sistema Solar";
+        }
+
+        if (!idCliente) { mostrarErroAcesso(); return; }
+
+        // Carregar tudo em paralelo
+        await Promise.all([
+            iniciarMonitoramento(),
+            carregarGeracaoEsperada(),
+            carregarHistoricoReal(),
+            carregarAlertas(),
+            carregarHistoricoContas()
+        ]);
+
+        renderizarGrafico();
+    }
+
+    function atualizarHeader(nome, distribuidora, uc) {
+        document.getElementById("header-nome-cliente").textContent = nome || "—";
+        document.getElementById("subtitulo-nome").textContent = "Meu Sistema Solar";
+        document.getElementById("header-distribuidora").textContent = [distribuidora, uc].filter(Boolean).join(" • ") || "—";
+    }
+
+    function mostrarErroAcesso() {
+        document.body.innerHTML = `
+            <div style="text-align:center; padding:80px 20px; font-family:sans-serif;">
+                <div style="font-size:60px; margin-bottom:20px;">🔒</div>
+                <h2 style="color:#334155; margin-bottom:10px;">Link inválido ou expirado</h2>
+                <p style="color:#64748b;">Solicite um novo link de acesso ao seu integrador solar.</p>
+            </div>`;
+    }
+
+    // ===== MONITORAMENTO TEMPO REAL =====
+    async function iniciarMonitoramento() {
+        await buscarMonitoramento();
+        intervaloMon = setInterval(buscarMonitoramento, 30000);
+    }
+
+    async function buscarMonitoramento() {
+        try {
+            const resp = await fetch(`${API}/clientes/${idCliente}/monitoramento`);
+            document.getElementById("card-sem-inversor").style.display = "none";
+
+            if (!resp.ok) {
+                document.getElementById("card-sem-inversor").style.display = "block";
+                document.getElementById("pv-power").textContent = "--";
+                document.getElementById("status-txt").textContent = "Inversor não configurado";
+                document.getElementById("dot-status").className = "dot cinza";
+                return;
+            }
+
+            const data = await resp.json();
+            const pv = parseFloat(data.geracao_atual_kw || 0);
+            document.getElementById("pv-power").textContent = pv.toFixed(2);
+
+            const hora = new Date().getHours();
+            const dot = document.getElementById("dot-status");
+            const txt = document.getElementById("status-txt");
+
+            if (hora < 6 || hora >= 19) {
+                dot.className = "dot cinza";
+                txt.textContent = "Período noturno — aguardando amanhecer 🌙";
+            } else if (pv > 0.05) {
+                dot.className = "dot pulsando";
+                txt.textContent = "Sistema gerando energia ✅";
+            } else if (pv > 0) {
+                dot.className = "dot vermelho";
+                txt.textContent = "Geração muito baixa — verificar painéis ⚠️";
+            } else {
+                dot.className = "dot vermelho";
+                txt.textContent = "Sistema sem geração no momento ⚠️";
+            }
+
+            const agora = new Date().toLocaleTimeString("pt-BR", {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+            document.getElementById("txt-atualizacao").textContent = `Última atualização: ${agora} — Atualiza a cada 30s`;
+
+        } catch(e) {
+            document.getElementById("pv-power").textContent = "--";
+            document.getElementById("status-txt").textContent = "Sem conexão com o inversor";
+            document.getElementById("dot-status").className = "dot cinza";
+        }
+    }
+
+    // ===== GERAÇÃO ESPERADA =====
+    async function carregarGeracaoEsperada() {
+        try {
+            const resp = await fetch(`${API}/clientes/${idCliente}/geracao-esperada`);
+            if (!resp.ok) { document.getElementById("card-sem-projeto").style.display = "block"; return; }
+            const data = await resp.json();
+            dadosGeracao = data.geracao_mensal || [];
+            document.getElementById("card-sem-projeto").style.display = "none";
+        } catch(e) {
+            document.getElementById("card-sem-projeto").style.display = "block";
+        }
+    }
+
+    // ===== HISTÓRICO REAL DO INVERSOR =====
+    async function carregarHistoricoReal() {
+        try {
+            const resp = await fetch(`${API}/clientes/${idCliente}/monitoramento/mensal`);
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (data.mensal && data.mensal.length > 0) {
+                dadosGeracaoReal = data.mensal;
+            }
+        } catch(e) {}
+    }
+
+    // ===== GRÁFICO =====
+    function renderizarGrafico() {
+        if (!dadosGeracao.length) return;
+
+        document.getElementById("card-grafico").style.display = "block";
+        document.getElementById("card-sem-projeto").style.display = "none";
+
+        const realMap = {};
+        dadosGeracaoReal.forEach(r => { realMap[`${r.mes_num}/${r.ano}`] = r.geracao_kwh; });
+
+        let mesesExibir = [];
+        if (dadosGeracaoReal.length > 0) {
+            const reaisOrdenados = [...dadosGeracaoReal].sort((a,b) => a.ano !== b.ano ? a.ano - b.ano : a.mes_num - b.mes_num);
+            mesesExibir = reaisOrdenados.slice(-12);
+        } else {
+            const anoAtual = new Date().getFullYear();
+            mesesExibir = dadosGeracao.map(d => ({ ...d, ano: anoAtual }));
+        }
+
+        const labels = mesesExibir.map(m => {
+            const e = dadosGeracao.find(d => d.mes_num === m.mes_num);
+            return `${e?.mes || m.mes}/${String(m.ano).slice(2)}`;
+        });
+        const esperados = mesesExibir.map(m => dadosGeracao.find(d => d.mes_num === m.mes_num)?.kwh_esperado || 0);
+        const gerados = mesesExibir.map(m => realMap[`${m.mes_num}/${m.ano}`] ?? null);
+
+        if (graficoInstance) graficoInstance.destroy();
+        const ctx = document.getElementById("grafico-geracao").getContext("2d");
+        graficoInstance = new Chart(ctx, {
+            type: "bar",
+            data: {
+                labels,
+                datasets: [
+                    { label: "Esperado", data: esperados, backgroundColor: "rgba(147,197,253,0.8)", borderColor: "#3b82f6", borderWidth: 1, borderRadius: 4 },
+                    { label: "Gerado", data: gerados, backgroundColor: "rgba(74,222,128,0.8)", borderColor: "#16a34a", borderWidth: 1, borderRadius: 4 }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, title: { display: true, text: "kWh" } } }
+            }
+        });
+
+        const tbody = document.getElementById("tbody-geracao");
+        tbody.innerHTML = mesesExibir.map(m => {
+            const e = dadosGeracao.find(d => d.mes_num === m.mes_num);
+            const esp = e?.kwh_esperado || 0;
+            const ger = realMap[`${m.mes_num}/${m.ano}`];
+            const diff = ger != null ? (ger - esp).toFixed(1) : null;
+            const pct = ger != null && esp > 0 ? (ger / esp * 100) : null;
+
+            let badge = '<span class="badge aguardando">⏳ Aguardando</span>';
+            if (ger != null && ger > 0) {
+                if (pct >= 95) badge = '<span class="badge excelente">✅ Excelente</span>';
+                else if (pct >= 80) badge = '<span class="badge bom">✅ Bom</span>';
+                else if (pct >= 70) badge = '<span class="badge abaixo">⚠️ Abaixo</span>';
+                else badge = '<span class="badge critico">🔴 Crítico</span>';
+            }
+
+            return `<tr>
+                <td><strong>${e?.mes || m.mes}/${m.ano}</strong></td>
+                <td>${esp}</td>
+                <td>${ger != null ? ger : "—"}</td>
+                <td>${diff != null ? (diff > 0 ? "+" : "") + diff + " kWh" : "—"}</td>
+                <td>${badge}</td>
+            </tr>`;
+        }).join("");
+    }
+
+    // ===== ALERTAS =====
+    async function carregarAlertas() {
+        try {
+            const resp = await fetch(`${API}/clientes/${idCliente}/verificar-anomalias`);
+            if (!resp.ok) return;
+            dadosAlertas = await resp.json();
+            const alertas = dadosAlertas.alertas || [];
+
+            const classeTipo = { urgente: "urgente", atencao: "atencao", informativo: "informativo", normal: "normal" };
+
+            const htmlAlertas = alertas.map(a => `
+                <div class="alerta-item ${classeTipo[a.tipo] || 'informativo'}">
+                    <div class="alerta-icone">${a.icone}</div>
+                    <div>
+                        <div class="alerta-titulo">${a.titulo}</div>
+                        <div class="alerta-msg">${a.mensagem}</div>
+                        <div class="alerta-acao">🔧 ${a.acao}</div>
+                    </div>
+                </div>`).join("");
+
+            // Página de alertas
+            document.getElementById("alertas-full-content").innerHTML = htmlAlertas || '<div class="empty"><div class="icone">✅</div><p>Nenhum alerta no momento.</p></div>';
+            document.getElementById("alertas-data").textContent = dadosAlertas.data_analise
+                ? `Análise: ${new Date(dadosAlertas.data_analise).toLocaleDateString("pt-BR")} • Geração ontem: ${dadosAlertas.geracao_ontem_kwh} kWh • Média 7 dias: ${dadosAlertas.media_7_dias_kwh} kWh`
+                : "";
+
+            // Resumo na página inicial (só urgente e atenção)
+            const alertasImportantes = alertas.filter(a => a.tipo === "urgente" || a.tipo === "atencao");
+            if (alertasImportantes.length > 0) {
+                document.getElementById("card-alertas-resumo").style.display = "block";
+                document.getElementById("alertas-resumo-content").innerHTML = alertasImportantes.map(a => `
+                    <div class="alerta-item ${classeTipo[a.tipo]}">
+                        <div class="alerta-icone">${a.icone}</div>
+                        <div>
+                            <div class="alerta-titulo">${a.titulo}</div>
+                            <div class="alerta-msg">${a.mensagem}</div>
+                        </div>
+                    </div>`).join("");
+            }
+
+        } catch(e) {
+            document.getElementById("alertas-full-content").innerHTML = '<div class="empty"><div class="icone">📡</div><p>Não foi possível carregar os alertas.</p></div>';
+        }
+    }
+
+    // ===== HISTÓRICO DE CONTAS =====
+    async function carregarHistoricoContas() {
+        try {
+            // Buscar contas do cliente (rota pública via token)
+            const resp = await fetch(`${API}/clientes/${idCliente}/contas-publico`);
+            if (!resp.ok) return;
+            const contas = await resp.json();
+
+            if (contas.length === 0) return;
+
+            ultimaConta = contas[0];
+            mostrarResumoUltimaConta(ultimaConta);
+
+            document.getElementById("card-historico-contas").style.display = "block";
+            document.getElementById("lista-historico").innerHTML = contas.map(c => `
+                <div class="historico-item ${c.status_sistema === 'SUPERAVITÁRIO' ? 'super' : 'defi'}">
+                    <div>
+                        <div class="hist-mes">${c.mes_referencia}</div>
+                        <div class="hist-valor">Fatura: R$ ${parseFloat(c.valor_fatura || 0).toFixed(2)} • Injetado: ${parseFloat(c.energia_injetada_kwh || 0).toFixed(0)} kWh</div>
+                    </div>
+                    <span class="hist-badge ${c.status_sistema === 'SUPERAVITÁRIO' ? 'super' : 'defi'}">
+                        ${c.status_sistema === 'SUPERAVITÁRIO' ? '✅ Superavitário' : '⚠️ Deficitário'}
+                    </span>
+                </div>`).join("");
+
+        } catch(e) {}
+    }
+
+    function mostrarResumoUltimaConta(conta) {
+        if (!conta) return;
+        document.getElementById("card-resumo-mes").style.display = "block";
+        document.getElementById("resumo-mes-content").innerHTML = `
+            <div class="metricas">
+                <div class="metrica amarela"><div class="val">${conta.mes_referencia || "—"}</div><div class="lbl">Última referência</div></div>
+                <div class="metrica vermelha"><div class="val">R$ ${parseFloat(conta.valor_fatura || 0).toFixed(2)}</div><div class="lbl">Valor da fatura</div></div>
+                <div class="metrica verde"><div class="val">${parseFloat(conta.energia_injetada_kwh || 0).toFixed(0)} kWh</div><div class="lbl">Energia injetada</div></div>
+                <div class="metrica azul"><div class="val">${parseFloat(conta.percentual_gerado || 0).toFixed(0)}%</div><div class="lbl">Injetado vs consumido</div></div>
+            </div>`;
+    }
+
+    // ===== UPLOAD E ANÁLISE DE CONTA =====
     function arquivoSelecionado(input) {
         if (input.files[0]) {
-            document.getElementById("nome-arquivo").textContent = "✅ " + input.files[0].name;
+            document.getElementById("txt-arquivo").textContent = "✅ " + input.files[0].name;
             document.getElementById("btn-enviar").disabled = false;
         }
     }
 
     async function enviarConta() {
         const arquivo = document.getElementById("arquivo").files[0];
-        if (!arquivo) return;
+        if (!arquivo || !idCliente) return;
 
-        document.getElementById("loading").style.display = "block";
-        document.getElementById("resultado").style.display = "none";
+        document.getElementById("loading-ia").style.display = "block";
+        document.getElementById("resultado-conta").style.display = "none";
         document.getElementById("btn-enviar").disabled = true;
 
         const form = new FormData();
         form.append("arquivo", arquivo);
 
         try {
-            const resp = await fetch(`${API}/contas/upload/${CLIENTE_ID}`, {
-                method: "POST",
-                body: form
-            });
-
+            const resp = await fetch(`${API}/contas/upload/${idCliente}`, { method: "POST", body: form });
             const data = await resp.json();
-            const conta = data.conta;
+            const c = data.conta;
 
-            // Preencher dados
-            document.getElementById("val-mes").textContent = conta.mes_referencia || "—";
-            document.getElementById("val-fatura").textContent = "R$ " + (conta.valor_fatura || 0).toFixed(2);
-            document.getElementById("val-consumo-bruto").textContent = (conta.consumo_bruto_kwh || 0).toFixed(2) + " kWh";
-            document.getElementById("val-consumo").textContent = (conta.consumo_kwh || 0).toFixed(2) + " kWh";
-            document.getElementById("val-injetado").textContent = (conta.energia_injetada_kwh || 0).toFixed(2) + " kWh";
-            document.getElementById("val-saldo").textContent = (conta.saldo_acumulado_kwh || 0).toFixed(2) + " kWh";
-            document.getElementById("val-percentual").textContent = (conta.percentual_gerado || 0).toFixed(1) + "%";
-            document.getElementById("val-mensagem").textContent = conta.mensagem_cliente || "—";
+            document.getElementById("val-mes").textContent = c.mes_referencia || "—";
+            document.getElementById("val-fatura").textContent = "R$ " + parseFloat(c.valor_fatura || 0).toFixed(2);
+            document.getElementById("val-consumo-bruto").textContent = parseFloat(c.consumo_bruto_kwh || 0).toFixed(2) + " kWh";
+            document.getElementById("val-consumo").textContent = parseFloat(c.consumo_kwh || 0).toFixed(2) + " kWh";
+            document.getElementById("val-injetado").textContent = parseFloat(c.energia_injetada_kwh || 0).toFixed(2) + " kWh";
+            document.getElementById("val-saldo").textContent = parseFloat(c.saldo_acumulado_kwh || 0).toFixed(2) + " kWh";
+            document.getElementById("val-percentual").textContent = parseFloat(c.percentual_gerado || 0).toFixed(1) + "%";
+            document.getElementById("val-mensagem").textContent = c.mensagem_cliente || "—";
 
-            // Status
-            const status = conta.status_sistema || "";
-            const statusEl = document.getElementById("val-status");
-            if (status === "SUPERAVITÁRIO") {
-                statusEl.innerHTML = '<span class="status super">✅ SUPERAVITÁRIO — seu sistema gerou mais do que consumiu!</span>';
-            } else {
-                statusEl.innerHTML = '<span class="status defi">⚠️ DEFICITÁRIO — seu sistema consumiu mais do que gerou.</span>';
-            }
+            const super_ = c.status_sistema === "SUPERAVITÁRIO";
+            document.getElementById("conta-status-badge").innerHTML = `<span class="conta-status ${super_ ? 'super' : 'defi'}">${super_ ? '✅ SUPERAVITÁRIO' : '⚠️ DEFICITÁRIO'} — ${super_ ? 'seu sistema injetou mais do que consumiu!' : 'seu sistema consumiu mais do que injetou.'}</span>`;
 
-            // Alerta média
-            if (conta.leitura_por_media) {
-                document.getElementById("alerta-media").style.display = "block";
-            }
+            if (c.leitura_por_media) document.getElementById("badge-media").style.display = "block";
 
-            document.getElementById("resultado").style.display = "block";
+            document.getElementById("resultado-conta").style.display = "block";
+            mostrarResumoUltimaConta(c);
+            document.getElementById("card-resumo-mes").style.display = "block";
+            await carregarHistoricoContas();
 
-        } catch (e) {
+        } catch(e) {
             alert("Erro ao processar a conta. Tente novamente.");
-            console.error(e);
         } finally {
-            document.getElementById("loading").style.display = "none";
+            document.getElementById("loading-ia").style.display = "none";
             document.getElementById("btn-enviar").disabled = false;
         }
     }
-</script>
 
+    inicializar();
+</script>
 </body>
 </html>
