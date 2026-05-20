@@ -9,3 +9,6 @@ COMANDOS:
 abrir venv:venv\Scripts\activate.bat
 rodar api:uvicorn api:app --reload
 rodar servidor: python -m http.server 3000
+
+https://solar-portal-api.onrender.com
+

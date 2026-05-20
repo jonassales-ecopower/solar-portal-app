@@ -1,0 +1,9 @@
+[[redirects]]
+  from = "/"
+  to = "/painel.html"
+  status = 200
+
+[[redirects]]
+  from = "/portal"
+  to = "/portal.html"
+  status = 200
