@@ -30,7 +30,7 @@
         }
         .card h2 { font-size: 16px; color: #666; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
 
-        #tela-login { max-width: 400px; margin: 80px auto; }
+        #tela-auth { max-width: 420px; margin: 60px auto; }
 
         .campo { margin-bottom: 12px; }
         .campo label { display: block; font-size: 12px; color: #666; margin-bottom: 4px; font-weight: 600; }
@@ -141,6 +141,29 @@
 
         #campos-manuais { display: none; margin-top: 12px; }
 
+        /* Tabs de auth */
+        .auth-tabs {
+            display: flex;
+            border-bottom: 2px solid #e2e8f0;
+            margin-bottom: 24px;
+        }
+        .auth-tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            color: #94a3b8;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+        }
+        .auth-tab.ativa { color: #1e293b; border-bottom-color: #f59e0b; }
+
+        .auth-form { display: none; }
+        .auth-form.ativa { display: block; }
+
         /* Card de monitoramento */
         .card-monitoramento {
             background: linear-gradient(135deg, #1e293b, #334155);
@@ -172,32 +195,89 @@
         .status-alerta { color: #fbbf24; }
         .status-problema { color: #f87171; }
         .status-offline { color: #9ca3af; }
+
+        .divisor-auth {
+            text-align: center;
+            color: #94a3b8;
+            font-size: 12px;
+            margin: 16px 0;
+            position: relative;
+        }
+        .divisor-auth::before, .divisor-auth::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            width: 40%;
+            height: 1px;
+            background: #e2e8f0;
+        }
+        .divisor-auth::before { left: 0; }
+        .divisor-auth::after { right: 0; }
     </style>
 </head>
 <body>
 
-<!-- Login -->
-<div id="tela-login">
+<!-- ===== TELA DE AUTENTICAÇÃO (LOGIN + REGISTRO) ===== -->
+<div id="tela-auth">
     <div class="card">
-        <div style="text-align:center; margin-bottom:20px;">
-            <div style="font-size:40px;">☀️</div>
-            <h1 style="font-size:20px; margin-top:8px;">Solar Portal</h1>
-            <p style="color:#888; font-size:13px;">Painel do Integrador</p>
+        <div style="text-align:center; margin-bottom:24px;">
+            <div style="font-size:44px;">☀️</div>
+            <h1 style="font-size:22px; margin-top:8px; color:#1e293b;">Solar Portal</h1>
+            <p style="color:#94a3b8; font-size:13px; margin-top:4px;">Painel do Integrador</p>
         </div>
-        <div class="campo">
-            <label>E-mail</label>
-            <input type="email" id="login-email" placeholder="seu@email.com">
+
+        <!-- Abas Login / Registro -->
+        <div class="auth-tabs">
+            <div class="auth-tab ativa" onclick="trocarAba('login')">Entrar</div>
+            <div class="auth-tab" onclick="trocarAba('registro')">Criar Conta</div>
         </div>
-        <div class="campo">
-            <label>Senha</label>
-            <input type="password" id="login-senha" placeholder="••••••">
+
+        <!-- Formulário de Login -->
+        <div class="auth-form ativa" id="form-login">
+            <div class="campo">
+                <label>E-mail</label>
+                <input type="email" id="login-email" placeholder="seu@email.com">
+            </div>
+            <div class="campo">
+                <label>Senha</label>
+                <input type="password" id="login-senha" placeholder="••••••" onkeydown="if(event.key==='Enter') fazerLogin()">
+            </div>
+            <button onclick="fazerLogin()" style="margin-top:16px;">Entrar no Painel</button>
+            <p class="erro" id="erro-login"></p>
         </div>
-        <button onclick="fazerLogin()">Entrar</button>
-        <p class="erro" id="erro-login"></p>
+
+        <!-- Formulário de Registro -->
+        <div class="auth-form" id="form-registro">
+            <div class="campo">
+                <label>Nome completo *</label>
+                <input type="text" id="reg-nome" placeholder="Seu nome ou nome da empresa">
+            </div>
+            <div class="campo">
+                <label>E-mail *</label>
+                <input type="email" id="reg-email" placeholder="seu@email.com">
+            </div>
+            <div class="campo">
+                <label>Telefone</label>
+                <input type="text" id="reg-telefone" placeholder="(35) 99999-9999">
+            </div>
+            <div class="campo">
+                <label>Senha *</label>
+                <input type="password" id="reg-senha" placeholder="Mínimo 6 caracteres">
+            </div>
+            <div class="campo">
+                <label>Confirmar senha *</label>
+                <input type="password" id="reg-senha2" placeholder="Repita a senha">
+            </div>
+            <button class="verde" onclick="fazerRegistro()" style="margin-top:16px;">✅ Criar Minha Conta</button>
+            <p class="erro" id="erro-registro"></p>
+            <p class="sucesso" id="sucesso-registro"></p>
+            <div class="divisor-auth">ou</div>
+            <p style="font-size:12px; color:#94a3b8; text-align:center;">Já tem conta? <span onclick="trocarAba('login')" style="color:#f59e0b; cursor:pointer; font-weight:600;">Faça login</span></p>
+        </div>
     </div>
 </div>
 
-<!-- Painel -->
+<!-- ===== PAINEL ===== -->
 <div id="tela-painel">
     <header>
         <div>
@@ -212,7 +292,7 @@
 
     <div class="container">
 
-        <!-- NOVO: Card de Monitoramento em Tempo Real -->
+        <!-- Card de Monitoramento em Tempo Real -->
         <div class="card card-monitoramento">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
                 <div>
@@ -245,6 +325,7 @@
             </div>
         </div>
 
+        <!-- Cadastrar Cliente -->
         <div class="card">
             <h2>➕ Cadastrar Novo Cliente</h2>
             <div class="grid-2">
@@ -260,6 +341,7 @@
             <p class="sucesso" id="sucesso-cadastro"></p>
         </div>
 
+        <!-- Lista de Clientes -->
         <div class="card">
             <h2>👥 Minha Carteira de Clientes</h2>
             <table>
@@ -319,7 +401,7 @@
         <div class="dica">
             💡 Digite o endereço e clique em <strong>Buscar</strong>.<br>
             Para endereços rurais: abra o <a href="https://maps.google.com" target="_blank" style="color:#d97706; font-weight:600;">Google Maps</a>,
-            clique com o botão direito no local da instalação e copie as coordenadas que aparecem. Cole abaixo manualmente.
+            clique com o botão direito no local da instalação e copie as coordenadas. Cole abaixo manualmente.
         </div>
 
         <div class="campo">
@@ -351,7 +433,7 @@
             <button class="verde pequeno" onclick="salvarProjeto()">✅ Salvar Projeto</button>
             <button class="secundario pequeno" onclick="fecharModal('modal-projeto')">Cancelar</button>
         </div>
-        <p class="sucesso" id="sucesso-projeto" style="display:none; margin-top:8px;">✅ Projeto salvo com sucesso!</p>
+        <p class="sucesso" id="sucesso-projeto" style="display:none; margin-top:8px;">✅ Projeto salvo!</p>
         <p class="erro" id="erro-projeto"></p>
     </div>
 </div>
@@ -364,11 +446,27 @@
     let modoManual = false;
     let intervaloMonitoramento = null;
 
-    if (token) { mostrarPainel(); }
+    if (token) {
+        mostrarPainel();
+        iniciarMonitoramentoAutomatico();
+    }
 
+    // ===== ABAS DE AUTENTICAÇÃO =====
+    function trocarAba(aba) {
+        document.querySelectorAll(".auth-tab").forEach(t => t.classList.remove("ativa"));
+        document.querySelectorAll(".auth-form").forEach(f => f.classList.remove("ativa"));
+        document.querySelectorAll(".auth-tab")[aba === "login" ? 0 : 1].classList.add("ativa");
+        document.getElementById(`form-${aba}`).classList.add("ativa");
+        document.getElementById("erro-login").textContent = "";
+        document.getElementById("erro-registro").textContent = "";
+        document.getElementById("sucesso-registro").textContent = "";
+    }
+
+    // ===== LOGIN =====
     async function fazerLogin() {
-        const email = document.getElementById("login-email").value;
+        const email = document.getElementById("login-email").value.trim();
         const senha = document.getElementById("login-senha").value;
+        if (!email || !senha) { document.getElementById("erro-login").textContent = "Preencha e-mail e senha"; return; }
         try {
             const resp = await fetch(`${API}/auth/login`, {
                 method: "POST",
@@ -377,23 +475,65 @@
             });
             const data = await resp.json();
             if (resp.ok) {
-                token = data.token; nomeUsuario = data.nome;
+                token = data.token;
+                nomeUsuario = data.nome;
                 localStorage.setItem("token", token);
                 localStorage.setItem("nome", nomeUsuario);
                 mostrarPainel();
+                iniciarMonitoramentoAutomatico();
             } else {
-                document.getElementById("erro-login").textContent = data.detail || "Erro ao fazer login";
+                document.getElementById("erro-login").textContent = data.detail || "E-mail ou senha incorretos";
             }
         } catch(e) {
-            document.getElementById("erro-login").textContent = "Erro de conexão com a API";
+            document.getElementById("erro-login").textContent = "Erro de conexão com o servidor";
+        }
+    }
+
+    // ===== REGISTRO =====
+    async function fazerRegistro() {
+        const nome = document.getElementById("reg-nome").value.trim();
+        const email = document.getElementById("reg-email").value.trim();
+        const telefone = document.getElementById("reg-telefone").value.trim();
+        const senha = document.getElementById("reg-senha").value;
+        const senha2 = document.getElementById("reg-senha2").value;
+
+        document.getElementById("erro-registro").textContent = "";
+        document.getElementById("sucesso-registro").textContent = "";
+
+        if (!nome || !email || !senha) { document.getElementById("erro-registro").textContent = "Nome, e-mail e senha são obrigatórios"; return; }
+        if (senha.length < 6) { document.getElementById("erro-registro").textContent = "A senha deve ter no mínimo 6 caracteres"; return; }
+        if (senha !== senha2) { document.getElementById("erro-registro").textContent = "As senhas não conferem"; return; }
+
+        try {
+            const resp = await fetch(`${API}/auth/registro`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({nome, email, telefone, senha})
+            });
+            const data = await resp.json();
+            if (resp.ok) {
+                document.getElementById("sucesso-registro").textContent = "✅ Conta criada! Faça login para continuar.";
+                document.getElementById("reg-nome").value = "";
+                document.getElementById("reg-email").value = "";
+                document.getElementById("reg-telefone").value = "";
+                document.getElementById("reg-senha").value = "";
+                document.getElementById("reg-senha2").value = "";
+                setTimeout(() => {
+                    trocarAba("login");
+                    document.getElementById("login-email").value = email;
+                }, 2000);
+            } else {
+                document.getElementById("erro-registro").textContent = data.detail || "Erro ao criar conta";
+            }
+        } catch(e) {
+            document.getElementById("erro-registro").textContent = "Erro de conexão com o servidor";
         }
     }
 
     function mostrarPainel() {
-        document.getElementById("tela-login").style.display = "none";
+        document.getElementById("tela-auth").style.display = "none";
         document.getElementById("tela-painel").style.display = "block";
         document.getElementById("nome-usuario").textContent = nomeUsuario || "";
-        iniciarMonitoramentoAutomatico();
     }
 
     function sair() {
@@ -401,11 +541,6 @@
         localStorage.removeItem("token");
         localStorage.removeItem("nome");
         location.reload();
-    }
-
-    async function carregarClientes() {
-        // Mantido para compatibilidade, mas o monitoramento que preenche a tabela
-        console.log("Clientes carregados via monitoramento");
     }
 
     async function cadastrarCliente() {
@@ -470,12 +605,9 @@
     async function buscarCoordenadas() {
         const endereco = document.getElementById("proj-endereco").value;
         if (!endereco) { document.getElementById("erro-endereco").textContent = "Digite o endereço primeiro"; return; }
-
         document.getElementById("erro-endereco").textContent = "";
         document.getElementById("endereco-encontrado").style.display = "none";
-
         const variacoes = [endereco, endereco + ", Brasil", endereco.split(",").slice(-2).join(",").trim() + ", Brasil"];
-
         for (const v of variacoes) {
             try {
                 const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(v)}&limit=1&countrycodes=br`;
@@ -492,7 +624,6 @@
                 }
             } catch(e) { continue; }
         }
-
         document.getElementById("erro-endereco").textContent = "Endereço não encontrado. Use o Google Maps para copiar as coordenadas manualmente.";
         modoManual = true;
         document.getElementById("campos-manuais").style.display = "block";
@@ -502,10 +633,8 @@
         const potencia = parseFloat(document.getElementById("proj-potencia").value);
         const lat = parseFloat(document.getElementById("proj-lat").value);
         const lng = parseFloat(document.getElementById("proj-lng").value);
-
         if (!potencia) { document.getElementById("erro-projeto").textContent = "Potência é obrigatória"; return; }
         if (!lat || !lng) { document.getElementById("erro-projeto").textContent = "Informe a localização da instalação"; return; }
-
         const dados = {
             potencia_kwp: potencia,
             data_instalacao: document.getElementById("proj-data").value || null,
@@ -513,7 +642,6 @@
             longitude: lng,
             performance_ratio: parseFloat(document.getElementById("proj-pr").value) || 0.80
         };
-
         try {
             const resp = await fetch(`${API}/clientes/${clienteProjetoId}/projeto`, {
                 method: "PUT",
@@ -544,18 +672,11 @@
         }
     }
 
-    // ========== MÓDULO 3 - MONITORAMENTO EM TEMPO REAL ==========
-
+    // ===== MONITORAMENTO =====
     async function carregarMonitoramento() {
         try {
-            console.log("🔄 Carregando monitoramento...");
-            
-            const resp = await fetch(`${API}/clientes`, { 
-                headers: {"Authorization": `Bearer ${token}`} 
-            });
+            const resp = await fetch(`${API}/clientes`, { headers: {"Authorization": `Bearer ${token}`} });
             const clientes = await resp.json();
-            
-            // Buscar monitoramento para cada cliente
             const clientesComMonitoramento = await Promise.all(
                 clientes.map(async (cliente) => {
                     try {
@@ -573,10 +694,8 @@
                     }
                 })
             );
-            
             atualizarTabelaComMonitoramento(clientesComMonitoramento);
             atualizarCardResumo(clientesComMonitoramento);
-            
         } catch(e) {
             console.error("Erro ao carregar monitoramento:", e);
         }
@@ -584,16 +703,13 @@
 
     function atualizarTabelaComMonitoramento(clientes) {
         const tbody = document.getElementById("tabela-clientes");
-        
         if (clientes.length === 0) {
-            tbody.innerHTML = '<td><td colspan="6" style="text-align:center; color:#888;">Nenhum cliente cadastrado</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#888;">Nenhum cliente cadastrado</td></tr>';
             return;
         }
-        
         tbody.innerHTML = clientes.map(c => {
             let statusHtml = '';
             let hasMonitoramento = c.monitoramento && c.monitoramento.status;
-            
             if (!hasMonitoramento) {
                 statusHtml = '<span style="color:#9ca3af;">⚙️ Inversor não configurado</span>';
             } else if (c.monitoramento.status === 'online') {
@@ -608,7 +724,6 @@
             } else {
                 statusHtml = '<span style="color:#dc2626;">🔴 Erro na comunicação</span>';
             }
-            
             return `
                 <tr>
                     <td><strong>${c.nome}</strong></td>
@@ -621,7 +736,7 @@
                             <button class="pequeno" onclick="verContas(${c.id}, '${c.nome}')">Ver Contas</button>
                             <button class="azul pequeno" onclick="obterLink(${c.id}, '${c.nome}')">🔗 Link</button>
                             <button class="amarelo pequeno" onclick="cadastrarProjeto(${c.id}, '${c.nome}')">☀️ Projeto</button>
-                            ${hasMonitoramento ? `<button class="verde pequeno" onclick="verMonitoramentoAoVivo(${c.id}, '${c.nome}')">📡 Ver Ao Vivo</button>` : ''}
+                            ${hasMonitoramento ? `<button class="verde pequeno" onclick="verMonitoramentoAoVivo(${c.id}, '${c.nome}')">📡 Ao Vivo</button>` : ''}
                         </div>
                     </td>
                 </tr>
@@ -632,16 +747,13 @@
     function atualizarCardResumo(clientes) {
         const comInversor = clientes.filter(c => c.monitoramento && c.monitoramento.status);
         const semInversor = clientes.filter(c => !c.monitoramento || !c.monitoramento.status);
-        
         const totais = { normal: 0, alerta: 0, problema: 0 };
-        
         comInversor.forEach(c => {
             const geracao = c.monitoramento?.geracao_atual_kw || 0;
             if (geracao > 0.1) totais.normal++;
             else if (geracao > 0) totais.alerta++;
             else totais.problema++;
         });
-        
         document.getElementById("total-usinas").textContent = comInversor.length;
         document.getElementById("usinas-normais").textContent = totais.normal;
         document.getElementById("usinas-alerta").textContent = totais.alerta;
@@ -655,7 +767,6 @@
                 headers: {"Authorization": `Bearer ${token}`}
             });
             const dados = await resp.json();
-            
             let modal = document.getElementById("modal-monitoramento");
             if (!modal) {
                 modal = document.createElement('div');
@@ -669,71 +780,54 @@
                             <button class="azul pequeno" onclick="atualizarModalMonitoramento(${clienteId})">🔄 Atualizar</button>
                             <button class="secundario pequeno" onclick="fecharModalMonitoramento()">Fechar</button>
                         </div>
-                    </div>
-                `;
+                    </div>`;
                 document.body.appendChild(modal);
             }
-            
-            const conteudo = document.getElementById("modal-monitoramento-conteudo");
-            document.getElementById("modal-monitoramento-titulo").innerHTML = `📡 Monitoramento - ${nomeCliente}`;
-            
-            conteudo.innerHTML = `
+            document.getElementById("modal-monitoramento-titulo").innerHTML = `📡 Monitoramento — ${nomeCliente}`;
+            document.getElementById("modal-monitoramento-conteudo").innerHTML = `
                 <div style="margin: 15px 0;">
-                    <div style="background: #f0fdf4; padding: 10px; border-radius: 8px; margin-bottom: 10px;">
-                        <p><strong>⚡ Geração atual:</strong> <span style="font-size: 24px; font-weight: bold;">${dados.geracao_atual_kw}</span> kW</p>
+                    <div style="background: #f0fdf4; padding: 16px; border-radius: 10px; margin-bottom: 14px; text-align:center;">
+                        <p style="font-size:13px; color:#64748b;">Geração atual</p>
+                        <p style="font-size: 40px; font-weight: bold; color:#16a34a;">${dados.geracao_atual_kw} <span style="font-size:18px;">kW</span></p>
                     </div>
-                    <p><strong>📤 Injetando na rede:</strong> ${dados.injetado_rede_kw} kW</p>
-                    <p><strong>🏠 Consumo da casa:</strong> ${dados.consumo_casa_kw} kW</p>
-                    <p><strong>🔌 Consumo da rede:</strong> ${dados.consumo_rede_kw} kW</p>
-                    <p><strong>📟 Status:</strong> ${dados.status === 'online' ? '🟢 Online' : '🔴 Offline'}</p>
-                    <p><strong>🔢 Serial:</strong> ${dados.serial}</p>
+                    <p style="margin-bottom:8px;"><strong>📟 Status:</strong> ${dados.status === 'online' ? '🟢 Online' : '🔴 Offline'}</p>
+                    <p style="margin-bottom:8px;"><strong>🔢 Serial:</strong> ${dados.serial}</p>
                     <p><strong>🕐 Última leitura:</strong> ${new Date(dados.timestamp).toLocaleString('pt-BR')}</p>
-                </div>
-            `;
-            
+                </div>`;
             modal.classList.add("ativo");
-            
         } catch(e) {
-            alert("Erro ao buscar dados de monitoramento: " + e.message);
+            alert("Erro ao buscar dados de monitoramento");
         }
     }
-    
+
     async function atualizarModalMonitoramento(clienteId) {
         try {
             const resp = await fetch(`${API}/clientes/${clienteId}/monitoramento`, {
                 headers: {"Authorization": `Bearer ${token}`}
             });
             const dados = await resp.json();
-            const conteudo = document.getElementById("modal-monitoramento-conteudo");
-            
-            conteudo.innerHTML = `
+            document.getElementById("modal-monitoramento-conteudo").innerHTML = `
                 <div style="margin: 15px 0;">
-                    <div style="background: #f0fdf4; padding: 10px; border-radius: 8px; margin-bottom: 10px;">
-                        <p><strong>⚡ Geração atual:</strong> <span style="font-size: 24px; font-weight: bold;">${dados.geracao_atual_kw}</span> kW</p>
+                    <div style="background: #f0fdf4; padding: 16px; border-radius: 10px; margin-bottom: 14px; text-align:center;">
+                        <p style="font-size:13px; color:#64748b;">Geração atual</p>
+                        <p style="font-size: 40px; font-weight: bold; color:#16a34a;">${dados.geracao_atual_kw} <span style="font-size:18px;">kW</span></p>
                     </div>
-                    <p><strong>📤 Injetando na rede:</strong> ${dados.injetado_rede_kw} kW</p>
-                    <p><strong>🏠 Consumo da casa:</strong> ${dados.consumo_casa_kw} kW</p>
-                    <p><strong>🔌 Consumo da rede:</strong> ${dados.consumo_rede_kw} kW</p>
-                    <p><strong>📟 Status:</strong> ${dados.status === 'online' ? '🟢 Online' : '🔴 Offline'}</p>
-                    <p><strong>🔢 Serial:</strong> ${dados.serial}</p>
+                    <p style="margin-bottom:8px;"><strong>📟 Status:</strong> ${dados.status === 'online' ? '🟢 Online' : '🔴 Offline'}</p>
+                    <p style="margin-bottom:8px;"><strong>🔢 Serial:</strong> ${dados.serial}</p>
                     <p><strong>🕐 Última leitura:</strong> ${new Date(dados.timestamp).toLocaleString('pt-BR')}</p>
-                </div>
-            `;
-        } catch(e) {
-            alert("Erro ao atualizar: " + e.message);
-        }
+                </div>`;
+        } catch(e) { alert("Erro ao atualizar"); }
     }
-    
+
     function fecharModalMonitoramento() {
         const modal = document.getElementById("modal-monitoramento");
         if (modal) modal.classList.remove("ativo");
     }
-    
+
     function iniciarMonitoramentoAutomatico() {
         if (intervaloMonitoramento) clearInterval(intervaloMonitoramento);
         carregarMonitoramento();
         intervaloMonitoramento = setInterval(carregarMonitoramento, 60000);
-        console.log("✅ Monitoramento automático iniciado (a cada 1 minuto)");
     }
 </script>
 </body>
