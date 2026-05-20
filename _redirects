@@ -1,0 +1,6 @@
+# Regra para manter portal.html e painel.html acessíveis diretamente
+/portal.html    /portal.html    200
+/painel.html    /painel.html    200
+
+# Qualquer outra rota que não exista vai para o index.html
+/*    /index.html   200
