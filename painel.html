@@ -34,14 +34,16 @@
 
         .campo { margin-bottom: 12px; }
         .campo label { display: block; font-size: 12px; color: #666; margin-bottom: 4px; font-weight: 600; }
-        input {
+        input, select {
             width: 100%;
             padding: 12px;
             border: 1px solid #ddd;
             border-radius: 8px;
             font-size: 14px;
+            font-family: 'Segoe UI', sans-serif;
+            background: white;
         }
-        input:focus { outline: none; border-color: #f59e0b; }
+        input:focus, select:focus { outline: none; border-color: #f59e0b; }
 
         button {
             background: linear-gradient(135deg, #1e293b, #334155);
@@ -60,6 +62,7 @@
         button.verde { background: linear-gradient(135deg, #16a34a, #15803d); }
         button.azul { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
         button.amarelo { background: linear-gradient(135deg, #d97706, #b45309); }
+        button.roxo { background: linear-gradient(135deg, #7c3aed, #6d28d9); }
         button.vermelho { background: linear-gradient(135deg, #dc2626, #b91c1c); }
         button.pequeno { width: auto; padding: 8px 16px; font-size: 13px; margin-top: 0; }
 
@@ -123,6 +126,17 @@
             line-height: 1.6;
         }
 
+        .dica-roxo {
+            background: #f5f3ff;
+            border: 1px solid #8b5cf6;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 12px;
+            color: #5b21b6;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+
         .separador { border: none; border-top: 1px dashed #ddd; margin: 15px 0; }
 
         .link-manual {
@@ -160,7 +174,6 @@
             transition: all 0.2s;
         }
         .auth-tab.ativa { color: #1e293b; border-bottom-color: #f59e0b; }
-
         .auth-form { display: none; }
         .auth-form.ativa { display: block; }
 
@@ -177,20 +190,9 @@
             flex-wrap: wrap;
             gap: 15px;
         }
-        .card-monitoramento .stat-item {
-            text-align: center;
-            flex: 1;
-            min-width: 80px;
-        }
-        .card-monitoramento .stat-number {
-            font-size: 28px;
-            font-weight: bold;
-            display: block;
-        }
-        .card-monitoramento .stat-label {
-            font-size: 12px;
-            opacity: 0.8;
-        }
+        .card-monitoramento .stat-item { text-align: center; flex: 1; min-width: 80px; }
+        .card-monitoramento .stat-number { font-size: 28px; font-weight: bold; display: block; }
+        .card-monitoramento .stat-label { font-size: 12px; opacity: 0.8; }
         .status-normal { color: #4ade80; }
         .status-alerta { color: #fbbf24; }
         .status-problema { color: #f87171; }
@@ -213,11 +215,23 @@
         }
         .divisor-auth::before { left: 0; }
         .divisor-auth::after { right: 0; }
+
+        /* Badge de inversor configurado */
+        .badge-inversor {
+            display: inline-block;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 600;
+            background: #f0fdf4;
+            color: #16a34a;
+            margin-top: 4px;
+        }
     </style>
 </head>
 <body>
 
-<!-- ===== TELA DE AUTENTICAÇÃO (LOGIN + REGISTRO) ===== -->
+<!-- ===== AUTENTICAÇÃO ===== -->
 <div id="tela-auth">
     <div class="card">
         <div style="text-align:center; margin-bottom:24px;">
@@ -225,14 +239,10 @@
             <h1 style="font-size:22px; margin-top:8px; color:#1e293b;">Solar Portal</h1>
             <p style="color:#94a3b8; font-size:13px; margin-top:4px;">Painel do Integrador</p>
         </div>
-
-        <!-- Abas Login / Registro -->
         <div class="auth-tabs">
             <div class="auth-tab ativa" onclick="trocarAba('login')">Entrar</div>
             <div class="auth-tab" onclick="trocarAba('registro')">Criar Conta</div>
         </div>
-
-        <!-- Formulário de Login -->
         <div class="auth-form ativa" id="form-login">
             <div class="campo">
                 <label>E-mail</label>
@@ -245,8 +255,6 @@
             <button onclick="fazerLogin()" style="margin-top:16px;">Entrar no Painel</button>
             <p class="erro" id="erro-login"></p>
         </div>
-
-        <!-- Formulário de Registro -->
         <div class="auth-form" id="form-registro">
             <div class="campo">
                 <label>Nome completo *</label>
@@ -292,7 +300,7 @@
 
     <div class="container">
 
-        <!-- Card de Monitoramento em Tempo Real -->
+        <!-- Monitoramento em Tempo Real -->
         <div class="card card-monitoramento">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
                 <div>
@@ -320,7 +328,7 @@
                 </div>
                 <div class="stat-item">
                     <span class="stat-number status-offline" id="usinas-sem-config">0</span>
-                    <span class="stat-label">⚙️ Sem Configuração</span>
+                    <span class="stat-label">⚙️ Sem Config</span>
                 </div>
             </div>
         </div>
@@ -357,7 +365,7 @@
     </div>
 </div>
 
-<!-- Modal Link -->
+<!-- ===== MODAL LINK ===== -->
 <div class="modal-overlay" id="modal-link">
     <div class="modal">
         <h3>🔗 Link do Portal do Cliente</h3>
@@ -371,12 +379,11 @@
     </div>
 </div>
 
-<!-- Modal Projeto Solar -->
+<!-- ===== MODAL PROJETO SOLAR ===== -->
 <div class="modal-overlay" id="modal-projeto">
     <div class="modal">
         <h3>☀️ Projeto Solar</h3>
         <p class="subtitulo" id="nome-projeto-cliente"></p>
-
         <div class="grid-2">
             <div class="campo">
                 <label>Potência do sistema (kWp) *</label>
@@ -387,23 +394,18 @@
                 <input type="date" id="proj-data">
             </div>
         </div>
-
         <div class="campo">
             <label>Eficiência do sistema (Performance Ratio)</label>
             <input type="number" id="proj-pr" value="0.80" step="0.01">
             <p style="font-size:11px; color:#888; margin-top:4px;">Eficiência real considerando perdas por calor, cabeamento e inversor. Entre 0,75 e 0,85 para sistemas residenciais. Se não souber, deixe 0,80.</p>
         </div>
-
         <hr class="separador">
-
         <p style="font-weight:600; font-size:14px; margin-bottom:12px;">📍 Localização da instalação</p>
-
         <div class="dica">
             💡 Digite o endereço e clique em <strong>Buscar</strong>.<br>
             Para endereços rurais: abra o <a href="https://maps.google.com" target="_blank" style="color:#d97706; font-weight:600;">Google Maps</a>,
             clique com o botão direito no local da instalação e copie as coordenadas. Cole abaixo manualmente.
         </div>
-
         <div class="campo">
             <label>Endereço da instalação</label>
             <div style="display:flex; gap:8px;">
@@ -413,9 +415,7 @@
             <p class="info" id="endereco-encontrado" style="display:none;"></p>
             <p class="erro" id="erro-endereco"></p>
         </div>
-
         <button class="link-manual" onclick="toggleManual()">✏️ Inserir coordenadas manualmente</button>
-
         <div id="campos-manuais">
             <div class="grid-2">
                 <div class="campo">
@@ -428,7 +428,6 @@
                 </div>
             </div>
         </div>
-
         <div class="modal-acoes">
             <button class="verde pequeno" onclick="salvarProjeto()">✅ Salvar Projeto</button>
             <button class="secundario pequeno" onclick="fecharModal('modal-projeto')">Cancelar</button>
@@ -438,11 +437,58 @@
     </div>
 </div>
 
+<!-- ===== MODAL INVERSOR ===== -->
+<div class="modal-overlay" id="modal-inversor">
+    <div class="modal">
+        <h3>🔌 Cadastro do Inversor</h3>
+        <p class="subtitulo" id="nome-inversor-cliente"></p>
+
+        <div class="dica-roxo">
+            💡 Configure o inversor do cliente para ativar o <strong>monitoramento em tempo real</strong>.
+            Com o inversor configurado, você verá a geração ao vivo no painel e o cliente verá no portal.
+        </div>
+
+        <div class="campo">
+            <label>Marca do Inversor *</label>
+            <select id="inv-marca" onchange="atualizarInstrucoes()">
+                <option value="">Selecione a marca...</option>
+                <option value="foxess">FoxESS</option>
+                <option value="growatt">Growatt</option>
+                <option value="deye">Deye</option>
+                <option value="weg">WEG / SunWEG</option>
+                <option value="hoymiles">Hoymiles</option>
+                <option value="solis">Solis</option>
+                <option value="outro">Outro</option>
+            </select>
+        </div>
+
+        <div class="campo">
+            <label>Número de Série do Inversor *</label>
+            <input type="text" id="inv-serial" placeholder="Ex: J0MF502043LK010">
+            <p style="font-size:11px; color:#888; margin-top:4px;">Encontrado na etiqueta do inversor ou no aplicativo do fabricante.</p>
+        </div>
+
+        <div class="campo">
+            <label>Chave de API *</label>
+            <input type="text" id="inv-api-key" placeholder="Cole aqui a chave de API do fabricante">
+            <div id="instrucoes-api" style="margin-top:8px;"></div>
+        </div>
+
+        <div class="modal-acoes">
+            <button class="roxo pequeno" onclick="salvarInversor()">🔌 Salvar Inversor</button>
+            <button class="secundario pequeno" onclick="fecharModal('modal-inversor')">Cancelar</button>
+        </div>
+        <p class="sucesso" id="sucesso-inversor" style="display:none; margin-top:8px;">✅ Inversor configurado com sucesso!</p>
+        <p class="erro" id="erro-inversor"></p>
+    </div>
+</div>
+
 <script>
     const API = "https://solar-portal-api.onrender.com";
     let token = localStorage.getItem("token");
     let nomeUsuario = localStorage.getItem("nome");
     let clienteProjetoId = null;
+    let clienteInversorId = null;
     let modoManual = false;
     let intervaloMonitoramento = null;
 
@@ -496,14 +542,11 @@
         const telefone = document.getElementById("reg-telefone").value.trim();
         const senha = document.getElementById("reg-senha").value;
         const senha2 = document.getElementById("reg-senha2").value;
-
         document.getElementById("erro-registro").textContent = "";
         document.getElementById("sucesso-registro").textContent = "";
-
         if (!nome || !email || !senha) { document.getElementById("erro-registro").textContent = "Nome, e-mail e senha são obrigatórios"; return; }
         if (senha.length < 6) { document.getElementById("erro-registro").textContent = "A senha deve ter no mínimo 6 caracteres"; return; }
         if (senha !== senha2) { document.getElementById("erro-registro").textContent = "As senhas não conferem"; return; }
-
         try {
             const resp = await fetch(`${API}/auth/registro`, {
                 method: "POST",
@@ -513,15 +556,8 @@
             const data = await resp.json();
             if (resp.ok) {
                 document.getElementById("sucesso-registro").textContent = "✅ Conta criada! Faça login para continuar.";
-                document.getElementById("reg-nome").value = "";
-                document.getElementById("reg-email").value = "";
-                document.getElementById("reg-telefone").value = "";
-                document.getElementById("reg-senha").value = "";
-                document.getElementById("reg-senha2").value = "";
-                setTimeout(() => {
-                    trocarAba("login");
-                    document.getElementById("login-email").value = email;
-                }, 2000);
+                ["reg-nome","reg-email","reg-telefone","reg-senha","reg-senha2"].forEach(id => document.getElementById(id).value = "");
+                setTimeout(() => { trocarAba("login"); document.getElementById("login-email").value = email; }, 2000);
             } else {
                 document.getElementById("erro-registro").textContent = data.detail || "Erro ao criar conta";
             }
@@ -543,6 +579,7 @@
         location.reload();
     }
 
+    // ===== CLIENTES =====
     async function cadastrarCliente() {
         const dados = {
             nome: document.getElementById("novo-nome").value,
@@ -591,6 +628,7 @@
         setTimeout(() => document.getElementById("copiado").style.display = "none", 2000);
     }
 
+    // ===== PROJETO SOLAR =====
     function cadastrarProjeto(clienteId, nomeCliente) {
         clienteProjetoId = clienteId;
         document.getElementById("nome-projeto-cliente").textContent = `Cliente: ${nomeCliente}`;
@@ -658,6 +696,94 @@
         } catch(e) { document.getElementById("erro-projeto").textContent = "Erro de conexão"; }
     }
 
+    // ===== INVERSOR =====
+    function cadastrarInversor(clienteId, nomeCliente) {
+        clienteInversorId = clienteId;
+        document.getElementById("nome-inversor-cliente").textContent = `Cliente: ${nomeCliente}`;
+        document.getElementById("inv-marca").value = "";
+        document.getElementById("inv-serial").value = "";
+        document.getElementById("inv-api-key").value = "";
+        document.getElementById("instrucoes-api").innerHTML = "";
+        document.getElementById("erro-inversor").textContent = "";
+        document.getElementById("sucesso-inversor").style.display = "none";
+        document.getElementById("modal-inversor").classList.add("ativo");
+    }
+
+    function atualizarInstrucoes() {
+        const marca = document.getElementById("inv-marca").value;
+        const instrucoes = {
+            foxess: `<div class="dica-roxo">
+                📋 <strong>Como obter a chave FoxESS:</strong><br>
+                1. Acesse <a href="https://www.foxesscloud.com" target="_blank" style="color:#7c3aed;">foxesscloud.com</a><br>
+                2. Faça login → clique no seu perfil (canto superior direito)<br>
+                3. Vá em <strong>User Profile → API Management</strong><br>
+                4. Clique em <strong>Generate API Key</strong> e copie a chave
+            </div>`,
+            growatt: `<div class="dica-roxo">
+                📋 <strong>Como obter a chave Growatt:</strong><br>
+                1. Acesse <a href="https://openapi.growatt.com" target="_blank" style="color:#7c3aed;">openapi.growatt.com</a><br>
+                2. Registre-se como desenvolvedor<br>
+                3. Crie uma aplicação para obter o token de acesso
+            </div>`,
+            deye: `<div class="dica-roxo">
+                📋 <strong>Como obter a chave Deye:</strong><br>
+                1. Acesse o portal <a href="https://seu.deye.com.cn" target="_blank" style="color:#7c3aed;">SolarmanPV</a><br>
+                2. Vá em <strong>Configurações → API</strong><br>
+                3. Gere o token de acesso
+            </div>`,
+            weg: `<div class="dica-roxo">
+                📋 <strong>Como obter a chave WEG/SunWEG:</strong><br>
+                1. Acesse <a href="https://solarportal.weg.net" target="_blank" style="color:#7c3aed;">solarportal.weg.net</a><br>
+                2. Faça login → vá em <strong>Gestão de API</strong><br>
+                3. Gere uma nova chave de acesso
+            </div>`,
+            hoymiles: `<div class="dica-roxo">
+                📋 <strong>Como obter a chave Hoymiles:</strong><br>
+                1. Acesse <a href="https://global.hoymiles.com" target="_blank" style="color:#7c3aed;">global.hoymiles.com</a><br>
+                2. Vá em <strong>Account → API Access</strong><br>
+                3. Solicite acesso à API e copie o token
+            </div>`,
+        };
+        document.getElementById("instrucoes-api").innerHTML = instrucoes[marca] || "";
+    }
+
+    async function salvarInversor() {
+        const marca = document.getElementById("inv-marca").value;
+        const serial = document.getElementById("inv-serial").value.trim();
+        const apiKey = document.getElementById("inv-api-key").value.trim();
+
+        document.getElementById("erro-inversor").textContent = "";
+
+        if (!marca) { document.getElementById("erro-inversor").textContent = "Selecione a marca do inversor"; return; }
+        if (!serial) { document.getElementById("erro-inversor").textContent = "Número de série é obrigatório"; return; }
+        if (!apiKey) { document.getElementById("erro-inversor").textContent = "Chave de API é obrigatória"; return; }
+
+        const dados = {
+            marca_inversor: marca,
+            serial_inversor: serial,
+            api_key_inversor: apiKey
+        };
+
+        try {
+            const resp = await fetch(`${API}/clientes/${clienteInversorId}/inversor`, {
+                method: "PUT",
+                headers: {"Content-Type": "application/json", "Authorization": `Bearer ${token}`},
+                body: JSON.stringify(dados)
+            });
+            if (resp.ok) {
+                document.getElementById("sucesso-inversor").style.display = "block";
+                setTimeout(() => {
+                    document.getElementById("sucesso-inversor").style.display = "none";
+                    fecharModal("modal-inversor");
+                    carregarMonitoramento();
+                }, 2000);
+            } else {
+                const data = await resp.json();
+                document.getElementById("erro-inversor").textContent = data.detail || "Erro ao salvar inversor";
+            }
+        } catch(e) { document.getElementById("erro-inversor").textContent = "Erro de conexão"; }
+    }
+
     function fecharModal(id) {
         document.getElementById(id).classList.remove("ativo");
         if (id === "modal-projeto") {
@@ -685,12 +811,12 @@
                         });
                         if (monitorResp.ok) {
                             const dados = await monitorResp.json();
-                            return { ...cliente, monitoramento: dados, erro: null };
+                            return { ...cliente, monitoramento: dados, temInversor: true };
                         } else {
-                            return { ...cliente, monitoramento: null, erro: "sem_config" };
+                            return { ...cliente, monitoramento: null, temInversor: false };
                         }
                     } catch(e) {
-                        return { ...cliente, monitoramento: null, erro: "erro_conexao" };
+                        return { ...cliente, monitoramento: null, temInversor: false };
                     }
                 })
             );
@@ -709,20 +835,19 @@
         }
         tbody.innerHTML = clientes.map(c => {
             let statusHtml = '';
-            let hasMonitoramento = c.monitoramento && c.monitoramento.status;
-            if (!hasMonitoramento) {
-                statusHtml = '<span style="color:#9ca3af;">⚙️ Inversor não configurado</span>';
-            } else if (c.monitoramento.status === 'online') {
+            if (!c.temInversor) {
+                statusHtml = '<span style="color:#9ca3af; font-size:13px;">⚙️ Não configurado</span>';
+            } else if (c.monitoramento && c.monitoramento.status === 'online') {
                 const geracao = c.monitoramento.geracao_atual_kw;
                 if (geracao > 0.1) {
-                    statusHtml = `<span style="color:#16a34a;">🟢 Gerando ${geracao.toFixed(2)} kW</span>`;
+                    statusHtml = `<span style="color:#16a34a; font-size:13px;">🟢 ${geracao.toFixed(2)} kW</span>`;
                 } else if (geracao > 0) {
-                    statusHtml = `<span style="color:#d97706;">🟡 Geração baixa (${geracao.toFixed(2)} kW)</span>`;
+                    statusHtml = `<span style="color:#d97706; font-size:13px;">🟡 ${geracao.toFixed(2)} kW</span>`;
                 } else {
-                    statusHtml = '<span style="color:#dc2626;">🔴 Parado/Offline</span>';
+                    statusHtml = '<span style="color:#dc2626; font-size:13px;">🔴 Sem geração</span>';
                 }
             } else {
-                statusHtml = '<span style="color:#dc2626;">🔴 Erro na comunicação</span>';
+                statusHtml = '<span style="color:#dc2626; font-size:13px;">🔴 Erro</span>';
             }
             return `
                 <tr>
@@ -736,7 +861,8 @@
                             <button class="pequeno" onclick="verContas(${c.id}, '${c.nome}')">Ver Contas</button>
                             <button class="azul pequeno" onclick="obterLink(${c.id}, '${c.nome}')">🔗 Link</button>
                             <button class="amarelo pequeno" onclick="cadastrarProjeto(${c.id}, '${c.nome}')">☀️ Projeto</button>
-                            ${hasMonitoramento ? `<button class="verde pequeno" onclick="verMonitoramentoAoVivo(${c.id}, '${c.nome}')">📡 Ao Vivo</button>` : ''}
+                            <button class="roxo pequeno" onclick="cadastrarInversor(${c.id}, '${c.nome}')">🔌 Inversor</button>
+                            ${c.temInversor ? `<button class="verde pequeno" onclick="verMonitoramentoAoVivo(${c.id}, '${c.nome}')">📡 Ao Vivo</button>` : ''}
                         </div>
                     </td>
                 </tr>
@@ -745,8 +871,8 @@
     }
 
     function atualizarCardResumo(clientes) {
-        const comInversor = clientes.filter(c => c.monitoramento && c.monitoramento.status);
-        const semInversor = clientes.filter(c => !c.monitoramento || !c.monitoramento.status);
+        const comInversor = clientes.filter(c => c.temInversor);
+        const semInversor = clientes.filter(c => !c.temInversor);
         const totais = { normal: 0, alerta: 0, problema: 0 };
         comInversor.forEach(c => {
             const geracao = c.monitoramento?.geracao_atual_kw || 0;
@@ -773,55 +899,31 @@
                 modal.id = "modal-monitoramento";
                 modal.className = "modal-overlay";
                 modal.innerHTML = `
-                    <div class="modal" style="max-width: 500px;">
-                        <h3 id="modal-monitoramento-titulo">📡 Monitoramento em Tempo Real</h3>
-                        <div id="modal-monitoramento-conteudo"></div>
+                    <div class="modal" style="max-width: 480px;">
+                        <h3 id="mon-titulo">📡 Monitoramento</h3>
+                        <div id="mon-conteudo"></div>
                         <div class="modal-acoes">
-                            <button class="azul pequeno" onclick="atualizarModalMonitoramento(${clienteId})">🔄 Atualizar</button>
-                            <button class="secundario pequeno" onclick="fecharModalMonitoramento()">Fechar</button>
+                            <button class="azul pequeno" id="btn-atualizar-mon">🔄 Atualizar</button>
+                            <button class="secundario pequeno" onclick="document.getElementById('modal-monitoramento').classList.remove('ativo')">Fechar</button>
                         </div>
                     </div>`;
                 document.body.appendChild(modal);
             }
-            document.getElementById("modal-monitoramento-titulo").innerHTML = `📡 Monitoramento — ${nomeCliente}`;
-            document.getElementById("modal-monitoramento-conteudo").innerHTML = `
-                <div style="margin: 15px 0;">
-                    <div style="background: #f0fdf4; padding: 16px; border-radius: 10px; margin-bottom: 14px; text-align:center;">
-                        <p style="font-size:13px; color:#64748b;">Geração atual</p>
-                        <p style="font-size: 40px; font-weight: bold; color:#16a34a;">${dados.geracao_atual_kw} <span style="font-size:18px;">kW</span></p>
-                    </div>
-                    <p style="margin-bottom:8px;"><strong>📟 Status:</strong> ${dados.status === 'online' ? '🟢 Online' : '🔴 Offline'}</p>
-                    <p style="margin-bottom:8px;"><strong>🔢 Serial:</strong> ${dados.serial}</p>
-                    <p><strong>🕐 Última leitura:</strong> ${new Date(dados.timestamp).toLocaleString('pt-BR')}</p>
-                </div>`;
+            document.getElementById("btn-atualizar-mon").onclick = () => verMonitoramentoAoVivo(clienteId, nomeCliente);
+            document.getElementById("mon-titulo").textContent = `📡 ${nomeCliente}`;
+            document.getElementById("mon-conteudo").innerHTML = `
+                <div style="text-align:center; background: linear-gradient(135deg, #f59e0b, #d97706); border-radius:12px; padding:24px; color:white; margin:16px 0;">
+                    <p style="font-size:13px; opacity:0.85;">Geração atual</p>
+                    <p style="font-size:52px; font-weight:800; line-height:1;">${dados.geracao_atual_kw}</p>
+                    <p style="font-size:18px; opacity:0.85;">kW</p>
+                </div>
+                <p style="margin-bottom:8px;"><strong>📟 Status:</strong> ${dados.status === 'online' ? '🟢 Online' : '🔴 Offline'}</p>
+                <p style="margin-bottom:8px;"><strong>🔢 Serial:</strong> ${dados.serial}</p>
+                <p><strong>🕐 Última leitura:</strong> ${new Date(dados.timestamp).toLocaleString('pt-BR')}</p>`;
             modal.classList.add("ativo");
         } catch(e) {
             alert("Erro ao buscar dados de monitoramento");
         }
-    }
-
-    async function atualizarModalMonitoramento(clienteId) {
-        try {
-            const resp = await fetch(`${API}/clientes/${clienteId}/monitoramento`, {
-                headers: {"Authorization": `Bearer ${token}`}
-            });
-            const dados = await resp.json();
-            document.getElementById("modal-monitoramento-conteudo").innerHTML = `
-                <div style="margin: 15px 0;">
-                    <div style="background: #f0fdf4; padding: 16px; border-radius: 10px; margin-bottom: 14px; text-align:center;">
-                        <p style="font-size:13px; color:#64748b;">Geração atual</p>
-                        <p style="font-size: 40px; font-weight: bold; color:#16a34a;">${dados.geracao_atual_kw} <span style="font-size:18px;">kW</span></p>
-                    </div>
-                    <p style="margin-bottom:8px;"><strong>📟 Status:</strong> ${dados.status === 'online' ? '🟢 Online' : '🔴 Offline'}</p>
-                    <p style="margin-bottom:8px;"><strong>🔢 Serial:</strong> ${dados.serial}</p>
-                    <p><strong>🕐 Última leitura:</strong> ${new Date(dados.timestamp).toLocaleString('pt-BR')}</p>
-                </div>`;
-        } catch(e) { alert("Erro ao atualizar"); }
-    }
-
-    function fecharModalMonitoramento() {
-        const modal = document.getElementById("modal-monitoramento");
-        if (modal) modal.classList.remove("ativo");
     }
 
     function iniciarMonitoramentoAutomatico() {
