@@ -7,7 +7,8 @@ import os
 import secrets
 import psycopg2
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
+from calendar import monthrange
 from fastapi import Depends, FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -17,16 +18,14 @@ import PyPDF2
 
 # ==================== CONFIGURAÇÃO ====================
 
-# Carregar .env se existir (desenvolvimento local)
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
     pass
 
-# Variáveis de ambiente — funcionam local e na nuvem
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
-OPENROUTER_KEY = os.environ.get("OPENROUTER_KEY", "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")
+OPENROUTER_KEY = os.environ.get("OPENROUTER_KEY", "")
 
 app = FastAPI(title="Solar Portal API")
 
@@ -44,16 +43,11 @@ security = HTTPBearer()
 
 def conectar_banco():
     if DATABASE_URL:
-        # Neon / Render / produção
         return psycopg2.connect(DATABASE_URL, sslmode="require")
     else:
-        # Fallback local
         return psycopg2.connect(
-            host="localhost",
-            port=5432,
-            database="solar_portal",
-            user="postgres",
-            password="991Bog31**"
+            host="localhost", port=5432,
+            database="solar_portal", user="postgres", password="991Bog31**"
         )
 
 # ==================== AUTENTICAÇÃO ====================
@@ -65,7 +59,7 @@ def obter_integrador_atual(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail="Token inválido ou expirado")
     return payload
 
-# ==================== FUNÇÕES AUXILIARES ====================
+# ==================== PDF ====================
 
 def extrair_texto_pdf(caminho_pdf):
     texto = ""
@@ -75,8 +69,10 @@ def extrair_texto_pdf(caminho_pdf):
             texto += pagina.extract_text()
     return texto
 
+# ==================== IA — ANÁLISE DE CONTA ====================
+
 def analisar_conta(texto_pdf):
-    cliente = OpenAI(
+    cliente_ia = OpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=OPENROUTER_KEY
     )
@@ -88,11 +84,27 @@ Analise o texto extraído da conta e retorne SOMENTE um JSON válido, sem texto 
 ATENÇÃO — regras importantes antes de extrair:
 
 1. NOME DO CLIENTE: Nome da pessoa titular. Ignore prefixos de localidade como "B JARDIM".
-2. MÊS DE REFERÊNCIA: Formato "Abril / 2026". NÃO confundir com referência dos indicadores de qualidade.
-3. DATA DE VENCIMENTO: Campo "VENCIMENTO" em destaque na conta. NÃO confundir com data de apresentação.
-4. CONSUMO BRUTO (kWh): É a soma de todos os itens de consumo antes dos descontos da GD. Some "Consumo acima de 80kWh-BR" + "Consumo até 80kWh-BR".
-5. CONSUMO FATURADO (kWh): Procure no histórico dos últimos 13 meses o valor correspondente ao mês atual. NÃO usar leitura bruta do medidor.
-6. SALDO DE CRÉDITOS (kWh): Campo "Saldo Acumulado". Se zero, retornar 0.
+
+2. MÊS DE REFERÊNCIA: É o mês e ano impressos no campo "REF: MÊS / ANO" ou "Referência" em destaque na fatura.
+   ATENÇÃO: Use o mês do campo de referência principal da fatura, NÃO o mês de leitura anterior.
+   Exemplos corretos: "Maio / 2026", "Abril / 2026", "Março / 2026"
+   Se a fatura diz "Maio / 2026" no campo REF, retorne "Maio / 2026" mesmo que haja referências a abril em outros campos.
+
+3. DATA DE VENCIMENTO: Campo "VENCIMENTO" em destaque. NÃO confundir com data de apresentação ou emissão.
+
+4. CONSUMO BRUTO (kWh): Soma de todos os itens de consumo antes dos descontos da GD.
+   Some "Consumo acima de 80kWh-BR" + "Consumo até 80kWh-BR".
+
+5. CONSUMO FATURADO (kWh): Valor no histórico dos últimos 13 meses referente ao mês atual.
+   NÃO usar a leitura bruta do medidor. NÃO confundir com "Consumo até 80kWh-BR".
+
+6. ENERGIA INJETADA (kWh): Energia enviada à rede elétrica. Sempre em kWh, nunca em R$.
+   Aparece como "Energia injetada", "Energia Ativa Inj." ou similar.
+
+7. SALDO DE CRÉDITOS (kWh): Campo "Saldo Acumulado". Se zero, retornar 0.
+
+8. CONSUMO DA REDE (kWh): Energia consumida da distribuidora (período noturno ou quando geração é insuficiente).
+   É o consumo bruto que a conta registrou como consumo da rede. Aproximadamente igual ao consumo faturado em sistemas GD.
 
 REGRA ESPECIAL — LEITURA POR MÉDIA:
 Se houver "FATURAMENTO PELA MÉDIA", "MÉDIA/MÍNIMO" ou "LEITURA INFORMADA PELO CLIENTE", a conta pode ter acúmulo de meses.
@@ -106,6 +118,7 @@ Retorne EXATAMENTE neste formato JSON:
   "data_vencimento": "DD/MM/AAAA",
   "consumo_bruto_kwh": 0.0,
   "consumo_kwh": 0.0,
+  "consumo_rede_kwh": 0.0,
   "energia_injetada_kwh": 0.0,
   "saldo_acumulado_kwh": 0.0,
   "valor_fatura": 0.0,
@@ -118,61 +131,111 @@ Retorne EXATAMENTE neste formato JSON:
   "mensagem_cliente": ""
 }}
 
-Regras para preencher status_sistema, percentual_gerado e mensagem_cliente:
-- status_sistema: Se energia_injetada_kwh >= consumo_kwh então "SUPERAVITÁRIO", senão "DEFICITÁRIO". NUNCA compare com consumo_bruto_kwh.
+Regras para calcular status_sistema, percentual_gerado e mensagem_cliente:
+- status_sistema: Se energia_injetada_kwh >= consumo_kwh então "SUPERAVITÁRIO", senão "DEFICITÁRIO".
 - percentual_gerado: (energia_injetada_kwh / consumo_kwh) x 100. NUNCA usar consumo_bruto_kwh.
-- mensagem_cliente: Explique em linguagem simples e amigável. Máximo 3 linhas. NÃO copie textos técnicos da conta.
+- mensagem_cliente: Explique em linguagem simples. Máximo 3 linhas. NÃO copie textos técnicos.
 
 Texto da conta:
 {texto_pdf}"""
 
-    resposta = cliente.chat.completions.create(
+    resposta = cliente_ia.chat.completions.create(
         model="openrouter/auto",
         messages=[{"role": "user", "content": prompt}]
     )
     return resposta.choices[0].message.content
 
-def salvar_no_banco(dados, cliente_id):
-    conn = conectar_banco()
-    cur = conn.cursor()
+# ==================== CÁLCULO DE CONSUMO ====================
 
-    data_venc = None
-    try:
-        data_venc = datetime.strptime(dados["data_vencimento"], "%d/%m/%Y").date()
-    except:
-        pass
+def calcular_analise_consumo(dados: dict, geracao_total_kwh: float = None) -> dict:
+    """
+    Calcula consumo instantâneo, consumo total e detecta aumento de consumo.
 
-    cur.execute("""
-        INSERT INTO contas (
-            cliente_id, mes_referencia, data_vencimento,
-            consumo_bruto_kwh, consumo_kwh, energia_injetada_kwh, saldo_acumulado_kwh,
-            valor_fatura, modalidade_tarifaria, status_sistema,
-            percentual_gerado, leitura_por_media, meses_acumulados,
-            mensagem_cliente
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        RETURNING id
-    """, (
-        cliente_id,
-        dados.get("mes_referencia"),
-        data_venc,
-        dados.get("consumo_bruto_kwh"),
-        dados.get("consumo_kwh"),
-        dados.get("energia_injetada_kwh"),
-        dados.get("saldo_acumulado_kwh"),
-        dados.get("valor_fatura"),
-        dados.get("modalidade_tarifaria"),
-        dados.get("status_sistema"),
-        dados.get("percentual_gerado"),
-        dados.get("leitura_por_media", False),
-        dados.get("meses_acumulados", 1),
-        dados.get("mensagem_cliente")
-    ))
+    Fórmulas:
+    - Consumo Instantâneo = Gerado (pvPower) - Injetado
+    - Consumo Total = Consumo Instantâneo + Consumo da Rede (Energisa)
 
-    conta_id = cur.fetchone()[0]
-    conn.commit()
-    cur.close()
-    conn.close()
-    return conta_id
+    Se não tiver pvPower, estima pela conta:
+    - Consumo Total ≈ Consumo Bruto da conta (antes dos descontos GD)
+    """
+    energia_injetada = float(dados.get("energia_injetada_kwh") or 0)
+    consumo_rede = float(dados.get("consumo_rede_kwh") or dados.get("consumo_kwh") or 0)
+    consumo_bruto = float(dados.get("consumo_bruto_kwh") or 0)
+
+    resultado = {
+        "geracao_total_kwh": None,
+        "consumo_instantaneo_kwh": None,
+        "consumo_total_kwh": None,
+        "analise_consumo": None
+    }
+
+    if geracao_total_kwh and geracao_total_kwh > 0:
+        # Temos dados do inversor — cálculo preciso
+        consumo_instantaneo = round(geracao_total_kwh - energia_injetada, 2)
+        consumo_total = round(consumo_instantaneo + consumo_rede, 2)
+        resultado["geracao_total_kwh"] = geracao_total_kwh
+        resultado["consumo_instantaneo_kwh"] = max(0, consumo_instantaneo)
+        resultado["consumo_total_kwh"] = consumo_total
+    else:
+        # Sem dados do inversor — estimativa pela conta
+        consumo_total = consumo_bruto if consumo_bruto > 0 else (consumo_rede + energia_injetada)
+        resultado["consumo_total_kwh"] = round(consumo_total, 2)
+
+    return resultado
+
+def gerar_mensagem_consumo(dados_conta: dict, consumo_anterior: float = None) -> str:
+    """
+    Gera mensagem inteligente explicando o comportamento de consumo ao cliente.
+    Detecta e explica aumento de consumo de forma clara e amigável.
+    """
+    energia_injetada = float(dados_conta.get("energia_injetada_kwh") or 0)
+    consumo_total = float(dados_conta.get("consumo_total_kwh") or 0)
+    geracao_total = float(dados_conta.get("geracao_total_kwh") or 0)
+    consumo_instantaneo = float(dados_conta.get("consumo_instantaneo_kwh") or 0)
+    consumo_rede = float(dados_conta.get("consumo_rede_kwh") or dados_conta.get("consumo_kwh") or 0)
+    mes = dados_conta.get("mes_referencia", "este mês")
+
+    linhas = []
+
+    if geracao_total > 0:
+        linhas.append(
+            f"☀️ Em {mes}, seu sistema solar gerou {geracao_total:.1f} kWh no total. "
+            f"Desses, {consumo_instantaneo:.1f} kWh foram consumidos instantaneamente na sua casa "
+            f"e {energia_injetada:.1f} kWh foram injetados na rede elétrica como créditos."
+        )
+        linhas.append(
+            f"🏠 Sua casa consumiu {consumo_total:.1f} kWh no total este mês "
+            f"({consumo_instantaneo:.1f} kWh do solar + {consumo_rede:.1f} kWh da distribuidora)."
+        )
+    else:
+        linhas.append(
+            f"⚡ Em {mes}, seu sistema injetou {energia_injetada:.1f} kWh na rede elétrica. "
+            f"Isso representa a sobra da geração solar após o consumo durante o dia."
+        )
+
+    if consumo_anterior and consumo_anterior > 0 and consumo_total > 0:
+        variacao = ((consumo_total - consumo_anterior) / consumo_anterior) * 100
+        if variacao > 20:
+            economia_perdida = round((consumo_total - consumo_anterior) * 0.75, 2)
+            linhas.append(
+                f"📈 Atenção: seu consumo total aumentou {variacao:.0f}% comparado ao período anterior "
+                f"({consumo_anterior:.1f} kWh antes vs {consumo_total:.1f} kWh agora). "
+                f"Seu sistema solar está funcionando normalmente — o aumento na conta se deve ao maior consumo de energia, "
+                f"não a uma falha no sistema. Se mantivesse o consumo anterior, economizaria cerca de R$ {economia_perdida:.2f} a mais."
+            )
+        elif variacao > 5:
+            linhas.append(
+                f"📊 Seu consumo aumentou {variacao:.0f}% em relação ao período anterior. "
+                f"O sistema solar continua gerando normalmente — considere revisar quais equipamentos "
+                f"estão consumindo mais energia."
+            )
+        elif variacao < -5:
+            linhas.append(
+                f"✅ Ótimo! Seu consumo reduziu {abs(variacao):.0f}% em relação ao período anterior. "
+                f"O solar + eficiência energética estão fazendo efeito!"
+            )
+
+    return " ".join(linhas)
 
 # ==================== FOXESS API ====================
 
@@ -198,16 +261,110 @@ def foxess_chamar_api(api_key: str, path: str, body: dict):
     except requests.exceptions.RequestException as e:
         return {"errno": 99999, "msg": f"Erro de conexão: {str(e)}"}
 
-def foxess_get_realtime_data(api_key: str, serial: str) -> dict:
+def foxess_get_realtime(api_key: str, serial: str) -> dict:
     path = "op/v0/device/real/query"
     body = {"sn": serial, "variables": []}
     return foxess_chamar_api(api_key, path, body)
 
-def salvar_dados_no_banco(cliente_id: int, dados_mensais: list):
-    from calendar import monthrange
+def foxess_get_mensal(api_key: str, serial: str, ano: int, mes: int) -> float:
+    """Busca geração total do mês na FoxESS. Retorna kWh ou 0."""
+    path = "op/v0/device/report/query"
+    body = {"sn": serial, "year": ano, "month": mes, "dimension": "month", "variables": ["generation"]}
+    try:
+        resposta = foxess_chamar_api(api_key, path, body)
+        if resposta.get("errno") == 0:
+            resultado = resposta.get("result", [])
+            if isinstance(resultado, list):
+                for item in resultado:
+                    if isinstance(item, dict) and item.get("variable") == "generation":
+                        valores = item.get("values", [])
+                        if isinstance(valores, list):
+                            return round(sum(v for v in valores if v), 2)
+    except Exception:
+        pass
+    return 0.0
+
+# ==================== BANCO — HELPERS ====================
+
+def salvar_no_banco(dados, cliente_id):
     conn = conectar_banco()
     cur = conn.cursor()
-    total_inserido = 0
+
+    data_venc = None
+    try:
+        data_venc = datetime.strptime(dados["data_vencimento"], "%d/%m/%Y").date()
+    except:
+        pass
+
+    cur.execute("""
+        INSERT INTO contas (
+            cliente_id, mes_referencia, data_vencimento,
+            consumo_bruto_kwh, consumo_kwh, energia_injetada_kwh, saldo_acumulado_kwh,
+            valor_fatura, modalidade_tarifaria, status_sistema,
+            percentual_gerado, leitura_por_media, meses_acumulados, mensagem_cliente,
+            geracao_total_kwh, consumo_instantaneo_kwh, consumo_total_kwh,
+            consumo_anterior_kwh, aumento_consumo_pct, analise_consumo
+        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        RETURNING id
+    """, (
+        cliente_id,
+        dados.get("mes_referencia"),
+        data_venc,
+        dados.get("consumo_bruto_kwh"),
+        dados.get("consumo_kwh"),
+        dados.get("energia_injetada_kwh"),
+        dados.get("saldo_acumulado_kwh"),
+        dados.get("valor_fatura"),
+        dados.get("modalidade_tarifaria"),
+        dados.get("status_sistema"),
+        dados.get("percentual_gerado"),
+        dados.get("leitura_por_media", False),
+        dados.get("meses_acumulados", 1),
+        dados.get("mensagem_cliente"),
+        dados.get("geracao_total_kwh"),
+        dados.get("consumo_instantaneo_kwh"),
+        dados.get("consumo_total_kwh"),
+        dados.get("consumo_anterior_kwh"),
+        dados.get("aumento_consumo_pct"),
+        dados.get("analise_consumo")
+    ))
+
+    conta_id = cur.fetchone()[0]
+    conn.commit()
+    cur.close()
+    conn.close()
+    return conta_id
+
+def buscar_geracao_dia(cliente_id: int, data_busca):
+    conn = conectar_banco()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT COALESCE(SUM(geracao_kwh), 0)
+        FROM historico_geracao
+        WHERE cliente_id = %s AND data = %s
+    """, (cliente_id, data_busca))
+    resultado = cur.fetchone()
+    cur.close()
+    conn.close()
+    return float(resultado[0]) if resultado[0] else 0.0
+
+def buscar_geracao_periodo(cliente_id: int, data_inicio, data_fim):
+    conn = conectar_banco()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT data, SUM(geracao_kwh) as total
+        FROM historico_geracao
+        WHERE cliente_id = %s AND data BETWEEN %s AND %s
+        GROUP BY data ORDER BY data
+    """, (cliente_id, data_inicio, data_fim))
+    resultados = cur.fetchall()
+    cur.close()
+    conn.close()
+    return [{"data": str(r[0]), "total_kwh": float(r[1]) if r[1] else 0} for r in resultados]
+
+def salvar_historico_banco(cliente_id: int, dados_mensais: list):
+    conn = conectar_banco()
+    cur = conn.cursor()
     for mes_dado in dados_mensais:
         ano = mes_dado["ano"]
         mes = mes_dado["mes_num"]
@@ -222,45 +379,17 @@ def salvar_dados_no_banco(cliente_id: int, dados_mensais: list):
                 ON CONFLICT (cliente_id, data)
                 DO UPDATE SET geracao_kwh = EXCLUDED.geracao_kwh
             """, (cliente_id, data, round(valor_diario, 2)))
-            total_inserido += 1
     conn.commit()
     cur.close()
     conn.close()
-
-def buscar_geracao_dia_especifico(cliente_id: int, data_busca):
-    conn = conectar_banco()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT SUM(geracao_kwh)
-        FROM historico_geracao
-        WHERE cliente_id = %s AND data = %s
-    """, (cliente_id, data_busca))
-    resultado = cur.fetchone()
-    cur.close()
-    conn.close()
-    valor = resultado[0] if resultado[0] else 0
-    return {"total_kwh": float(valor) if valor else 0}
-
-def buscar_geracao_periodo(cliente_id: int, data_inicio, data_fim):
-    conn = conectar_banco()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT data, SUM(geracao_kwh) as total
-        FROM historico_geracao
-        WHERE cliente_id = %s AND data BETWEEN %s AND %s
-        GROUP BY data
-        ORDER BY data
-    """, (cliente_id, data_inicio, data_fim))
-    resultados = cur.fetchall()
-    cur.close()
-    conn.close()
-    return [{"data": r[0], "total_kwh": float(r[1]) if r[1] else 0} for r in resultados]
 
 # ==================== ROTAS ====================
 
 @app.get("/")
 def inicio():
     return {"status": "Solar Portal API funcionando!"}
+
+# ===== AUTH =====
 
 @app.post("/auth/registro")
 def registrar_integrador(dados: dict):
@@ -299,15 +428,25 @@ def login(dados: dict):
 def meu_perfil(integrador: dict = Depends(obter_integrador_atual)):
     return integrador
 
+# ===== CLIENTES =====
+
 @app.get("/clientes")
 def listar_clientes(integrador: dict = Depends(obter_integrador_atual)):
     conn = conectar_banco()
     cur = conn.cursor()
-    cur.execute("SELECT id, nome, numero_uc, distribuidora, tipo_gd FROM clientes WHERE integrador_id = %s", (integrador["id"],))
+    cur.execute("""
+        SELECT id, nome, numero_uc, distribuidora, tipo_gd,
+               marca_inversor, serial_inversor
+        FROM clientes WHERE integrador_id = %s
+    """, (integrador["id"],))
     clientes = cur.fetchall()
     cur.close()
     conn.close()
-    return [{"id": c[0], "nome": c[1], "numero_uc": c[2], "distribuidora": c[3], "tipo_gd": c[4]} for c in clientes]
+    return [{
+        "id": c[0], "nome": c[1], "numero_uc": c[2],
+        "distribuidora": c[3], "tipo_gd": c[4],
+        "marca_inversor": c[5], "serial_inversor": c[6]
+    } for c in clientes]
 
 @app.post("/clientes")
 def cadastrar_cliente(dados: dict, integrador: dict = Depends(obter_integrador_atual)):
@@ -320,14 +459,9 @@ def cadastrar_cliente(dados: dict, integrador: dict = Depends(obter_integrador_a
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id, nome, token_acesso
         """, (
-            integrador["id"],
-            dados.get("nome"),
-            dados.get("email"),
-            dados.get("telefone"),
-            dados.get("numero_uc"),
-            dados.get("distribuidora"),
-            dados.get("tipo_gd"),
-            token_acesso
+            integrador["id"], dados.get("nome"), dados.get("email"),
+            dados.get("telefone"), dados.get("numero_uc"),
+            dados.get("distribuidora"), dados.get("tipo_gd"), token_acesso
         ))
         cliente = cur.fetchone()
         conn.commit()
@@ -357,7 +491,9 @@ def listar_contas(cliente_id: int, integrador: dict = Depends(obter_integrador_a
     cur.execute("""
         SELECT c.id, c.mes_referencia, c.data_vencimento, c.consumo_kwh,
                c.energia_injetada_kwh, c.saldo_acumulado_kwh, c.valor_fatura,
-               c.status_sistema, c.percentual_gerado, c.mensagem_cliente
+               c.status_sistema, c.percentual_gerado, c.mensagem_cliente,
+               c.geracao_total_kwh, c.consumo_instantaneo_kwh, c.consumo_total_kwh,
+               c.analise_consumo
         FROM contas c
         JOIN clientes cl ON cl.id = c.cliente_id
         WHERE c.cliente_id = %s AND cl.integrador_id = %s
@@ -371,7 +507,9 @@ def listar_contas(cliente_id: int, integrador: dict = Depends(obter_integrador_a
         "consumo_kwh": float(c[3] or 0), "energia_injetada_kwh": float(c[4] or 0),
         "saldo_acumulado_kwh": float(c[5] or 0), "valor_fatura": float(c[6] or 0),
         "status_sistema": c[7], "percentual_gerado": float(c[8] or 0),
-        "mensagem_cliente": c[9]
+        "mensagem_cliente": c[9], "geracao_total_kwh": float(c[10] or 0),
+        "consumo_instantaneo_kwh": float(c[11] or 0), "consumo_total_kwh": float(c[12] or 0),
+        "analise_consumo": c[13]
     } for c in contas]
 
 @app.get("/clientes/{cliente_id}/contas-publico")
@@ -382,7 +520,8 @@ def listar_contas_publico(cliente_id: int):
         SELECT id, mes_referencia, data_vencimento, consumo_kwh,
                energia_injetada_kwh, saldo_acumulado_kwh, valor_fatura,
                status_sistema, percentual_gerado, mensagem_cliente,
-               consumo_bruto_kwh
+               consumo_bruto_kwh, geracao_total_kwh, consumo_instantaneo_kwh,
+               consumo_total_kwh, analise_consumo
         FROM contas
         WHERE cliente_id = %s
         ORDER BY criado_em DESC
@@ -396,7 +535,9 @@ def listar_contas_publico(cliente_id: int):
         "consumo_kwh": float(c[3] or 0), "energia_injetada_kwh": float(c[4] or 0),
         "saldo_acumulado_kwh": float(c[5] or 0), "valor_fatura": float(c[6] or 0),
         "status_sistema": c[7], "percentual_gerado": float(c[8] or 0),
-        "mensagem_cliente": c[9], "consumo_bruto_kwh": float(c[10] or 0)
+        "mensagem_cliente": c[9], "consumo_bruto_kwh": float(c[10] or 0),
+        "geracao_total_kwh": float(c[11] or 0), "consumo_instantaneo_kwh": float(c[12] or 0),
+        "consumo_total_kwh": float(c[13] or 0), "analise_consumo": c[14]
     } for c in contas]
 
 @app.get("/portal/{token_acesso}")
@@ -417,22 +558,14 @@ def atualizar_projeto(cliente_id: int, dados: dict, integrador: dict = Depends(o
     cur = conn.cursor()
     try:
         cur.execute("""
-            UPDATE clientes SET
-                potencia_kwp = %s,
-                latitude = %s,
-                longitude = %s,
-                data_instalacao = %s,
-                performance_ratio = %s
-            WHERE id = %s AND integrador_id = %s
+            UPDATE clientes SET potencia_kwp=%s, latitude=%s, longitude=%s,
+                data_instalacao=%s, performance_ratio=%s
+            WHERE id=%s AND integrador_id=%s
             RETURNING id, nome
         """, (
-            dados.get("potencia_kwp"),
-            dados.get("latitude"),
-            dados.get("longitude"),
-            dados.get("data_instalacao"),
-            dados.get("performance_ratio", 0.80),
-            cliente_id,
-            integrador["id"]
+            dados.get("potencia_kwp"), dados.get("latitude"), dados.get("longitude"),
+            dados.get("data_instalacao"), dados.get("performance_ratio", 0.80),
+            cliente_id, integrador["id"]
         ))
         cliente = cur.fetchone()
         conn.commit()
@@ -451,18 +584,12 @@ def atualizar_inversor(cliente_id: int, dados: dict, integrador: dict = Depends(
     cur = conn.cursor()
     try:
         cur.execute("""
-            UPDATE clientes SET
-                marca_inversor = %s,
-                serial_inversor = %s,
-                api_key_inversor = %s
-            WHERE id = %s AND integrador_id = %s
+            UPDATE clientes SET marca_inversor=%s, serial_inversor=%s, api_key_inversor=%s
+            WHERE id=%s AND integrador_id=%s
             RETURNING id, nome
         """, (
-            dados.get("marca_inversor"),
-            dados.get("serial_inversor"),
-            dados.get("api_key_inversor"),
-            cliente_id,
-            integrador["id"]
+            dados.get("marca_inversor"), dados.get("serial_inversor"),
+            dados.get("api_key_inversor"), cliente_id, integrador["id"]
         ))
         cliente = cur.fetchone()
         conn.commit()
@@ -475,6 +602,95 @@ def atualizar_inversor(cliente_id: int, dados: dict, integrador: dict = Depends(
         cur.close()
         conn.close()
 
+# ===== UPLOAD DE CONTA =====
+
+@app.post("/contas/upload/{cliente_id}")
+async def upload_conta(cliente_id: int, arquivo: UploadFile = File(...)):
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        tmp.write(await arquivo.read())
+        tmp_path = tmp.name
+
+    try:
+        # 1. Extrair texto do PDF
+        texto = extrair_texto_pdf(tmp_path)
+
+        # 2. Analisar com IA
+        resultado_raw = analisar_conta(texto)
+        resultado_raw = re.sub(r"```json|```", "", resultado_raw).strip()
+        dados = json.loads(resultado_raw)
+
+        # 3. Buscar geração total do inversor (se configurado)
+        conn = conectar_banco()
+        cur = conn.cursor()
+        cur.execute("SELECT marca_inversor, serial_inversor, api_key_inversor FROM clientes WHERE id = %s", (cliente_id,))
+        inversor = cur.fetchone()
+
+        # Buscar conta anterior para comparar consumo
+        cur.execute("""
+            SELECT consumo_total_kwh, consumo_bruto_kwh
+            FROM contas WHERE cliente_id = %s
+            ORDER BY criado_em DESC LIMIT 1
+        """, (cliente_id,))
+        conta_anterior = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        consumo_anterior = None
+        if conta_anterior:
+            consumo_anterior = float(conta_anterior[0] or conta_anterior[1] or 0)
+
+        # 4. Buscar geração total do mês via FoxESS
+        geracao_total_kwh = None
+        if inversor and inversor[0] and inversor[0].lower() == "foxess" and inversor[2]:
+            try:
+                mes_ref = dados.get("mes_referencia", "")
+                meses_map = {
+                    "jan": 1, "fev": 2, "mar": 3, "abr": 4, "mai": 5, "jun": 6,
+                    "jul": 7, "ago": 8, "set": 9, "out": 10, "nov": 11, "dez": 12
+                }
+                mes_num = None
+                ano_num = datetime.now().year
+                for nome, num in meses_map.items():
+                    if nome in mes_ref.lower():
+                        mes_num = num
+                        break
+                partes = re.findall(r'\d{4}', mes_ref)
+                if partes:
+                    ano_num = int(partes[0])
+
+                if mes_num:
+                    geracao_total_kwh = foxess_get_mensal(inversor[2], inversor[1], ano_num, mes_num)
+                    if geracao_total_kwh == 0:
+                        geracao_total_kwh = None
+            except Exception:
+                geracao_total_kwh = None
+
+        # 5. Calcular consumo instantâneo e total
+        analise = calcular_analise_consumo(dados, geracao_total_kwh)
+        dados.update(analise)
+
+        # 6. Calcular aumento de consumo
+        if consumo_anterior and consumo_anterior > 0 and dados.get("consumo_total_kwh"):
+            aumento_pct = ((dados["consumo_total_kwh"] - consumo_anterior) / consumo_anterior) * 100
+            dados["consumo_anterior_kwh"] = consumo_anterior
+            dados["aumento_consumo_pct"] = round(aumento_pct, 1)
+
+        # 7. Gerar análise inteligente de consumo
+        dados["analise_consumo"] = gerar_mensagem_consumo(dados, consumo_anterior)
+
+        # 8. Salvar no banco
+        conta_id = salvar_no_banco(dados, cliente_id)
+        dados["id"] = conta_id
+
+        return {"sucesso": True, "conta": dados}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        os.unlink(tmp_path)
+
+# ===== GERAÇÃO ESPERADA =====
+
 @app.get("/clientes/{cliente_id}/geracao-esperada")
 def geracao_esperada(cliente_id: int):
     conn = conectar_banco()
@@ -483,23 +699,25 @@ def geracao_esperada(cliente_id: int):
     cliente = cur.fetchone()
     cur.close()
     conn.close()
+
     if not cliente or not cliente[0]:
         raise HTTPException(status_code=404, detail="Projeto solar não cadastrado")
-    potencia_kwp, latitude, longitude, pr = cliente
-    potencia_kwp = float(potencia_kwp)
-    pr = float(pr) if pr else 0.80
+
+    potencia_kwp = float(cliente[0])
+    pr = float(cliente[3]) if cliente[3] else 0.80
+
     hsp_mensal = {
         1: 5.2, 2: 5.4, 3: 5.1, 4: 4.8, 5: 4.5, 6: 4.3,
         7: 4.5, 8: 5.0, 9: 4.9, 10: 4.8, 11: 4.9, 12: 5.0
     }
     meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
     dias_mes = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
     geracao = []
     for i in range(1, 13):
-        hsp = hsp_mensal[i]
-        dias = dias_mes[i-1]
-        kwh_esperado = round(potencia_kwp * hsp * dias * pr, 2)
-        geracao.append({"mes": meses[i-1], "mes_num": i, "hsp": hsp, "kwh_esperado": kwh_esperado})
+        kwh_esperado = round(potencia_kwp * hsp_mensal[i] * dias_mes[i-1] * pr, 2)
+        geracao.append({"mes": meses[i-1], "mes_num": i, "hsp": hsp_mensal[i], "kwh_esperado": kwh_esperado})
+
     return {
         "potencia_kwp": potencia_kwp,
         "performance_ratio": pr,
@@ -507,23 +725,7 @@ def geracao_esperada(cliente_id: int):
         "total_anual": round(sum(g["kwh_esperado"] for g in geracao), 2)
     }
 
-@app.post("/contas/upload/{cliente_id}")
-async def upload_conta(cliente_id: int, arquivo: UploadFile = File(...)):
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-        tmp.write(await arquivo.read())
-        tmp_path = tmp.name
-    try:
-        texto = extrair_texto_pdf(tmp_path)
-        resultado_raw = analisar_conta(texto)
-        resultado_raw = re.sub(r"```json|```", "", resultado_raw).strip()
-        dados = json.loads(resultado_raw)
-        conta_id = salvar_no_banco(dados, cliente_id)
-        dados["id"] = conta_id
-        return {"sucesso": True, "conta": dados}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        os.unlink(tmp_path)
+# ===== MONITORAMENTO =====
 
 @app.get("/clientes/{cliente_id}/monitoramento")
 def monitoramento_foxess(cliente_id: int):
@@ -533,30 +735,32 @@ def monitoramento_foxess(cliente_id: int):
     cliente = cur.fetchone()
     cur.close()
     conn.close()
+
     if not cliente or not cliente[2]:
         raise HTTPException(status_code=404, detail="Inversor não configurado")
+
     marca, serial, api_key = cliente
     if marca.lower() != "foxess":
         raise HTTPException(status_code=400, detail="Marca não suportada ainda")
-    data = foxess_get_realtime_data(api_key, serial)
+
+    data = foxess_get_realtime(api_key, serial)
+
     if data.get("errno") != 0:
         raise HTTPException(status_code=400, detail=f"Erro Foxess: {data.get('msg')} (errno: {data.get('errno')})")
+
     resultado = data.get("result", [])
     if not resultado:
         raise HTTPException(status_code=404, detail="Nenhum dado retornado")
+
     variaveis = {}
     for item in resultado[0].get("datas", []):
-        valor = item.get("value", 0)
-        if valor == "" or valor is None:
-            valor = 0
         try:
-            variaveis[item["variable"]] = float(valor)
-        except (ValueError, TypeError):
+            variaveis[item["variable"]] = float(item.get("value") or 0)
+        except:
             variaveis[item["variable"]] = 0.0
+
     return {
-        "marca": marca,
-        "serial": serial,
-        "status": "online",
+        "marca": marca, "serial": serial, "status": "online",
         "geracao_atual_kw": variaveis.get("pvPower", 0.0),
         "injetado_rede_kw": variaveis.get("feedinPower", 0.0),
         "consumo_rede_kw": variaveis.get("gridConsumptionPower", 0.0),
@@ -567,229 +771,129 @@ def monitoramento_foxess(cliente_id: int):
 
 @app.get("/clientes/{cliente_id}/monitoramento/mensal")
 def monitoramento_mensal(cliente_id: int):
-    from datetime import date
+    nomes_meses = {
+        1: "Jan", 2: "Fev", 3: "Mar", 4: "Abr", 5: "Mai", 6: "Jun",
+        7: "Jul", 8: "Ago", 9: "Set", 10: "Out", 11: "Nov", 12: "Dez"
+    }
+
     conn = conectar_banco()
     cur = conn.cursor()
-    cur.execute("SELECT nome, marca_inversor FROM clientes WHERE id = %s", (cliente_id,))
+    cur.execute("SELECT nome, marca_inversor, serial_inversor, api_key_inversor FROM clientes WHERE id = %s", (cliente_id,))
     cliente = cur.fetchone()
-    if not cliente:
-        cur.close()
-        conn.close()
-        raise HTTPException(status_code=404, detail="Cliente não encontrado")
-    nome_cliente, marca = cliente
+
+    # Tentar dados do banco local primeiro
     cur.execute("""
-        SELECT
-            EXTRACT(YEAR FROM data) as ano,
-            EXTRACT(MONTH FROM data) as mes,
-            SUM(geracao_kwh) as total_geracao
+        SELECT EXTRACT(YEAR FROM data) as ano, EXTRACT(MONTH FROM data) as mes,
+               SUM(geracao_kwh) as total
         FROM historico_geracao
-        WHERE cliente_id = %s
-          AND data >= CURRENT_DATE - INTERVAL '12 months'
-        GROUP BY ano, mes
-        ORDER BY ano DESC, mes DESC
+        WHERE cliente_id = %s AND data >= CURRENT_DATE - INTERVAL '12 months'
+        GROUP BY ano, mes ORDER BY ano, mes
     """, (cliente_id,))
     resultados = cur.fetchall()
     cur.close()
     conn.close()
-    nomes_meses = {1: "Jan", 2: "Fev", 3: "Mar", 4: "Abr", 5: "Mai", 6: "Jun",
-                   7: "Jul", 8: "Ago", 9: "Set", 10: "Out", 11: "Nov", 12: "Dez"}
-    if resultados and len(resultados) > 0:
-        mensal = []
-        for ano, mes, total in resultados:
-            if total and float(total) > 0:
-                mensal.append({
-                    "ano": int(ano),
-                    "mes_num": int(mes),
-                    "mes": nomes_meses[int(mes)],
-                    "geracao_kwh": round(float(total), 2),
-                    "fonte": "banco_local"
-                })
-        mensal.sort(key=lambda x: (x["ano"], x["mes_num"]))
-        if len(mensal) > 12:
-            mensal = mensal[-12:]
-        return {
-            "cliente_id": cliente_id,
-            "cliente_nome": nome_cliente,
-            "mensal": mensal,
-            "total_periodo": round(sum(m["geracao_kwh"] for m in mensal), 2),
-            "fonte": "banco_local"
-        }
-    if not marca or marca.lower() != "foxess":
+
+    if resultados:
+        mensal = [{"ano": int(r[0]), "mes_num": int(r[1]), "mes": nomes_meses[int(r[1])],
+                   "geracao_kwh": round(float(r[2]), 2), "fonte": "banco"} for r in resultados if float(r[2]) > 0]
+        if mensal:
+            return {"cliente_id": cliente_id, "mensal": mensal[-12:],
+                    "total_periodo": round(sum(m["geracao_kwh"] for m in mensal), 2), "fonte": "banco"}
+
+    # Fallback FoxESS
+    if not cliente or not cliente[1] or cliente[1].lower() != "foxess" or not cliente[3]:
         return {"cliente_id": cliente_id, "mensal": [], "total_periodo": 0, "fonte": "nenhuma"}
-    conn = conectar_banco()
-    cur = conn.cursor()
-    cur.execute("SELECT serial_inversor, api_key_inversor FROM clientes WHERE id = %s", (cliente_id,))
-    dados_inversor = cur.fetchone()
-    cur.close()
-    conn.close()
-    if not dados_inversor or not dados_inversor[1]:
-        return {"cliente_id": cliente_id, "mensal": [], "total_periodo": 0, "fonte": "nenhuma"}
-    serial, api_key = dados_inversor
+
+    nome, marca, serial, api_key = cliente
     hoje = datetime.now()
     dados_por_mes = []
+
     for i in range(12):
         data_mes = hoje - timedelta(days=30 * i)
-        ano = data_mes.year
-        mes = data_mes.month
-        path = "op/v0/device/report/query"
-        body = {"sn": serial, "year": ano, "month": mes, "dimension": "month", "variables": ["generation"]}
-        try:
-            resposta = foxess_chamar_api(api_key, path, body)
-            if resposta.get("errno") == 0:
-                resultado = resposta.get("result", [])
-                total_mes = 0
-                if isinstance(resultado, list):
-                    for item in resultado:
-                        if isinstance(item, dict) and item.get("variable") == "generation":
-                            valores = item.get("values", [])
-                            if isinstance(valores, list):
-                                total_mes = sum(valores)
-                            break
-                if total_mes > 0:
-                    dados_por_mes.append({
-                        "ano": ano, "mes_num": mes,
-                        "mes": nomes_meses[mes],
-                        "geracao_kwh": round(total_mes, 2)
-                    })
-        except Exception as e:
-            continue
+        total = foxess_get_mensal(api_key, serial, data_mes.year, data_mes.month)
+        if total > 0:
+            dados_por_mes.append({
+                "ano": data_mes.year, "mes_num": data_mes.month,
+                "mes": nomes_meses[data_mes.month], "geracao_kwh": total
+            })
+
     if dados_por_mes:
-        salvar_dados_no_banco(cliente_id, dados_por_mes)
+        salvar_historico_banco(cliente_id, dados_por_mes)
         return {
             "cliente_id": cliente_id,
-            "cliente_nome": nome_cliente,
             "mensal": sorted(dados_por_mes, key=lambda x: (x["ano"], x["mes_num"])),
             "total_periodo": round(sum(m["geracao_kwh"] for m in dados_por_mes), 2),
-            "fonte": "foxess_api"
+            "fonte": "foxess"
         }
+
     return {"cliente_id": cliente_id, "mensal": [], "total_periodo": 0, "fonte": "nenhuma"}
 
-@app.get("/clientes/{cliente_id}/monitoramento/status")
-def status_inversor(cliente_id: int):
-    conn = conectar_banco()
-    cur = conn.cursor()
-    cur.execute("SELECT marca_inversor, serial_inversor, api_key_inversor FROM clientes WHERE id = %s", (cliente_id,))
-    cliente = cur.fetchone()
-    cur.close()
-    conn.close()
-    if not cliente or not cliente[2]:
-        raise HTTPException(status_code=404, detail="Inversor não configurado")
-    marca, serial, api_key = cliente
-    if marca.lower() != "foxess":
-        raise HTTPException(status_code=400, detail="Marca não suportada ainda")
-    data = foxess_get_realtime_data(api_key, serial)
-    if data.get("errno") != 0:
-        return {"online": False, "error": data.get("msg"), "gerando": False}
-    resultado = data.get("result", [])
-    if not resultado:
-        return {"online": False, "gerando": False}
-    variaveis = {}
-    for item in resultado[0].get("datas", []):
-        variaveis[item["variable"]] = item.get("value", 0)
-    pv_power = float(variaveis.get("pvPower", 0) or 0)
-    return {
-        "online": True,
-        "gerando": pv_power > 0.05,
-        "potencia_atual_kw": pv_power,
-        "timestamp": datetime.utcnow().isoformat()
-    }
-
-@app.get("/clientes/{cliente_id}/monitoramento-raw")
-def monitoramento_raw(cliente_id: int):
-    conn = conectar_banco()
-    cur = conn.cursor()
-    cur.execute("SELECT marca_inversor, serial_inversor, api_key_inversor FROM clientes WHERE id = %s", (cliente_id,))
-    cliente = cur.fetchone()
-    cur.close()
-    conn.close()
-    if not cliente or not cliente[2]:
-        raise HTTPException(status_code=404, detail="Inversor não configurado")
-    marca, serial, api_key = cliente
-    if marca.lower() != "foxess":
-        raise HTTPException(status_code=400, detail="Marca não suportada ainda")
-    data = foxess_get_realtime_data(api_key, serial)
-    return data
+# ===== ALERTAS E ANOMALIAS =====
 
 @app.get("/clientes/{cliente_id}/verificar-anomalias")
 def verificar_anomalias(cliente_id: int):
-    from datetime import date
     conn = conectar_banco()
     cur = conn.cursor()
     cur.execute("SELECT nome FROM clientes WHERE id = %s", (cliente_id,))
     cliente = cur.fetchone()
     cur.close()
     conn.close()
+
     if not cliente:
         raise HTTPException(status_code=404, detail="Cliente não encontrado")
+
     hoje = date.today()
     ontem = hoje - timedelta(days=1)
-    dados_ontem = buscar_geracao_dia_especifico(cliente_id, ontem)
-    geracao_ontem = float(dados_ontem.get("total_kwh", 0))
-    data_inicio = hoje - timedelta(days=8)
-    data_fim = hoje - timedelta(days=1)
-    ultimos_7_dias = buscar_geracao_periodo(cliente_id, data_inicio, data_fim)
-    if ultimos_7_dias:
-        soma = sum(d["total_kwh"] for d in ultimos_7_dias)
-        media_7_dias = float(soma / len(ultimos_7_dias))
-    else:
-        media_7_dias = 0.0
+    geracao_ontem = buscar_geracao_dia(cliente_id, ontem)
+
+    ultimos_7 = buscar_geracao_periodo(cliente_id, hoje - timedelta(days=8), ontem)
+    media_7_dias = sum(d["total_kwh"] for d in ultimos_7) / len(ultimos_7) if ultimos_7 else 0.0
+
     alertas = []
+
     if geracao_ontem < 0.5:
         alertas.append({
-            "tipo": "urgente",
+            "tipo": "urgente", "icone": "🔴",
             "titulo": "Sistema Parado",
             "mensagem": f"Seu sistema não gerou energia significativa ontem ({geracao_ontem:.1f} kWh). Isso pode indicar disjuntor desarmado ou falha no inversor.",
-            "acao": "Verificar disjuntor CA e entrar em contato com o técnico.",
-            "icone": "🔴"
+            "acao": "Verificar disjuntor CA e entrar em contato com o técnico."
         })
     elif media_7_dias > 0 and geracao_ontem < media_7_dias * 0.4:
         queda = ((media_7_dias - geracao_ontem) / media_7_dias * 100)
         alertas.append({
-            "tipo": "atencao",
+            "tipo": "atencao", "icone": "⚠️",
             "titulo": "Geração Muito Abaixo do Normal",
             "mensagem": f"Ontem seu sistema gerou {geracao_ontem:.1f} kWh, enquanto a média dos últimos 7 dias foi {media_7_dias:.1f} kWh. Queda de {queda:.0f}%.",
-            "acao": "Verificar sombreamento, sujeira nos painéis ou problema no inversor.",
-            "icone": "⚠️"
+            "acao": "Verificar sombreamento, sujeira nos painéis ou problema no inversor."
         })
     elif media_7_dias > 0 and geracao_ontem < media_7_dias * 0.7:
         alertas.append({
-            "tipo": "informativo",
+            "tipo": "informativo", "icone": "📉",
             "titulo": "Geração Abaixo da Média",
             "mensagem": f"Ontem seu sistema gerou {geracao_ontem:.1f} kWh. A média dos últimos 7 dias é {media_7_dias:.1f} kWh.",
-            "acao": "Monitorar nos próximos dias. Se continuar baixo, agendar limpeza preventiva.",
-            "icone": "📉"
+            "acao": "Monitorar nos próximos dias. Se continuar baixo, agendar limpeza preventiva."
         })
+
     if not alertas and geracao_ontem > 0:
         alertas.append({
-            "tipo": "normal",
+            "tipo": "normal", "icone": "✅",
             "titulo": "Sistema Operando Normalmente",
             "mensagem": f"Ontem seu sistema gerou {geracao_ontem:.1f} kWh.",
-            "acao": "Nenhuma ação necessária. Continue monitorando!",
-            "icone": "✅"
+            "acao": "Nenhuma ação necessária. Continue monitorando!"
         })
+
     if media_7_dias == 0 and geracao_ontem == 0:
         alertas = [{
-            "tipo": "informativo",
+            "tipo": "informativo", "icone": "📡",
             "titulo": "Coletando Dados",
             "mensagem": "Seu sistema está coletando os primeiros dados de geração. Em alguns dias teremos estatísticas completas.",
-            "acao": "Aguardar coleta de mais dias para gerar alertas precisos.",
-            "icone": "📡"
+            "acao": "Aguardar coleta de mais dias para gerar alertas precisos."
         }]
+
     return {
-        "cliente_id": cliente_id,
-        "cliente_nome": cliente[0],
+        "cliente_id": cliente_id, "cliente_nome": cliente[0],
         "data_analise": hoje.isoformat(),
         "geracao_ontem_kwh": round(geracao_ontem, 1),
         "media_7_dias_kwh": round(media_7_dias, 1),
         "alertas": alertas
     }
-
-@app.post("/clientes/{cliente_id}/atualizar-historico")
-def atualizar_historico_banco(cliente_id: int):
-    dados = monitoramento_mensal(cliente_id)
-    if dados.get("fonte") == "foxess_api":
-        return {"sucesso": True, "mensagem": "Histórico atualizado com sucesso da FoxESS", "dados": dados}
-    elif dados.get("fonte") == "banco_local":
-        return {"sucesso": True, "mensagem": "Dados já estavam no banco local", "dados": dados}
-    else:
-        return {"sucesso": False, "mensagem": dados.get("mensagem", "Erro ao atualizar histórico")}
