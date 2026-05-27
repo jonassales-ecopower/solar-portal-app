@@ -69,26 +69,31 @@ REGRAS CRÍTICAS DE EXTRAÇÃO:
 
 3. DATA DE VENCIMENTO: Campo "VENCIMENTO" em destaque. NÃO confundir com data de emissão.
 
-4. CONSUMO BRUTO (kWh): ATENÇÃO CRÍTICA — é a leitura REAL DO MEDIDOR.
+4. CONSUMO BRUTO (kWh): ATENÇÃO CRÍTICA — é a leitura REAL DO MEDIDOR no período.
    Localize a tabela "ESTRUTURA DO CONSUMO" ou "DADOS DO CONSUMO" ou tabela de medidores.
    Use o campo "FATURADO" ou "Consumo kWh" da linha "Energia ativa em kWh".
+   Exemplo: "Energia ativa em kWh Ponta | 8557 | 10054 | 1 | 1497" → consumo_bruto_kwh = 1497.
    Exemplo: "Energia ativa em kWh Ponta | 10054 | 10930 | 1 | 876" → consumo_bruto_kwh = 876.
-   NUNCA use "Consumo até 80kWh-BR" (é faixa tarifária zerada pelo governo, não é consumo real!).
+   NUNCA use "Consumo até 80kWh-BR" — é faixa tarifária zerada pelo governo, NÃO é consumo real!
    NUNCA use "Consumo acima de 80kWh-BR" isoladamente.
-   O consumo bruto real é sempre: (Leitura Atual - Leitura Anterior) × Constante.
+   O consumo bruto real é SEMPRE: (Leitura Atual - Leitura Anterior) × Constante.
 
 5. CONSUMO FATURADO (kWh): Valor no histórico dos últimos 13 meses referente ao mês atual.
-   É MENOR que consumo bruto em sistemas GD. Ex: MAI/26 = 277,45 kWh.
+   É MENOR que consumo bruto em sistemas GD. Ex: ABR/26 = 420,63 kWh; MAI/26 = 277,45 kWh.
 
 6. CONSUMO DA REDE (kWh): Mesmo valor que consumo_bruto_kwh.
 
 7. ENERGIA INJETADA (kWh): SEMPRE em kWh, nunca em R$.
    Tabela medidores linha "Energia injetada": campo "Consumo kWh" ou "FATURADO".
+   Exemplo: "Energia injetada Ponta | 7321 | 8016 | 1 | 695" → energia_injetada_kwh = 695.
    Exemplo: "Energia injetada Ponta | 8016 | 8350 | 1 | 334" → energia_injetada_kwh = 334.
 
 8. SALDO ACUMULADO (kWh): Campo "Saldo Acumulado". Se zero, retornar 0.
 
-REGRA ESPECIAL: Se houver "FATURAMENTO PELA MÉDIA" ou "LEITURA INFORMADA PELO CLIENTE" → leitura_por_media = true.
+9. MESES ACUMULADOS: Se houver "FATURAMENTO PELA MÉDIA" ou "LEITURA INFORMADA PELO CLIENTE",
+   a conta pode cobrir mais de um mês. Analise o período (Leitura Anterior → Leitura Atual) para
+   determinar quantos meses foram acumulados. Ex: 13/03 a 13/04 = 1 mês. 13/02 a 13/04 = 2 meses.
+   Se o consumo bruto for muito alto (acima de 1.000 kWh residencial), provavelmente é leitura acumulada.
 
 Retorne EXATAMENTE neste formato JSON:
 {{
@@ -114,7 +119,7 @@ Retorne EXATAMENTE neste formato JSON:
 
 - status_sistema: Se energia_injetada_kwh >= consumo_kwh → "SUPERAVITÁRIO", senão → "DEFICITÁRIO".
 - percentual_gerado: (energia_injetada_kwh / consumo_kwh) × 100.
-- mensagem_cliente: Máximo 2 linhas. Linguagem simples.
+- mensagem_cliente: Máximo 2 linhas. Linguagem simples. Se leitura acumulada, mencionar isso.
 
 Texto da conta:
 {texto_pdf}"""
@@ -126,20 +131,34 @@ Texto da conta:
 def calcular_analise_consumo(dados: dict, geracao_total_kwh: float = None) -> dict:
     energia_injetada = float(dados.get("energia_injetada_kwh") or 0)
     consumo_rede = float(dados.get("consumo_bruto_kwh") or dados.get("consumo_rede_kwh") or 0)
+    meses = int(dados.get("meses_acumulados") or 1)
 
-    resultado = {"geracao_total_kwh": None, "consumo_instantaneo_kwh": None, "consumo_total_kwh": None, "analise_consumo": None}
+    resultado = {
+        "geracao_total_kwh": None,
+        "consumo_instantaneo_kwh": None,
+        "consumo_total_kwh": None,
+        "analise_consumo": None
+    }
 
+    # Se leitura acumulada de N meses, ajustar geração do inversor (que é mensal)
+    geracao_ajustada = None
     if geracao_total_kwh and geracao_total_kwh > 0:
-        consumo_instantaneo = max(0, round(geracao_total_kwh - energia_injetada, 2))
+        if meses > 1:
+            # Multiplicar geração mensal pelos meses acumulados
+            geracao_ajustada = round(geracao_total_kwh * meses, 2)
+        else:
+            geracao_ajustada = geracao_total_kwh
+
+    if geracao_ajustada and geracao_ajustada > 0:
+        consumo_instantaneo = max(0, round(geracao_ajustada - energia_injetada, 2))
         consumo_total = round(consumo_instantaneo + consumo_rede, 2)
-        resultado["geracao_total_kwh"] = geracao_total_kwh
+        resultado["geracao_total_kwh"] = geracao_ajustada
         resultado["consumo_instantaneo_kwh"] = consumo_instantaneo
         resultado["consumo_total_kwh"] = consumo_total
     else:
-        # Sem pvPower: consumo total = leitura real do medidor (consumo_bruto_kwh)
-        consumo_total = consumo_rede
+        # Sem pvPower: consumo total = leitura real do medidor
         consumo_instantaneo = max(0, round(consumo_rede - energia_injetada, 2)) if consumo_rede > energia_injetada else 0
-        resultado["consumo_total_kwh"] = round(consumo_total, 2)
+        resultado["consumo_total_kwh"] = round(consumo_rede, 2)
         resultado["consumo_instantaneo_kwh"] = consumo_instantaneo
 
     return resultado
@@ -151,39 +170,60 @@ def gerar_mensagem_consumo(dados: dict, consumo_anterior: float = None) -> str:
     consumo_instantaneo = float(dados.get("consumo_instantaneo_kwh") or 0)
     consumo_rede = float(dados.get("consumo_bruto_kwh") or 0)
     mes = dados.get("mes_referencia", "este mês")
+    meses = int(dados.get("meses_acumulados") or 1)
     partes = []
 
+    periodo = f"nos últimos {meses} meses" if meses > 1 else f"em {mes}"
+
     if geracao_total > 0:
-        partes.append(f"☀️ Em {mes}, seu sistema solar gerou {geracao_total:.1f} kWh. Desses, {consumo_instantaneo:.1f} kWh foram usados instantaneamente na sua casa e {energia_injetada:.1f} kWh foram injetados na rede como créditos.")
+        partes.append(
+            f"☀️ {periodo.capitalize()}, seu sistema solar gerou {geracao_total:.1f} kWh. "
+            f"Desses, {consumo_instantaneo:.1f} kWh foram usados instantaneamente "
+            f"e {energia_injetada:.1f} kWh foram injetados na rede como créditos."
+        )
     else:
-        partes.append(f"⚡ Em {mes}, seu sistema injetou {energia_injetada:.1f} kWh na rede elétrica como créditos. Sua casa consumiu {consumo_rede:.1f} kWh da distribuidora (período noturno e dias nublados).")
+        partes.append(
+            f"⚡ {periodo.capitalize()}, seu sistema injetou {energia_injetada:.1f} kWh na rede como créditos. "
+            f"Sua casa consumiu {consumo_rede:.1f} kWh da distribuidora."
+        )
 
     if consumo_total > 0 and consumo_rede > 0:
-        partes.append(f"📊 Consumo total da sua casa: {consumo_total:.1f} kWh ({consumo_instantaneo:.1f} kWh do solar + {consumo_rede:.1f} kWh da rede).")
+        partes.append(
+            f"📊 Consumo total da casa: {consumo_total:.1f} kWh "
+            f"({consumo_instantaneo:.1f} kWh do solar + {consumo_rede:.1f} kWh da rede)."
+        )
+
+    if meses > 1:
+        partes.append(
+            f"⚠️ Esta conta cobre {meses} meses de leitura acumulada — os valores são referentes ao período completo."
+        )
 
     if consumo_anterior and consumo_anterior > 0 and consumo_total > 0:
-        variacao = ((consumo_total - consumo_anterior) / consumo_anterior) * 100
+        consumo_anterior_ajustado = consumo_anterior * meses if meses > 1 else consumo_anterior
+        variacao = ((consumo_total - consumo_anterior_ajustado) / consumo_anterior_ajustado) * 100
         if variacao > 20:
-            partes.append(f"📈 ATENÇÃO: Seu consumo total aumentou {variacao:.0f}% em relação ao mês anterior ({consumo_anterior:.1f} kWh → {consumo_total:.1f} kWh). Seu sistema solar está funcionando normalmente — o aumento na conta é causado pelo maior consumo de energia, não por falha no sistema fotovoltaico. Verifique se novos equipamentos foram ligados.")
+            partes.append(
+                f"📈 ATENÇÃO: Seu consumo aumentou {variacao:.0f}% em relação ao período anterior "
+                f"({consumo_anterior_ajustado:.1f} kWh → {consumo_total:.1f} kWh). "
+                f"Seu sistema solar está funcionando normalmente — o aumento se deve ao maior consumo de energia, "
+                f"não a falha no sistema. Verifique se novos equipamentos foram ligados."
+            )
         elif variacao > 5:
-            partes.append(f"📊 Consumo aumentou {variacao:.0f}% em relação ao mês anterior. O sistema solar continua operando — verifique equipamentos com alto consumo.")
+            partes.append(f"📊 Consumo aumentou {variacao:.0f}% em relação ao período anterior.")
         elif variacao < -10:
-            partes.append(f"✅ Ótimo! Consumo reduziu {abs(variacao):.0f}% em relação ao mês anterior.")
+            partes.append(f"✅ Consumo reduziu {abs(variacao):.0f}% — solar + eficiência energética funcionando!")
 
     return " ".join(partes)
 
 # ==================== CLIMA ====================
 
 def consultar_clima(latitude: float, longitude: float, data_inicio: str, data_fim: str) -> dict:
-    """Consulta Open-Meteo API (gratuita, sem chave) para dados de cobertura de nuvens."""
     try:
-        url = (
-            f"https://api.open-meteo.com/v1/forecast"
-            f"?latitude={latitude}&longitude={longitude}"
-            f"&daily=cloudcover_mean,precipitation_sum"
-            f"&timezone=America/Sao_Paulo"
-            f"&start_date={data_inicio}&end_date={data_fim}"
-        )
+        url = (f"https://api.open-meteo.com/v1/forecast"
+               f"?latitude={latitude}&longitude={longitude}"
+               f"&daily=cloudcover_mean,precipitation_sum"
+               f"&timezone=America/Sao_Paulo"
+               f"&start_date={data_inicio}&end_date={data_fim}")
         resp = requests.get(url, timeout=10)
         if resp.status_code == 200:
             data = resp.json()
@@ -298,7 +338,8 @@ def salvar_historico_banco(cliente_id: int, dados_mensais: list):
         val_dia = m["geracao_kwh"] / dias
         for d in range(1, dias + 1):
             dt = datetime(m["ano"], m["mes_num"], d).date()
-            cur.execute("INSERT INTO historico_geracao (cliente_id,data,geracao_kwh) VALUES (%s,%s,%s) ON CONFLICT (cliente_id,data) DO UPDATE SET geracao_kwh=EXCLUDED.geracao_kwh", (cliente_id, dt, round(val_dia, 2)))
+            cur.execute("INSERT INTO historico_geracao (cliente_id,data,geracao_kwh) VALUES (%s,%s,%s) ON CONFLICT (cliente_id,data) DO UPDATE SET geracao_kwh=EXCLUDED.geracao_kwh",
+                        (cliente_id, dt, round(val_dia, 2)))
     conn.commit()
     cur.close()
     conn.close()
@@ -388,7 +429,8 @@ def listar_contas(cliente_id: int, integrador: dict = Depends(obter_integrador_a
         SELECT c.id,c.mes_referencia,c.data_vencimento,c.consumo_kwh,c.energia_injetada_kwh,
                c.saldo_acumulado_kwh,c.valor_fatura,c.status_sistema,c.percentual_gerado,
                c.mensagem_cliente,c.geracao_total_kwh,c.consumo_instantaneo_kwh,
-               c.consumo_total_kwh,c.analise_consumo,c.consumo_bruto_kwh,c.criado_em
+               c.consumo_total_kwh,c.analise_consumo,c.consumo_bruto_kwh,c.criado_em,
+               c.leitura_por_media,c.meses_acumulados
         FROM contas c JOIN clientes cl ON cl.id=c.cliente_id
         WHERE c.cliente_id=%s AND cl.integrador_id=%s ORDER BY c.criado_em DESC
     """, (cliente_id, integrador["id"]))
@@ -400,7 +442,7 @@ def listar_contas(cliente_id: int, integrador: dict = Depends(obter_integrador_a
              "valor_fatura":float(c[6] or 0),"status_sistema":c[7],"percentual_gerado":float(c[8] or 0),
              "mensagem_cliente":c[9],"geracao_total_kwh":float(c[10] or 0),"consumo_instantaneo_kwh":float(c[11] or 0),
              "consumo_total_kwh":float(c[12] or 0),"analise_consumo":c[13],"consumo_bruto_kwh":float(c[14] or 0),
-             "criado_em":str(c[15])} for c in contas]
+             "criado_em":str(c[15]),"leitura_por_media":c[16],"meses_acumulados":c[17]} for c in contas]
 
 @app.get("/clientes/{cliente_id}/contas-publico")
 def listar_contas_publico(cliente_id: int):
@@ -411,7 +453,8 @@ def listar_contas_publico(cliente_id: int):
                saldo_acumulado_kwh,valor_fatura,status_sistema,percentual_gerado,
                mensagem_cliente,consumo_bruto_kwh,geracao_total_kwh,
                consumo_instantaneo_kwh,consumo_total_kwh,analise_consumo,
-               consumo_anterior_kwh,aumento_consumo_pct,criado_em
+               consumo_anterior_kwh,aumento_consumo_pct,criado_em,
+               leitura_por_media,meses_acumulados
         FROM contas WHERE cliente_id=%s ORDER BY criado_em DESC LIMIT 12
     """, (cliente_id,))
     contas = cur.fetchall()
@@ -423,7 +466,8 @@ def listar_contas_publico(cliente_id: int):
              "mensagem_cliente":c[9],"consumo_bruto_kwh":float(c[10] or 0),"geracao_total_kwh":float(c[11] or 0),
              "consumo_instantaneo_kwh":float(c[12] or 0),"consumo_total_kwh":float(c[13] or 0),
              "analise_consumo":c[14],"consumo_anterior_kwh":float(c[15] or 0),
-             "aumento_consumo_pct":float(c[16] or 0),"criado_em":str(c[17])} for c in contas]
+             "aumento_consumo_pct":float(c[16] or 0),"criado_em":str(c[17]),
+             "leitura_por_media":c[18],"meses_acumulados":c[19]} for c in contas]
 
 @app.delete("/contas/{conta_id}")
 def excluir_conta(conta_id: int):
@@ -512,6 +556,7 @@ async def upload_conta(cliente_id: int, arquivo: UploadFile = File(...)):
 
         consumo_anterior = float(conta_ant[0] or conta_ant[1] or 0) if conta_ant else None
 
+        # Buscar geração mensal do inversor
         geracao_total_kwh = None
         if inversor and inversor[0] and inversor[0].lower() == "foxess" and inversor[2]:
             try:
@@ -641,71 +686,57 @@ def verificar_anomalias(cliente_id: int):
     ultimos7 = buscar_geracao_periodo(cliente_id, hoje-timedelta(days=8), ontem)
     media7 = sum(d["total_kwh"] for d in ultimos7)/len(ultimos7) if ultimos7 else 0.0
 
-    # Calcular média diária esperada baseada no projeto
+    # Média diária esperada baseada no projeto
     media_diaria_esperada = 0.0
     if potencia_kwp and performance_ratio:
-        mes_atual = hoje.month
         hsp = {1:5.2,2:5.4,3:5.1,4:4.8,5:4.5,6:4.3,7:4.5,8:5.0,9:4.9,10:4.8,11:4.9,12:5.0}
-        media_diaria_esperada = float(potencia_kwp) * hsp.get(mes_atual, 5.0) * float(performance_ratio)
+        media_diaria_esperada = float(potencia_kwp) * hsp.get(hoje.month, 5.0) * float(performance_ratio)
 
-    # Verificar 3 dias consecutivos abaixo da média
+    # Alerta de 3 dias consecutivos abaixo da média
     alerta_consecutivo = None
     if media_diaria_esperada > 0 and len(ultimos7) >= 3:
         ultimos3 = ultimos7[-3:]
         dias_baixos = [d for d in ultimos3 if d["total_kwh"] < media_diaria_esperada * 0.7]
         if len(dias_baixos) == 3:
-            # Consultar clima para verificar se é falso positivo
             data_inicio = ultimos3[0]["data"]
             data_fim = ultimos3[-1]["data"]
             clima = {}
             if latitude and longitude:
                 clima = consultar_clima(float(latitude), float(longitude), data_inicio, data_fim)
-
-            dias_nublados = sum(1 for d in ultimos3 if clima.get(d["data"], {}).get("dia_nublado", False) or clima.get(d["data"], {}).get("dia_chuvoso", False))
+            dias_ruins = sum(1 for d in ultimos3 if clima.get(d["data"], {}).get("dia_nublado", False) or clima.get(d["data"], {}).get("dia_chuvoso", False))
             media_3dias = sum(d["total_kwh"] for d in ultimos3) / 3
 
-            if dias_nublados >= 2:
-                alerta_consecutivo = {
-                    "tipo": "informativo",
-                    "icone": "☁️",
-                    "titulo": "Geração Baixa por Condições Climáticas",
-                    "mensagem": f"Seu sistema gerou abaixo da média nos últimos 3 dias (média: {media_3dias:.1f} kWh/dia vs esperado: {media_diaria_esperada:.1f} kWh/dia), mas isso é normal — o período teve muita nebulosidade ou chuva na sua região. Quando o tempo abrir, a geração voltará ao normal.",
-                    "acao": "Nenhuma ação necessária. Aguardar melhora nas condições climáticas."
-                }
+            if dias_ruins >= 2:
+                alerta_consecutivo = {"tipo":"informativo","icone":"☁️",
+                    "titulo":"Geração Baixa por Condições Climáticas",
+                    "mensagem":f"Geração abaixo da média por 3 dias ({media_3dias:.1f} kWh/dia vs esperado {media_diaria_esperada:.1f} kWh/dia), mas o período teve muita nebulosidade ou chuva. Isso é normal!",
+                    "acao":"Aguardar melhora climática. Se continuar após dias ensolarados, contate o integrador."}
             else:
-                alerta_consecutivo = {
-                    "tipo": "atencao",
-                    "icone": "⚠️",
-                    "titulo": "3 Dias Consecutivos com Geração Abaixo da Média",
-                    "mensagem": f"Seu sistema gerou abaixo do esperado por 3 dias consecutivos (média: {media_3dias:.1f} kWh/dia vs esperado: {media_diaria_esperada:.1f} kWh/dia). As condições climáticas estavam boas, o que pode indicar um problema técnico.",
-                    "acao": "Verificar se há sombra nova nos painéis, sujeira acumulada ou problema no inversor. Contate seu integrador."
-                }
+                alerta_consecutivo = {"tipo":"atencao","icone":"⚠️",
+                    "titulo":"3 Dias Consecutivos com Geração Abaixo da Média",
+                    "mensagem":f"Geração abaixo do esperado por 3 dias consecutivos ({media_3dias:.1f} kWh/dia vs esperado {media_diaria_esperada:.1f} kWh/dia). O tempo estava bom — pode haver problema técnico.",
+                    "acao":"Verificar sombra nos painéis, sujeira acumulada ou problema no inversor. Contate seu integrador."}
 
     alertas = []
-
-    # Adicionar alerta de 3 dias consecutivos se existir
     if alerta_consecutivo:
         alertas.append(alerta_consecutivo)
 
-    # Alertas do dia anterior
     if g_ontem < 0.5:
         alertas.append({"tipo":"urgente","icone":"🔴","titulo":"Sistema Parado",
-            "mensagem":f"Seu sistema não gerou energia significativa ontem ({g_ontem:.1f} kWh). Isso pode indicar disjuntor desarmado ou falha no inversor.",
-            "acao":"Verificar disjuntor CA e entrar em contato com o técnico imediatamente."})
+            "mensagem":f"Seu sistema não gerou energia significativa ontem ({g_ontem:.1f} kWh). Pode ser disjuntor desarmado ou falha no inversor.",
+            "acao":"Verificar disjuntor CA e acionar o técnico imediatamente."})
     elif media7 > 0 and g_ontem < media7*0.4:
-        # Verificar clima de ontem
         clima_ontem = {}
         if latitude and longitude:
             clima_ontem = consultar_clima(float(latitude), float(longitude), str(ontem), str(ontem))
         dia_ruim = clima_ontem.get(str(ontem), {}).get("dia_nublado", False) or clima_ontem.get(str(ontem), {}).get("dia_chuvoso", False)
-
         if dia_ruim:
             alertas.append({"tipo":"informativo","icone":"☁️","titulo":"Geração Baixa — Dia Nublado/Chuvoso",
-                "mensagem":f"Ontem seu sistema gerou apenas {g_ontem:.1f} kWh (média: {media7:.1f} kWh), mas as condições climáticas estavam desfavoráveis na sua região. Isso é normal!",
-                "acao":"Nenhuma ação necessária. Se continuar após dias ensolarados, verificar o sistema."})
+                "mensagem":f"Ontem seu sistema gerou apenas {g_ontem:.1f} kWh — condições climáticas desfavoráveis na sua região. Isso é normal!",
+                "acao":"Nenhuma ação necessária. Monitorar nos próximos dias ensolarados."})
         else:
             alertas.append({"tipo":"atencao","icone":"⚠️","titulo":"Geração Muito Abaixo do Normal",
-                "mensagem":f"Ontem: {g_ontem:.1f} kWh vs média 7 dias: {media7:.1f} kWh. Queda de {((media7-g_ontem)/media7*100):.0f}%. O tempo estava bom, o que pode indicar um problema técnico.",
+                "mensagem":f"Ontem: {g_ontem:.1f} kWh vs média 7 dias: {media7:.1f} kWh. Queda de {((media7-g_ontem)/media7*100):.0f}%. O tempo estava bom.",
                 "acao":"Verificar sombreamento, sujeira nos painéis ou problema no inversor."})
     elif media7 > 0 and g_ontem < media7*0.7:
         alertas.append({"tipo":"informativo","icone":"📉","titulo":"Geração Abaixo da Média",
