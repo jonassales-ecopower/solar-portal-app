@@ -16,8 +16,6 @@ from openai import OpenAI
 from auth import criptografar_senha, verificar_senha, criar_token, verificar_token
 import PyPDF2
 
-# ==================== CONFIGURAÇÃO ====================
-
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -28,15 +26,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "")
 OPENROUTER_KEY = os.environ.get("OPENROUTER_KEY", "")
 
 app = FastAPI(title="Solar Portal API")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-    allow_credentials=False,
-)
-
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], allow_credentials=False)
 security = HTTPBearer()
 
 # ==================== BANCO ====================
@@ -44,14 +34,10 @@ security = HTTPBearer()
 def conectar_banco():
     if DATABASE_URL:
         return psycopg2.connect(DATABASE_URL, sslmode="require")
-    return psycopg2.connect(
-        host="localhost", port=5432,
-        database="solar_portal", user="postgres", password="991Bog31**"
-    )
+    return psycopg2.connect(host="localhost", port=5432, database="solar_portal", user="postgres", password="991Bog31**")
 
 def obter_integrador_atual(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    token = credentials.credentials
-    payload = verificar_token(token)
+    payload = verificar_token(credentials.credentials)
     if not payload:
         raise HTTPException(status_code=401, detail="Token inválido ou expirado")
     return payload
@@ -70,7 +56,6 @@ def extrair_texto_pdf(caminho_pdf):
 
 def analisar_conta(texto_pdf):
     cliente_ia = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_KEY)
-
     prompt = f"""Você é um especialista em contas de energia elétrica brasileiras com foco em Geração Distribuída (GD).
 
 Analise o texto extraído da conta e retorne SOMENTE um JSON válido, sem texto adicional, sem explicações, sem markdown.
@@ -82,32 +67,28 @@ REGRAS CRÍTICAS DE EXTRAÇÃO:
 2. MÊS DE REFERÊNCIA: Use EXATAMENTE o valor do campo "REF: MÊS / ANO" impresso na fatura.
    Exemplos: "Maio / 2026", "Abril / 2026". NUNCA use o mês de leitura anterior.
 
-3. DATA DE VENCIMENTO: Campo "VENCIMENTO" em destaque. NÃO confundir com data de emissão ou apresentação.
+3. DATA DE VENCIMENTO: Campo "VENCIMENTO" em destaque. NÃO confundir com data de emissão.
 
-4. CONSUMO BRUTO (kWh): É a LEITURA REAL DO MEDIDOR no período.
-   ATENÇÃO CRÍTICA: NÃO use o campo "Consumo até 80kWh-BR" (que é uma faixa tarifária zerada pelo governo).
-   Use a leitura dos "DADOS DO CONSUMO" ou "ESTRUTURA DO CONSUMO" na tabela de medidores.
-   Na tabela de medidores, o campo "FATURADO" da linha "Energia ativa em kWh" é o consumo real.
-   Exemplo: se a tabela mostra "Energia ativa em kWh Ponta | Leitura Anterior: 10054 | Leitura Atual: 10930 | Constante: 1 | Consumo: 876", então consumo_bruto_kwh = 876.
+4. CONSUMO BRUTO (kWh): ATENÇÃO CRÍTICA — é a leitura REAL DO MEDIDOR.
+   Localize a tabela "ESTRUTURA DO CONSUMO" ou "DADOS DO CONSUMO" ou tabela de medidores.
+   Use o campo "FATURADO" ou "Consumo kWh" da linha "Energia ativa em kWh".
+   Exemplo: "Energia ativa em kWh Ponta | 10054 | 10930 | 1 | 876" → consumo_bruto_kwh = 876.
+   NUNCA use "Consumo até 80kWh-BR" (é faixa tarifária zerada pelo governo, não é consumo real!).
+   NUNCA use "Consumo acima de 80kWh-BR" isoladamente.
+   O consumo bruto real é sempre: (Leitura Atual - Leitura Anterior) × Constante.
 
-5. CONSUMO FATURADO (kWh): É o valor cobrado após os descontos da GD.
-   Procure no histórico dos últimos 13 meses o valor do mês atual (ex: MAI/26 = 277,45 kWh).
-   Este valor é MENOR que o consumo bruto em sistemas GD.
+5. CONSUMO FATURADO (kWh): Valor no histórico dos últimos 13 meses referente ao mês atual.
+   É MENOR que consumo bruto em sistemas GD. Ex: MAI/26 = 277,45 kWh.
 
-6. CONSUMO DA REDE (kWh): É o consumo bruto (leitura do medidor de energia ativa).
-   Mesmo valor que consumo_bruto_kwh na maioria dos casos.
+6. CONSUMO DA REDE (kWh): Mesmo valor que consumo_bruto_kwh.
 
-7. ENERGIA INJETADA (kWh): Energia solar enviada à rede. SEMPRE em kWh.
-   Na tabela de medidores: linha "Energia injetada" → campo "FATURADO" ou "Consumo kWh".
+7. ENERGIA INJETADA (kWh): SEMPRE em kWh, nunca em R$.
+   Tabela medidores linha "Energia injetada": campo "Consumo kWh" ou "FATURADO".
    Exemplo: "Energia injetada Ponta | 8016 | 8350 | 1 | 334" → energia_injetada_kwh = 334.
 
 8. SALDO ACUMULADO (kWh): Campo "Saldo Acumulado". Se zero, retornar 0.
 
-REGRA ESPECIAL — LEITURA POR MÉDIA:
-Se houver "FATURAMENTO PELA MÉDIA", "MÉDIA/MÍNIMO" ou "LEITURA INFORMADA PELO CLIENTE", informar leitura_por_media = true.
-
-IMPORTANTE: O campo "Consumo até 80kWh-BR" com valor 80 é APENAS uma faixa tarifária, NÃO é o consumo real!
-O consumo real está na tabela de medidores (DADOS DO CONSUMO / ESTRUTURA DO CONSUMO).
+REGRA ESPECIAL: Se houver "FATURAMENTO PELA MÉDIA" ou "LEITURA INFORMADA PELO CLIENTE" → leitura_por_media = true.
 
 Retorne EXATAMENTE neste formato JSON:
 {{
@@ -131,33 +112,22 @@ Retorne EXATAMENTE neste formato JSON:
   "mensagem_cliente": ""
 }}
 
-Regras de cálculo:
-- status_sistema: Se energia_injetada_kwh >= consumo_kwh então "SUPERAVITÁRIO", senão "DEFICITÁRIO".
-- percentual_gerado: (energia_injetada_kwh / consumo_kwh) x 100.
-- mensagem_cliente: Máximo 2 linhas. Linguagem simples. NÃO copie textos técnicos.
+- status_sistema: Se energia_injetada_kwh >= consumo_kwh → "SUPERAVITÁRIO", senão → "DEFICITÁRIO".
+- percentual_gerado: (energia_injetada_kwh / consumo_kwh) × 100.
+- mensagem_cliente: Máximo 2 linhas. Linguagem simples.
 
 Texto da conta:
 {texto_pdf}"""
-
-    resposta = cliente_ia.chat.completions.create(
-        model="openrouter/auto",
-        messages=[{"role": "user", "content": prompt}]
-    )
+    resposta = cliente_ia.chat.completions.create(model="openrouter/auto", messages=[{"role": "user", "content": prompt}])
     return resposta.choices[0].message.content
 
 # ==================== CÁLCULO DE CONSUMO ====================
 
 def calcular_analise_consumo(dados: dict, geracao_total_kwh: float = None) -> dict:
     energia_injetada = float(dados.get("energia_injetada_kwh") or 0)
-    consumo_rede = float(dados.get("consumo_rede_kwh") or dados.get("consumo_bruto_kwh") or 0)
-    consumo_kwh = float(dados.get("consumo_kwh") or 0)
+    consumo_rede = float(dados.get("consumo_bruto_kwh") or dados.get("consumo_rede_kwh") or 0)
 
-    resultado = {
-        "geracao_total_kwh": None,
-        "consumo_instantaneo_kwh": None,
-        "consumo_total_kwh": None,
-        "analise_consumo": None
-    }
+    resultado = {"geracao_total_kwh": None, "consumo_instantaneo_kwh": None, "consumo_total_kwh": None, "analise_consumo": None}
 
     if geracao_total_kwh and geracao_total_kwh > 0:
         consumo_instantaneo = max(0, round(geracao_total_kwh - energia_injetada, 2))
@@ -166,11 +136,9 @@ def calcular_analise_consumo(dados: dict, geracao_total_kwh: float = None) -> di
         resultado["consumo_instantaneo_kwh"] = consumo_instantaneo
         resultado["consumo_total_kwh"] = consumo_total
     else:
-        # Sem pvPower — estimar pelo medidor
-        # Consumo Total = Consumo Bruto (leitura medidor)
-        # Consumo Instantâneo estimado = Consumo Bruto - Energia Injetada - Consumo Faturado
-        consumo_total = consumo_rede if consumo_rede > 0 else (consumo_kwh + energia_injetada)
-        consumo_instantaneo = max(0, round(consumo_total - consumo_rede, 2)) if consumo_rede > 0 else 0
+        # Sem pvPower: consumo total = leitura real do medidor (consumo_bruto_kwh)
+        consumo_total = consumo_rede
+        consumo_instantaneo = max(0, round(consumo_rede - energia_injetada, 2)) if consumo_rede > energia_injetada else 0
         resultado["consumo_total_kwh"] = round(consumo_total, 2)
         resultado["consumo_instantaneo_kwh"] = consumo_instantaneo
 
@@ -181,51 +149,60 @@ def gerar_mensagem_consumo(dados: dict, consumo_anterior: float = None) -> str:
     consumo_total = float(dados.get("consumo_total_kwh") or 0)
     geracao_total = float(dados.get("geracao_total_kwh") or 0)
     consumo_instantaneo = float(dados.get("consumo_instantaneo_kwh") or 0)
-    consumo_rede = float(dados.get("consumo_rede_kwh") or dados.get("consumo_bruto_kwh") or 0)
+    consumo_rede = float(dados.get("consumo_bruto_kwh") or 0)
     mes = dados.get("mes_referencia", "este mês")
-
     partes = []
 
     if geracao_total > 0:
-        partes.append(
-            f"☀️ Em {mes}, seu sistema solar gerou {geracao_total:.1f} kWh. "
-            f"Desses, {consumo_instantaneo:.1f} kWh foram usados instantaneamente na sua casa "
-            f"e {energia_injetada:.1f} kWh foram injetados na rede como créditos."
-        )
+        partes.append(f"☀️ Em {mes}, seu sistema solar gerou {geracao_total:.1f} kWh. Desses, {consumo_instantaneo:.1f} kWh foram usados instantaneamente na sua casa e {energia_injetada:.1f} kWh foram injetados na rede como créditos.")
     else:
-        partes.append(
-            f"⚡ Em {mes}, seu sistema injetou {energia_injetada:.1f} kWh na rede elétrica como créditos. "
-            f"Sua casa consumiu {consumo_rede:.1f} kWh da distribuidora (período noturno e dias nublados)."
-        )
+        partes.append(f"⚡ Em {mes}, seu sistema injetou {energia_injetada:.1f} kWh na rede elétrica como créditos. Sua casa consumiu {consumo_rede:.1f} kWh da distribuidora (período noturno e dias nublados).")
 
     if consumo_total > 0 and consumo_rede > 0:
-        partes.append(
-            f"📊 Consumo total da sua casa: {consumo_total:.1f} kWh "
-            f"({consumo_instantaneo:.1f} kWh do solar + {consumo_rede:.1f} kWh da rede)."
-        )
+        partes.append(f"📊 Consumo total da sua casa: {consumo_total:.1f} kWh ({consumo_instantaneo:.1f} kWh do solar + {consumo_rede:.1f} kWh da rede).")
 
     if consumo_anterior and consumo_anterior > 0 and consumo_total > 0:
         variacao = ((consumo_total - consumo_anterior) / consumo_anterior) * 100
         if variacao > 20:
-            partes.append(
-                f"📈 ATENÇÃO: Seu consumo total aumentou {variacao:.0f}% em relação ao mês anterior "
-                f"({consumo_anterior:.1f} kWh → {consumo_total:.1f} kWh). "
-                f"Seu sistema solar está funcionando normalmente — o aumento na conta "
-                f"é causado pelo maior consumo de energia elétrica, não por falha no sistema fotovoltaico. "
-                f"Verifique se novos equipamentos (ar-condicionado, chuveiro elétrico, etc.) foram ligados."
-            )
+            partes.append(f"📈 ATENÇÃO: Seu consumo total aumentou {variacao:.0f}% em relação ao mês anterior ({consumo_anterior:.1f} kWh → {consumo_total:.1f} kWh). Seu sistema solar está funcionando normalmente — o aumento na conta é causado pelo maior consumo de energia, não por falha no sistema fotovoltaico. Verifique se novos equipamentos foram ligados.")
         elif variacao > 5:
-            partes.append(
-                f"📊 Consumo aumentou {variacao:.0f}% em relação ao mês anterior. "
-                f"O sistema solar continua operando — verifique equipamentos com alto consumo."
-            )
+            partes.append(f"📊 Consumo aumentou {variacao:.0f}% em relação ao mês anterior. O sistema solar continua operando — verifique equipamentos com alto consumo.")
         elif variacao < -10:
-            partes.append(
-                f"✅ Ótimo! Consumo reduziu {abs(variacao):.0f}% em relação ao mês anterior. "
-                f"Solar + eficiência energética fazendo efeito!"
-            )
+            partes.append(f"✅ Ótimo! Consumo reduziu {abs(variacao):.0f}% em relação ao mês anterior.")
 
     return " ".join(partes)
+
+# ==================== CLIMA ====================
+
+def consultar_clima(latitude: float, longitude: float, data_inicio: str, data_fim: str) -> dict:
+    """Consulta Open-Meteo API (gratuita, sem chave) para dados de cobertura de nuvens."""
+    try:
+        url = (
+            f"https://api.open-meteo.com/v1/forecast"
+            f"?latitude={latitude}&longitude={longitude}"
+            f"&daily=cloudcover_mean,precipitation_sum"
+            f"&timezone=America/Sao_Paulo"
+            f"&start_date={data_inicio}&end_date={data_fim}"
+        )
+        resp = requests.get(url, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            daily = data.get("daily", {})
+            datas = daily.get("time", [])
+            nuvens = daily.get("cloudcover_mean", [])
+            chuva = daily.get("precipitation_sum", [])
+            resultado = {}
+            for i, d in enumerate(datas):
+                resultado[d] = {
+                    "cloudcover_pct": nuvens[i] if i < len(nuvens) else None,
+                    "precipitation_mm": chuva[i] if i < len(chuva) else None,
+                    "dia_nublado": (nuvens[i] > 70) if i < len(nuvens) and nuvens[i] is not None else False,
+                    "dia_chuvoso": (chuva[i] > 5) if i < len(chuva) and chuva[i] is not None else False
+                }
+            return resultado
+    except Exception:
+        pass
+    return {}
 
 # ==================== FOXESS ====================
 
@@ -234,11 +211,8 @@ def foxess_chamar_api(api_key: str, path: str, body: dict):
     path_com_barra = f"/{path}"
     signature_raw = fr"{path_com_barra}\r\n{api_key}\r\n{timestamp}"
     signature = hashlib.md5(signature_raw.encode("utf-8")).hexdigest()
-    headers = {
-        "Token": api_key, "Lang": "en", "Timestamp": timestamp,
-        "Signature": signature, "Content-Type": "application/json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    }
+    headers = {"Token": api_key, "Lang": "en", "Timestamp": timestamp, "Signature": signature,
+               "Content-Type": "application/json", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     try:
         resp = requests.post(f"https://www.foxesscloud.com/{path}", json=body, headers=headers, timeout=30)
         return resp.json()
@@ -255,8 +229,7 @@ def foxess_get_mensal(api_key: str, serial: str, ano: int, mes: int) -> float:
         if r.get("errno") == 0:
             for item in r.get("result", []):
                 if isinstance(item, dict) and item.get("variable") == "generation":
-                    valores = item.get("values", [])
-                    return round(sum(v for v in valores if v), 2)
+                    return round(sum(v for v in item.get("values", []) if v), 2)
     except Exception:
         pass
     return 0.0
@@ -311,11 +284,7 @@ def buscar_geracao_dia(cliente_id: int, data_busca):
 def buscar_geracao_periodo(cliente_id: int, data_inicio, data_fim):
     conn = conectar_banco()
     cur = conn.cursor()
-    cur.execute("""
-        SELECT data, SUM(geracao_kwh) FROM historico_geracao
-        WHERE cliente_id=%s AND data BETWEEN %s AND %s
-        GROUP BY data ORDER BY data
-    """, (cliente_id, data_inicio, data_fim))
+    cur.execute("SELECT data, SUM(geracao_kwh) FROM historico_geracao WHERE cliente_id=%s AND data BETWEEN %s AND %s GROUP BY data ORDER BY data", (cliente_id, data_inicio, data_fim))
     r = cur.fetchall()
     cur.close()
     conn.close()
@@ -329,10 +298,7 @@ def salvar_historico_banco(cliente_id: int, dados_mensais: list):
         val_dia = m["geracao_kwh"] / dias
         for d in range(1, dias + 1):
             dt = datetime(m["ano"], m["mes_num"], d).date()
-            cur.execute("""
-                INSERT INTO historico_geracao (cliente_id, data, geracao_kwh)
-                VALUES (%s,%s,%s) ON CONFLICT (cliente_id,data) DO UPDATE SET geracao_kwh=EXCLUDED.geracao_kwh
-            """, (cliente_id, dt, round(val_dia, 2)))
+            cur.execute("INSERT INTO historico_geracao (cliente_id,data,geracao_kwh) VALUES (%s,%s,%s) ON CONFLICT (cliente_id,data) DO UPDATE SET geracao_kwh=EXCLUDED.geracao_kwh", (cliente_id, dt, round(val_dia, 2)))
     conn.commit()
     cur.close()
     conn.close()
@@ -348,9 +314,8 @@ def registrar_integrador(dados: dict):
     conn = conectar_banco()
     cur = conn.cursor()
     try:
-        senha_hash = criptografar_senha(dados["senha"])
         cur.execute("INSERT INTO integradores (nome,email,telefone,senha_hash) VALUES (%s,%s,%s,%s) RETURNING id,nome,email",
-                    (dados["nome"], dados["email"], dados.get("telefone"), senha_hash))
+                    (dados["nome"], dados["email"], dados.get("telefone"), criptografar_senha(dados["senha"])))
         i = cur.fetchone()
         conn.commit()
         return {"id": i[0], "nome": i[1], "email": i[2]}
@@ -370,8 +335,7 @@ def login(dados: dict):
     conn.close()
     if not i or not verificar_senha(dados["senha"], i[3]):
         raise HTTPException(status_code=401, detail="Email ou senha incorretos")
-    token = criar_token({"id": i[0], "nome": i[1], "email": i[2]})
-    return {"token": token, "nome": i[1], "email": i[2]}
+    return {"token": criar_token({"id": i[0], "nome": i[1], "email": i[2]}), "nome": i[1], "email": i[2]}
 
 @app.get("/auth/me")
 def meu_perfil(integrador: dict = Depends(obter_integrador_atual)):
@@ -385,7 +349,7 @@ def listar_clientes(integrador: dict = Depends(obter_integrador_atual)):
     clientes = cur.fetchall()
     cur.close()
     conn.close()
-    return [{"id": c[0], "nome": c[1], "numero_uc": c[2], "distribuidora": c[3], "tipo_gd": c[4], "marca_inversor": c[5], "serial_inversor": c[6]} for c in clientes]
+    return [{"id":c[0],"nome":c[1],"numero_uc":c[2],"distribuidora":c[3],"tipo_gd":c[4],"marca_inversor":c[5],"serial_inversor":c[6]} for c in clientes]
 
 @app.post("/clientes")
 def cadastrar_cliente(dados: dict, integrador: dict = Depends(obter_integrador_atual)):
@@ -393,14 +357,11 @@ def cadastrar_cliente(dados: dict, integrador: dict = Depends(obter_integrador_a
     cur = conn.cursor()
     try:
         token_acesso = secrets.token_urlsafe(32)
-        cur.execute("""
-            INSERT INTO clientes (integrador_id,nome,email,telefone,numero_uc,distribuidora,tipo_gd,token_acesso)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id,nome,token_acesso
-        """, (integrador["id"], dados.get("nome"), dados.get("email"), dados.get("telefone"),
-              dados.get("numero_uc"), dados.get("distribuidora"), dados.get("tipo_gd"), token_acesso))
+        cur.execute("INSERT INTO clientes (integrador_id,nome,email,telefone,numero_uc,distribuidora,tipo_gd,token_acesso) VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id,nome,token_acesso",
+                    (integrador["id"],dados.get("nome"),dados.get("email"),dados.get("telefone"),dados.get("numero_uc"),dados.get("distribuidora"),dados.get("tipo_gd"),token_acesso))
         c = cur.fetchone()
         conn.commit()
-        return {"id": c[0], "nome": c[1], "token_acesso": c[2]}
+        return {"id":c[0],"nome":c[1],"token_acesso":c[2]}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     finally:
@@ -427,20 +388,19 @@ def listar_contas(cliente_id: int, integrador: dict = Depends(obter_integrador_a
         SELECT c.id,c.mes_referencia,c.data_vencimento,c.consumo_kwh,c.energia_injetada_kwh,
                c.saldo_acumulado_kwh,c.valor_fatura,c.status_sistema,c.percentual_gerado,
                c.mensagem_cliente,c.geracao_total_kwh,c.consumo_instantaneo_kwh,
-               c.consumo_total_kwh,c.analise_consumo,c.consumo_bruto_kwh
+               c.consumo_total_kwh,c.analise_consumo,c.consumo_bruto_kwh,c.criado_em
         FROM contas c JOIN clientes cl ON cl.id=c.cliente_id
         WHERE c.cliente_id=%s AND cl.integrador_id=%s ORDER BY c.criado_em DESC
     """, (cliente_id, integrador["id"]))
     contas = cur.fetchall()
     cur.close()
     conn.close()
-    return [{"id": c[0], "mes_referencia": c[1], "data_vencimento": str(c[2]),
-             "consumo_kwh": float(c[3] or 0), "energia_injetada_kwh": float(c[4] or 0),
-             "saldo_acumulado_kwh": float(c[5] or 0), "valor_fatura": float(c[6] or 0),
-             "status_sistema": c[7], "percentual_gerado": float(c[8] or 0),
-             "mensagem_cliente": c[9], "geracao_total_kwh": float(c[10] or 0),
-             "consumo_instantaneo_kwh": float(c[11] or 0), "consumo_total_kwh": float(c[12] or 0),
-             "analise_consumo": c[13], "consumo_bruto_kwh": float(c[14] or 0)} for c in contas]
+    return [{"id":c[0],"mes_referencia":c[1],"data_vencimento":str(c[2]),"consumo_kwh":float(c[3] or 0),
+             "energia_injetada_kwh":float(c[4] or 0),"saldo_acumulado_kwh":float(c[5] or 0),
+             "valor_fatura":float(c[6] or 0),"status_sistema":c[7],"percentual_gerado":float(c[8] or 0),
+             "mensagem_cliente":c[9],"geracao_total_kwh":float(c[10] or 0),"consumo_instantaneo_kwh":float(c[11] or 0),
+             "consumo_total_kwh":float(c[12] or 0),"analise_consumo":c[13],"consumo_bruto_kwh":float(c[14] or 0),
+             "criado_em":str(c[15])} for c in contas]
 
 @app.get("/clientes/{cliente_id}/contas-publico")
 def listar_contas_publico(cliente_id: int):
@@ -451,20 +411,36 @@ def listar_contas_publico(cliente_id: int):
                saldo_acumulado_kwh,valor_fatura,status_sistema,percentual_gerado,
                mensagem_cliente,consumo_bruto_kwh,geracao_total_kwh,
                consumo_instantaneo_kwh,consumo_total_kwh,analise_consumo,
-               consumo_anterior_kwh,aumento_consumo_pct
+               consumo_anterior_kwh,aumento_consumo_pct,criado_em
         FROM contas WHERE cliente_id=%s ORDER BY criado_em DESC LIMIT 12
     """, (cliente_id,))
     contas = cur.fetchall()
     cur.close()
     conn.close()
-    return [{"id": c[0], "mes_referencia": c[1], "data_vencimento": str(c[2]),
-             "consumo_kwh": float(c[3] or 0), "energia_injetada_kwh": float(c[4] or 0),
-             "saldo_acumulado_kwh": float(c[5] or 0), "valor_fatura": float(c[6] or 0),
-             "status_sistema": c[7], "percentual_gerado": float(c[8] or 0),
-             "mensagem_cliente": c[9], "consumo_bruto_kwh": float(c[10] or 0),
-             "geracao_total_kwh": float(c[11] or 0), "consumo_instantaneo_kwh": float(c[12] or 0),
-             "consumo_total_kwh": float(c[13] or 0), "analise_consumo": c[14],
-             "consumo_anterior_kwh": float(c[15] or 0), "aumento_consumo_pct": float(c[16] or 0)} for c in contas]
+    return [{"id":c[0],"mes_referencia":c[1],"data_vencimento":str(c[2]),"consumo_kwh":float(c[3] or 0),
+             "energia_injetada_kwh":float(c[4] or 0),"saldo_acumulado_kwh":float(c[5] or 0),
+             "valor_fatura":float(c[6] or 0),"status_sistema":c[7],"percentual_gerado":float(c[8] or 0),
+             "mensagem_cliente":c[9],"consumo_bruto_kwh":float(c[10] or 0),"geracao_total_kwh":float(c[11] or 0),
+             "consumo_instantaneo_kwh":float(c[12] or 0),"consumo_total_kwh":float(c[13] or 0),
+             "analise_consumo":c[14],"consumo_anterior_kwh":float(c[15] or 0),
+             "aumento_consumo_pct":float(c[16] or 0),"criado_em":str(c[17])} for c in contas]
+
+@app.delete("/contas/{conta_id}")
+def excluir_conta(conta_id: int):
+    conn = conectar_banco()
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM contas WHERE id=%s RETURNING id", (conta_id,))
+        deletado = cur.fetchone()
+        conn.commit()
+        if not deletado:
+            raise HTTPException(status_code=404, detail="Conta não encontrada")
+        return {"sucesso": True, "id": conta_id}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
 
 @app.get("/portal/{token_acesso}")
 def portal_cliente(token_acesso: str):
@@ -476,23 +452,20 @@ def portal_cliente(token_acesso: str):
     conn.close()
     if not c:
         raise HTTPException(status_code=404, detail="Link inválido")
-    return {"id": c[0], "nome": c[1], "numero_uc": c[2], "distribuidora": c[3], "tipo_gd": c[4]}
+    return {"id":c[0],"nome":c[1],"numero_uc":c[2],"distribuidora":c[3],"tipo_gd":c[4]}
 
 @app.put("/clientes/{cliente_id}/projeto")
 def atualizar_projeto(cliente_id: int, dados: dict, integrador: dict = Depends(obter_integrador_atual)):
     conn = conectar_banco()
     cur = conn.cursor()
     try:
-        cur.execute("""
-            UPDATE clientes SET potencia_kwp=%s,latitude=%s,longitude=%s,data_instalacao=%s,performance_ratio=%s
-            WHERE id=%s AND integrador_id=%s RETURNING id,nome
-        """, (dados.get("potencia_kwp"), dados.get("latitude"), dados.get("longitude"),
-              dados.get("data_instalacao"), dados.get("performance_ratio", 0.80), cliente_id, integrador["id"]))
+        cur.execute("UPDATE clientes SET potencia_kwp=%s,latitude=%s,longitude=%s,data_instalacao=%s,performance_ratio=%s WHERE id=%s AND integrador_id=%s RETURNING id,nome",
+                    (dados.get("potencia_kwp"),dados.get("latitude"),dados.get("longitude"),dados.get("data_instalacao"),dados.get("performance_ratio",0.80),cliente_id,integrador["id"]))
         c = cur.fetchone()
         conn.commit()
         if not c:
             raise HTTPException(status_code=404, detail="Cliente não encontrado")
-        return {"sucesso": True, "id": c[0], "nome": c[1]}
+        return {"sucesso":True,"id":c[0],"nome":c[1]}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     finally:
@@ -504,15 +477,13 @@ def atualizar_inversor(cliente_id: int, dados: dict, integrador: dict = Depends(
     conn = conectar_banco()
     cur = conn.cursor()
     try:
-        cur.execute("""
-            UPDATE clientes SET marca_inversor=%s,serial_inversor=%s,api_key_inversor=%s
-            WHERE id=%s AND integrador_id=%s RETURNING id,nome
-        """, (dados.get("marca_inversor"), dados.get("serial_inversor"), dados.get("api_key_inversor"), cliente_id, integrador["id"]))
+        cur.execute("UPDATE clientes SET marca_inversor=%s,serial_inversor=%s,api_key_inversor=%s WHERE id=%s AND integrador_id=%s RETURNING id,nome",
+                    (dados.get("marca_inversor"),dados.get("serial_inversor"),dados.get("api_key_inversor"),cliente_id,integrador["id"]))
         c = cur.fetchone()
         conn.commit()
         if not c:
             raise HTTPException(status_code=404, detail="Cliente não encontrado")
-        return {"sucesso": True, "id": c[0], "nome": c[1]}
+        return {"sucesso":True,"id":c[0],"nome":c[1]}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     finally:
@@ -541,7 +512,6 @@ async def upload_conta(cliente_id: int, arquivo: UploadFile = File(...)):
 
         consumo_anterior = float(conta_ant[0] or conta_ant[1] or 0) if conta_ant else None
 
-        # Buscar geração mensal do inversor
         geracao_total_kwh = None
         if inversor and inversor[0] and inversor[0].lower() == "foxess" and inversor[2]:
             try:
@@ -589,8 +559,8 @@ def geracao_esperada(cliente_id: int):
     hsp = {1:5.2,2:5.4,3:5.1,4:4.8,5:4.5,6:4.3,7:4.5,8:5.0,9:4.9,10:4.8,11:4.9,12:5.0}
     meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]
     dias = [31,28,31,30,31,30,31,31,30,31,30,31]
-    geracao = [{"mes": meses[i], "mes_num": i+1, "hsp": hsp[i+1], "kwh_esperado": round(kwp*hsp[i+1]*dias[i]*pr,2)} for i in range(12)]
-    return {"potencia_kwp": kwp, "performance_ratio": pr, "geracao_mensal": geracao, "total_anual": round(sum(g["kwh_esperado"] for g in geracao),2)}
+    geracao = [{"mes":meses[i],"mes_num":i+1,"hsp":hsp[i+1],"kwh_esperado":round(kwp*hsp[i+1]*dias[i]*pr,2)} for i in range(12)]
+    return {"potencia_kwp":kwp,"performance_ratio":pr,"geracao_mensal":geracao,"total_anual":round(sum(g["kwh_esperado"] for g in geracao),2)}
 
 @app.get("/clientes/{cliente_id}/monitoramento")
 def monitoramento(cliente_id: int):
@@ -617,15 +587,10 @@ def monitoramento(cliente_id: int):
             variaveis[item["variable"]] = float(item.get("value") or 0)
         except:
             variaveis[item["variable"]] = 0.0
-    return {
-        "marca": marca, "serial": serial, "status": "online",
-        "geracao_atual_kw": variaveis.get("pvPower", 0.0),
-        "injetado_rede_kw": variaveis.get("feedinPower", 0.0),
-        "consumo_rede_kw": variaveis.get("gridConsumptionPower", 0.0),
-        "consumo_casa_kw": variaveis.get("loadsPower", 0.0),
-        "potencia_total_kw": variaveis.get("generationPower", 0.0),
-        "timestamp": datetime.utcnow().isoformat()
-    }
+    return {"marca":marca,"serial":serial,"status":"online",
+            "geracao_atual_kw":variaveis.get("pvPower",0.0),"injetado_rede_kw":variaveis.get("feedinPower",0.0),
+            "consumo_rede_kw":variaveis.get("gridConsumptionPower",0.0),"consumo_casa_kw":variaveis.get("loadsPower",0.0),
+            "potencia_total_kw":variaveis.get("generationPower",0.0),"timestamp":datetime.utcnow().isoformat()}
 
 @app.get("/clientes/{cliente_id}/monitoramento/mensal")
 def monitoramento_mensal(cliente_id: int):
@@ -634,11 +599,7 @@ def monitoramento_mensal(cliente_id: int):
     cur = conn.cursor()
     cur.execute("SELECT nome,marca_inversor,serial_inversor,api_key_inversor FROM clientes WHERE id=%s", (cliente_id,))
     cliente = cur.fetchone()
-    cur.execute("""
-        SELECT EXTRACT(YEAR FROM data)::int,EXTRACT(MONTH FROM data)::int,SUM(geracao_kwh)
-        FROM historico_geracao WHERE cliente_id=%s AND data>=CURRENT_DATE-INTERVAL '12 months'
-        GROUP BY 1,2 ORDER BY 1,2
-    """, (cliente_id,))
+    cur.execute("SELECT EXTRACT(YEAR FROM data)::int,EXTRACT(MONTH FROM data)::int,SUM(geracao_kwh) FROM historico_geracao WHERE cliente_id=%s AND data>=CURRENT_DATE-INTERVAL '12 months' GROUP BY 1,2 ORDER BY 1,2", (cliente_id,))
     resultados = cur.fetchall()
     cur.close()
     conn.close()
@@ -666,35 +627,99 @@ def monitoramento_mensal(cliente_id: int):
 def verificar_anomalias(cliente_id: int):
     conn = conectar_banco()
     cur = conn.cursor()
-    cur.execute("SELECT nome FROM clientes WHERE id=%s", (cliente_id,))
+    cur.execute("SELECT nome,latitude,longitude,potencia_kwp,performance_ratio FROM clientes WHERE id=%s", (cliente_id,))
     cliente = cur.fetchone()
     cur.close()
     conn.close()
     if not cliente:
         raise HTTPException(status_code=404, detail="Cliente não encontrado")
+
+    nome, latitude, longitude, potencia_kwp, performance_ratio = cliente
     hoje = date.today()
     ontem = hoje - timedelta(days=1)
     g_ontem = buscar_geracao_dia(cliente_id, ontem)
     ultimos7 = buscar_geracao_periodo(cliente_id, hoje-timedelta(days=8), ontem)
     media7 = sum(d["total_kwh"] for d in ultimos7)/len(ultimos7) if ultimos7 else 0.0
+
+    # Calcular média diária esperada baseada no projeto
+    media_diaria_esperada = 0.0
+    if potencia_kwp and performance_ratio:
+        mes_atual = hoje.month
+        hsp = {1:5.2,2:5.4,3:5.1,4:4.8,5:4.5,6:4.3,7:4.5,8:5.0,9:4.9,10:4.8,11:4.9,12:5.0}
+        media_diaria_esperada = float(potencia_kwp) * hsp.get(mes_atual, 5.0) * float(performance_ratio)
+
+    # Verificar 3 dias consecutivos abaixo da média
+    alerta_consecutivo = None
+    if media_diaria_esperada > 0 and len(ultimos7) >= 3:
+        ultimos3 = ultimos7[-3:]
+        dias_baixos = [d for d in ultimos3 if d["total_kwh"] < media_diaria_esperada * 0.7]
+        if len(dias_baixos) == 3:
+            # Consultar clima para verificar se é falso positivo
+            data_inicio = ultimos3[0]["data"]
+            data_fim = ultimos3[-1]["data"]
+            clima = {}
+            if latitude and longitude:
+                clima = consultar_clima(float(latitude), float(longitude), data_inicio, data_fim)
+
+            dias_nublados = sum(1 for d in ultimos3 if clima.get(d["data"], {}).get("dia_nublado", False) or clima.get(d["data"], {}).get("dia_chuvoso", False))
+            media_3dias = sum(d["total_kwh"] for d in ultimos3) / 3
+
+            if dias_nublados >= 2:
+                alerta_consecutivo = {
+                    "tipo": "informativo",
+                    "icone": "☁️",
+                    "titulo": "Geração Baixa por Condições Climáticas",
+                    "mensagem": f"Seu sistema gerou abaixo da média nos últimos 3 dias (média: {media_3dias:.1f} kWh/dia vs esperado: {media_diaria_esperada:.1f} kWh/dia), mas isso é normal — o período teve muita nebulosidade ou chuva na sua região. Quando o tempo abrir, a geração voltará ao normal.",
+                    "acao": "Nenhuma ação necessária. Aguardar melhora nas condições climáticas."
+                }
+            else:
+                alerta_consecutivo = {
+                    "tipo": "atencao",
+                    "icone": "⚠️",
+                    "titulo": "3 Dias Consecutivos com Geração Abaixo da Média",
+                    "mensagem": f"Seu sistema gerou abaixo do esperado por 3 dias consecutivos (média: {media_3dias:.1f} kWh/dia vs esperado: {media_diaria_esperada:.1f} kWh/dia). As condições climáticas estavam boas, o que pode indicar um problema técnico.",
+                    "acao": "Verificar se há sombra nova nos painéis, sujeira acumulada ou problema no inversor. Contate seu integrador."
+                }
+
     alertas = []
+
+    # Adicionar alerta de 3 dias consecutivos se existir
+    if alerta_consecutivo:
+        alertas.append(alerta_consecutivo)
+
+    # Alertas do dia anterior
     if g_ontem < 0.5:
         alertas.append({"tipo":"urgente","icone":"🔴","titulo":"Sistema Parado",
-            "mensagem":f"Seu sistema não gerou energia significativa ontem ({g_ontem:.1f} kWh).",
-            "acao":"Verificar disjuntor CA e entrar em contato com o técnico."})
+            "mensagem":f"Seu sistema não gerou energia significativa ontem ({g_ontem:.1f} kWh). Isso pode indicar disjuntor desarmado ou falha no inversor.",
+            "acao":"Verificar disjuntor CA e entrar em contato com o técnico imediatamente."})
     elif media7 > 0 and g_ontem < media7*0.4:
-        alertas.append({"tipo":"atencao","icone":"⚠️","titulo":"Geração Muito Abaixo do Normal",
-            "mensagem":f"Ontem: {g_ontem:.1f} kWh vs média 7 dias: {media7:.1f} kWh. Queda de {((media7-g_ontem)/media7*100):.0f}%.",
-            "acao":"Verificar sombreamento, sujeira nos painéis ou problema no inversor."})
+        # Verificar clima de ontem
+        clima_ontem = {}
+        if latitude and longitude:
+            clima_ontem = consultar_clima(float(latitude), float(longitude), str(ontem), str(ontem))
+        dia_ruim = clima_ontem.get(str(ontem), {}).get("dia_nublado", False) or clima_ontem.get(str(ontem), {}).get("dia_chuvoso", False)
+
+        if dia_ruim:
+            alertas.append({"tipo":"informativo","icone":"☁️","titulo":"Geração Baixa — Dia Nublado/Chuvoso",
+                "mensagem":f"Ontem seu sistema gerou apenas {g_ontem:.1f} kWh (média: {media7:.1f} kWh), mas as condições climáticas estavam desfavoráveis na sua região. Isso é normal!",
+                "acao":"Nenhuma ação necessária. Se continuar após dias ensolarados, verificar o sistema."})
+        else:
+            alertas.append({"tipo":"atencao","icone":"⚠️","titulo":"Geração Muito Abaixo do Normal",
+                "mensagem":f"Ontem: {g_ontem:.1f} kWh vs média 7 dias: {media7:.1f} kWh. Queda de {((media7-g_ontem)/media7*100):.0f}%. O tempo estava bom, o que pode indicar um problema técnico.",
+                "acao":"Verificar sombreamento, sujeira nos painéis ou problema no inversor."})
     elif media7 > 0 and g_ontem < media7*0.7:
         alertas.append({"tipo":"informativo","icone":"📉","titulo":"Geração Abaixo da Média",
             "mensagem":f"Ontem: {g_ontem:.1f} kWh vs média: {media7:.1f} kWh.",
-            "acao":"Monitorar nos próximos dias. Se continuar, agendar limpeza."})
+            "acao":"Monitorar nos próximos dias. Se continuar, agendar limpeza preventiva."})
+
     if not alertas and g_ontem > 0:
         alertas.append({"tipo":"normal","icone":"✅","titulo":"Sistema Operando Normalmente",
             "mensagem":f"Ontem seu sistema gerou {g_ontem:.1f} kWh.","acao":"Nenhuma ação necessária."})
+
     if media7 == 0 and g_ontem == 0:
         alertas = [{"tipo":"informativo","icone":"📡","titulo":"Coletando Dados",
-            "mensagem":"Aguardando coleta de dados de geração.","acao":"Em alguns dias teremos estatísticas."}]
-    return {"cliente_id":cliente_id,"cliente_nome":cliente[0],"data_analise":hoje.isoformat(),
-            "geracao_ontem_kwh":round(g_ontem,1),"media_7_dias_kwh":round(media7,1),"alertas":alertas}
+            "mensagem":"Aguardando coleta de dados de geração.","acao":"Em alguns dias teremos estatísticas completas."}]
+
+    return {"cliente_id":cliente_id,"cliente_nome":nome,"data_analise":hoje.isoformat(),
+            "geracao_ontem_kwh":round(g_ontem,1),"media_7_dias_kwh":round(media7,1),
+            "media_diaria_esperada_kwh":round(media_diaria_esperada,1),"alertas":alertas}

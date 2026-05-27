@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; color: #333; min-height: 100vh; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; color: #333; }
 
         header {
             background: linear-gradient(135deg, #1e293b, #334155);
@@ -18,32 +18,16 @@
             z-index: 100;
             box-shadow: 0 2px 12px rgba(0,0,0,0.2);
         }
-        .header-top {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 16px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
+        .header-top { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
         .header-brand { display: flex; align-items: center; gap: 12px; }
         .header-brand .sol { font-size: 28px; }
         .header-brand h1 { font-size: 18px; font-weight: 700; }
         .header-brand p { font-size: 12px; opacity: 0.7; }
-        .header-cliente { text-align: right; }
-        .header-cliente .nome { font-weight: 600; font-size: 15px; }
-        .header-cliente .sub { opacity: 0.6; font-size: 12px; }
+        .header-cliente .nome { font-weight: 600; font-size: 15px; text-align: right; }
+        .header-cliente .sub { opacity: 0.6; font-size: 12px; text-align: right; }
 
         .nav-abas { display: flex; overflow-x: auto; }
-        .aba {
-            padding: 14px 20px;
-            font-size: 13px;
-            font-weight: 600;
-            color: rgba(255,255,255,0.6);
-            cursor: pointer;
-            border-bottom: 3px solid transparent;
-            white-space: nowrap;
-            transition: all 0.2s;
-        }
+        .aba { padding: 14px 20px; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.6); cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; transition: all 0.2s; }
         .aba:hover { color: white; background: rgba(255,255,255,0.05); }
         .aba.ativa { color: #f59e0b; border-bottom-color: #f59e0b; }
 
@@ -51,195 +35,69 @@
         .pagina { display: none; }
         .pagina.ativa { display: block; }
 
-        .card {
-            background: white;
-            border-radius: 14px;
-            padding: 24px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-        }
-        .card-titulo {
-            font-size: 14px;
-            font-weight: 700;
-            color: #64748b;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-            margin-bottom: 18px;
-        }
+        .card { background: white; border-radius: 14px; padding: 24px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .card-titulo { font-size: 14px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 18px; }
 
-        /* Hero geração tempo real */
-        .geracao-hero {
-            background: linear-gradient(135deg, #f59e0b, #d97706);
-            border-radius: 16px;
-            padding: 32px;
-            text-align: center;
-            color: white;
-            margin-bottom: 20px;
-            position: relative;
-            overflow: hidden;
-        }
-        .geracao-hero::before {
-            content: "☀️";
-            position: absolute;
-            font-size: 120px;
-            opacity: 0.08;
-            right: -10px;
-            top: -10px;
-        }
+        .geracao-hero { background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 16px; padding: 32px; text-align: center; color: white; margin-bottom: 20px; position: relative; overflow: hidden; }
+        .geracao-hero::before { content: "☀️"; position: absolute; font-size: 120px; opacity: 0.08; right: -10px; top: -10px; }
         .geracao-hero .kw-num { font-size: 64px; font-weight: 800; line-height: 1; }
         .geracao-hero .kw-label { font-size: 16px; opacity: 0.85; margin-top: 6px; }
-        .status-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            background: rgba(255,255,255,0.2);
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 13px;
-            margin-top: 12px;
-        }
+        .status-pill { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; font-size: 13px; margin-top: 12px; }
         .dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; }
         .dot.pulsando { animation: pulsar 2s infinite; }
         .dot.vermelho { background: #f87171; }
         .dot.cinza { background: rgba(255,255,255,0.4); }
         @keyframes pulsar { 0%,100%{opacity:1} 50%{opacity:0.3} }
-        .txt-atualizacao { font-size: 11px; color: #94a3b8; text-align: center; margin-top: 8px; }
+        .txt-atu { font-size: 11px; color: #94a3b8; text-align: center; margin-top: 8px; }
 
-        /* Grid de métricas */
         .metricas { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
-        .metrica {
-            background: #f8fafc;
-            border-radius: 12px;
-            padding: 16px;
-            text-align: center;
-            border-top: 3px solid #e2e8f0;
-        }
+        .metrica { background: #f8fafc; border-radius: 12px; padding: 16px; text-align: center; border-top: 3px solid #e2e8f0; }
         .metrica.am { border-top-color: #f59e0b; }
         .metrica.vd { border-top-color: #22c55e; }
         .metrica.az { border-top-color: #3b82f6; }
-        .metrica.rx { border-top-color: #8b5cf6; }
         .metrica.vm { border-top-color: #ef4444; }
         .metrica.or { border-top-color: #f97316; }
         .metrica .val { font-size: 20px; font-weight: 800; color: #1e293b; line-height: 1.1; }
         .metrica.vd .val { color: #16a34a; }
         .metrica.az .val { color: #2563eb; }
-        .metrica.rx .val { color: #7c3aed; }
         .metrica.vm .val { color: #dc2626; }
         .metrica.or .val { color: #ea580c; }
         .metrica .lbl { font-size: 11px; color: #94a3b8; margin-top: 4px; font-weight: 500; }
 
-        /* Status conta */
-        .conta-status {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 18px;
-            border-radius: 24px;
-            font-weight: 700;
-            font-size: 14px;
-            margin-bottom: 16px;
-        }
+        .conta-status { display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px; border-radius: 24px; font-weight: 700; font-size: 14px; margin-bottom: 16px; }
         .conta-status.super { background: #dcfce7; color: #16a34a; }
         .conta-status.defi { background: #fee2e2; color: #dc2626; }
 
-        /* Planilha de consumo */
-        .planilha {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 16px;
-            font-size: 13px;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        .planilha thead th {
-            background: #f1f5f9;
-            padding: 10px 14px;
-            text-align: left;
-            color: #64748b;
-            font-weight: 700;
-            border-bottom: 2px solid #e2e8f0;
-        }
-        .planilha tbody td {
-            padding: 10px 14px;
-            border-bottom: 1px solid #f1f5f9;
-            vertical-align: middle;
-        }
-        .planilha tbody tr:last-child td {
-            border-bottom: none;
-            font-weight: 700;
-            background: #f8fafc;
-        }
-        .planilha .cor-verde { color: #16a34a; font-weight: 700; }
-        .planilha .cor-azul { color: #2563eb; font-weight: 700; }
-        .planilha .cor-vermelho { color: #dc2626; font-weight: 700; }
-        .planilha .cor-laranja { color: #ea580c; font-weight: 700; }
+        .planilha { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }
+        .planilha thead th { background: #f1f5f9; padding: 10px 14px; text-align: left; color: #64748b; font-weight: 700; border-bottom: 2px solid #e2e8f0; }
+        .planilha tbody td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+        .planilha tbody tr:last-child td { border-bottom: none; font-weight: 700; background: #f8fafc; }
+        .cor-vd { color: #16a34a; font-weight: 700; }
+        .cor-az { color: #2563eb; font-weight: 700; }
+        .cor-or { color: #ea580c; font-weight: 700; }
 
-        /* Caixas de análise */
-        .box-analise {
-            border-radius: 10px;
-            padding: 16px 20px;
-            font-size: 14px;
-            line-height: 1.8;
-            margin-top: 14px;
-        }
-        .box-analise.azul {
-            background: #eff6ff;
-            border-left: 4px solid #3b82f6;
-            color: #1e40af;
-        }
-        .box-analise.amarelo {
-            background: #fffbeb;
-            border-left: 4px solid #f59e0b;
-            color: #78350f;
-        }
-        .box-analise.vermelho {
-            background: #fef2f2;
-            border: 2px solid #ef4444;
-            color: #991b1b;
-        }
+        .box { border-radius: 10px; padding: 16px 20px; font-size: 14px; line-height: 1.8; margin-top: 14px; }
+        .box.az { background: #eff6ff; border-left: 4px solid #3b82f6; color: #1e40af; }
+        .box.am { background: #fffbeb; border-left: 4px solid #f59e0b; color: #78350f; }
+        .box.vm { background: #fef2f2; border: 2px solid #ef4444; color: #991b1b; }
 
-        /* Upload */
-        .upload-zone {
-            border: 2px dashed #cbd5e1;
-            border-radius: 12px;
-            padding: 36px 20px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
+        .upload-zone { border: 2px dashed #cbd5e1; border-radius: 12px; padding: 36px 20px; text-align: center; cursor: pointer; transition: all 0.2s; }
         .upload-zone:hover { border-color: #f59e0b; background: #fffbeb; }
         .upload-zone .icone { font-size: 44px; margin-bottom: 10px; }
         .upload-zone p { color: #64748b; font-size: 14px; }
         .upload-zone .hint { font-size: 12px; color: #94a3b8; margin-top: 6px; }
-        .btn {
-            background: linear-gradient(135deg, #f59e0b, #d97706);
-            color: white;
-            border: none;
-            padding: 13px 24px;
-            border-radius: 10px;
-            font-size: 15px;
-            font-weight: 700;
-            cursor: pointer;
-            width: 100%;
-            margin-top: 14px;
-        }
+        .btn { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; border: none; padding: 13px 24px; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; width: 100%; margin-top: 14px; }
         .btn:hover { opacity: 0.9; }
         .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-vm { background: linear-gradient(135deg, #dc2626, #b91c1c); color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+        .btn-vm:hover { opacity: 0.8; }
 
         .loading-ia { text-align: center; padding: 30px; display: none; }
         .loading-ia .spinner { font-size: 36px; animation: girar 1s linear infinite; display: inline-block; }
         @keyframes girar { to { transform: rotate(360deg); } }
         .loading-ia p { color: #64748b; margin-top: 12px; font-size: 14px; }
 
-        /* Alertas */
-        .alerta-item {
-            border-radius: 10px;
-            padding: 14px 16px;
-            margin-bottom: 10px;
-            display: flex;
-            gap: 12px;
-            align-items: flex-start;
-        }
+        .alerta-item { border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; display: flex; gap: 12px; align-items: flex-start; }
         .alerta-item.urgente { background: #fef2f2; border-left: 4px solid #ef4444; }
         .alerta-item.atencao { background: #fffbeb; border-left: 4px solid #f59e0b; }
         .alerta-item.informativo { background: #eff6ff; border-left: 4px solid #3b82f6; }
@@ -249,35 +107,24 @@
         .alerta-msg { font-size: 13px; color: #555; line-height: 1.5; }
         .alerta-acao { font-size: 12px; color: #888; margin-top: 6px; }
 
-        /* Histórico */
-        .hist-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: #f8fafc;
-            border-radius: 10px;
-            padding: 14px 16px;
-            margin-bottom: 10px;
-            border-left: 4px solid #e2e8f0;
-        }
-        .hist-item.super { border-left-color: #22c55e; }
-        .hist-item.defi { border-left-color: #ef4444; }
-        .hist-mes { font-weight: 700; font-size: 14px; }
-        .hist-detalhe { font-size: 13px; color: #64748b; margin-top: 2px; }
-        .hist-badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 10px; }
-        .hist-badge.super { background: #dcfce7; color: #16a34a; }
-        .hist-badge.defi { background: #fee2e2; color: #dc2626; }
+        /* Gestão de contas */
+        .conta-item { background: #f8fafc; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; border-left: 4px solid #e2e8f0; }
+        .conta-item.super { border-left-color: #22c55e; }
+        .conta-item.defi { border-left-color: #ef4444; }
+        .conta-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+        .conta-mes { font-weight: 700; font-size: 14px; }
+        .conta-resumo { font-size: 13px; color: #64748b; margin-top: 2px; }
+        .conta-badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 10px; flex-shrink: 0; margin-left: 8px; }
+        .conta-badge.super { background: #dcfce7; color: #16a34a; }
+        .conta-badge.defi { background: #fee2e2; color: #dc2626; }
+        .conta-detalhe { display: none; margin-top: 14px; padding-top: 14px; border-top: 1px solid #e2e8f0; }
+        .conta-detalhe.aberto { display: block; }
+        .conta-acoes { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }
 
-        /* Gráfico */
-        .legenda-graf {
-            display: flex;
-            gap: 20px;
-            justify-content: center;
-            margin-top: 14px;
-            flex-wrap: wrap;
-        }
+        .legenda-graf { display: flex; gap: 20px; justify-content: center; margin-top: 14px; flex-wrap: wrap; }
         .legenda-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #64748b; }
         .legenda-cor { width: 14px; height: 14px; border-radius: 3px; }
+        .legenda-info { font-size: 12px; color: #94a3b8; text-align: center; margin-top: 8px; }
 
         .tabela-ger { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
         .tabela-ger th { background: #f8fafc; padding: 10px; text-align: center; color: #64748b; border-bottom: 2px solid #e2e8f0; font-weight: 600; }
@@ -293,16 +140,7 @@
         .empty .icone { font-size: 48px; margin-bottom: 12px; }
         .empty p { font-size: 14px; }
 
-        .badge-media {
-            background: #fef3c7;
-            border: 1px solid #fbbf24;
-            border-radius: 8px;
-            padding: 10px 14px;
-            font-size: 13px;
-            color: #92400e;
-            margin-bottom: 14px;
-            display: none;
-        }
+        .badge-media { background: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #92400e; margin-bottom: 14px; display: none; }
 
         @media (max-width: 600px) {
             .geracao-hero .kw-num { font-size: 48px; }
@@ -317,10 +155,7 @@
     <div class="header-top">
         <div class="header-brand">
             <div class="sol">☀️</div>
-            <div>
-                <h1>Solar Portal</h1>
-                <p id="subtitulo">Meu Sistema Solar</p>
-            </div>
+            <div><h1>Solar Portal</h1><p id="subtitulo">Meu Sistema Solar</p></div>
         </div>
         <div class="header-cliente">
             <div class="nome" id="hdr-nome">—</div>
@@ -339,7 +174,6 @@
 
     <!-- INÍCIO -->
     <div class="pagina ativa" id="pag-inicio">
-
         <div class="geracao-hero">
             <div class="kw-num" id="pv-power">--</div>
             <div class="kw-label">kW gerados agora pelos painéis</div>
@@ -348,7 +182,7 @@
                 <span id="status-txt">Conectando ao inversor...</span>
             </div>
         </div>
-        <p class="txt-atualizacao" id="txt-atualizacao">Atualizando a cada 30 segundos</p>
+        <p class="txt-atu" id="txt-atu">Atualizando a cada 30 segundos</p>
 
         <div class="card" id="card-resumo" style="display:none;">
             <div class="card-titulo">📊 Última Conta Analisada</div>
@@ -357,47 +191,39 @@
 
         <div class="card" id="card-alertas-home" style="display:none;">
             <div class="card-titulo">🔔 Notificações</div>
-            <div id="alertas-home-content"></div>
-            <p style="font-size:12px; color:#94a3b8; margin-top:10px; text-align:right; cursor:pointer;" onclick="irPara('alertas')">Ver todos →</p>
+            <div id="alertas-home"></div>
+            <p style="font-size:12px;color:#94a3b8;margin-top:10px;text-align:right;cursor:pointer;" onclick="irPara('alertas')">Ver todos →</p>
         </div>
 
         <div class="card" id="card-sem-inversor" style="display:none;">
-            <div class="empty">
-                <div class="icone">🔌</div>
-                <p>Monitoramento em tempo real será ativado em breve.<br>Entre em contato com seu integrador.</p>
-            </div>
+            <div class="empty"><div class="icone">🔌</div><p>Monitoramento em tempo real será ativado em breve.<br>Entre em contato com seu integrador.</p></div>
         </div>
-
     </div>
 
     <!-- GERAÇÃO -->
     <div class="pagina" id="pag-geracao">
-
         <div class="card" id="card-grafico" style="display:none;">
             <div class="card-titulo">📈 Geração Esperada vs Real</div>
             <canvas id="grafico-geracao" height="130"></canvas>
             <div class="legenda-graf">
                 <div class="legenda-item"><div class="legenda-cor" style="background:#93c5fd;"></div>Esperado (kWh)</div>
-                <div class="legenda-item"><div class="legenda-cor" style="background:#4ade80;"></div>Gerado Real (kWh)</div>
+                <div class="legenda-item"><div class="legenda-cor" style="background:#4ade80;"></div>≥90% — Normal</div>
+                <div class="legenda-item"><div class="legenda-cor" style="background:#fb923c;"></div>70-90% — Abaixo</div>
+                <div class="legenda-item"><div class="legenda-cor" style="background:#f87171;"></div>&lt;70% — Crítico</div>
             </div>
+            <p class="legenda-info">As cores das barras indicam a performance do sistema em relação ao esperado.</p>
             <table class="tabela-ger">
-                <thead><tr><th>Mês</th><th>Esperado (kWh)</th><th>Gerado (kWh)</th><th>Diferença</th><th>Status</th></tr></thead>
+                <thead><tr><th>Mês</th><th>Esperado (kWh)</th><th>Gerado (kWh)</th><th>Performance</th><th>Status</th></tr></thead>
                 <tbody id="tbody-geracao"></tbody>
             </table>
         </div>
-
         <div class="card" id="card-sem-projeto">
-            <div class="empty">
-                <div class="icone">📐</div>
-                <p>Dados do projeto sendo configurados.<br>Em breve o gráfico estará disponível.</p>
-            </div>
+            <div class="empty"><div class="icone">📐</div><p>Dados do projeto sendo configurados.<br>Em breve o gráfico estará disponível.</p></div>
         </div>
-
     </div>
 
     <!-- CONTA DE ENERGIA -->
     <div class="pagina" id="pag-conta">
-
         <div class="card">
             <div class="card-titulo">📤 Enviar Nova Conta</div>
             <div class="upload-zone" onclick="document.getElementById('arquivo').click()">
@@ -417,14 +243,8 @@
         <div id="resultado-conta" style="display:none;">
             <div class="card">
                 <div class="card-titulo">📊 Resultado da Análise</div>
-
-                <div class="badge-media" id="badge-media">
-                    ⚠️ <strong>Atenção:</strong> Esta conta possui leitura acumulada de mais de um mês.
-                </div>
-
+                <div class="badge-media" id="badge-media">⚠️ <strong>Atenção:</strong> Esta conta possui leitura acumulada de mais de um mês.</div>
                 <div id="conta-status-badge"></div>
-
-                <!-- Métricas básicas -->
                 <div class="metricas" style="margin-bottom:20px;">
                     <div class="metrica am"><div class="val" id="val-mes">—</div><div class="lbl">Mês de Referência</div></div>
                     <div class="metrica vm"><div class="val" id="val-fatura">—</div><div class="lbl">Valor da Fatura</div></div>
@@ -432,83 +252,69 @@
                     <div class="metrica"><div class="val" id="val-saldo">—</div><div class="lbl">Saldo Acumulado</div></div>
                 </div>
 
-                <!-- Planilha Balanço Energético -->
                 <div id="secao-balanco" style="display:none;">
-                    <p style="font-size:13px; font-weight:700; color:#334155; margin-bottom:10px;">⚡ Balanço Energético do Período</p>
+                    <p style="font-size:13px;font-weight:700;color:#334155;margin-bottom:10px;">⚡ Balanço Energético do Período</p>
                     <table class="planilha">
-                        <thead>
-                            <tr>
-                                <th>Descrição</th>
-                                <th style="text-align:right;">Quantidade</th>
-                                <th>O que significa</th>
-                            </tr>
-                        </thead>
+                        <thead><tr><th>Descrição</th><th style="text-align:right;">Quantidade</th><th>O que significa</th></tr></thead>
                         <tbody>
                             <tr id="linha-gerado" style="display:none;">
                                 <td>☀️ <strong>Total Gerado pelos Painéis</strong></td>
-                                <td style="text-align:right;" class="cor-verde" id="plan-gerado">—</td>
-                                <td style="color:#64748b; font-size:12px;">Energia total produzida pelo seu sistema solar no período</td>
+                                <td style="text-align:right;" class="cor-vd" id="plan-gerado">—</td>
+                                <td style="color:#64748b;font-size:12px;">Energia total produzida pelo sistema solar</td>
                             </tr>
                             <tr>
                                 <td>🔌 <strong>Injetado na Rede</strong></td>
-                                <td style="text-align:right;" class="cor-azul" id="plan-injetado">—</td>
-                                <td style="color:#64748b; font-size:12px;">Sobra do solar enviada à distribuidora como créditos</td>
+                                <td style="text-align:right;" class="cor-az" id="plan-injetado">—</td>
+                                <td style="color:#64748b;font-size:12px;">Sobra enviada à distribuidora como créditos</td>
                             </tr>
-                            <tr id="linha-instantaneo" style="display:none;">
+                            <tr id="linha-inst" style="display:none;">
                                 <td>🏠 <strong>Consumo Instantâneo</strong></td>
-                                <td style="text-align:right;" class="cor-azul" id="plan-instantaneo">—</td>
-                                <td style="color:#64748b; font-size:12px;">Energia solar consumida na hora em que foi gerada</td>
+                                <td style="text-align:right;" class="cor-az" id="plan-inst">—</td>
+                                <td style="color:#64748b;font-size:12px;">Solar consumido na hora da geração</td>
                             </tr>
                             <tr>
                                 <td>🌙 <strong>Consumo da Distribuidora</strong></td>
                                 <td style="text-align:right;" id="plan-rede">—</td>
-                                <td style="color:#64748b; font-size:12px;">Energia consumida à noite ou em dias de pouca geração</td>
+                                <td style="color:#64748b;font-size:12px;">Energia da rede (noturno/dias nublados)</td>
                             </tr>
                             <tr>
                                 <td>📊 <strong>Consumo Total da Casa</strong></td>
-                                <td style="text-align:right;" class="cor-laranja" id="plan-total">—</td>
-                                <td style="color:#64748b; font-size:12px;">Tudo que sua casa consumiu no período (solar + rede)</td>
+                                <td style="text-align:right;" class="cor-or" id="plan-total">—</td>
+                                <td style="color:#64748b;font-size:12px;">Tudo que sua casa consumiu no período</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
 
-                <!-- Análise inteligente de consumo -->
-                <div id="box-analise-consumo" style="display:none;"></div>
-
-                <!-- Mensagem da IA -->
-                <div class="box-analise amarelo" id="val-mensagem" style="margin-top:14px;"></div>
+                <div id="box-analise" style="display:none;"></div>
+                <div class="box am" id="val-mensagem" style="margin-top:14px;"></div>
             </div>
         </div>
 
+        <!-- Histórico e Gestão de Contas -->
         <div class="card" id="card-historico" style="display:none;">
             <div class="card-titulo">🗂️ Histórico de Contas</div>
             <div id="lista-historico"></div>
         </div>
-
     </div>
 
     <!-- ALERTAS -->
     <div class="pagina" id="pag-alertas">
-
         <div class="card">
             <div class="card-titulo">🔔 Alertas Inteligentes do Sistema</div>
-            <div id="alertas-content">
-                <div class="empty"><div class="icone">📡</div><p>Carregando alertas...</p></div>
-            </div>
-            <p class="txt-atualizacao" id="alertas-data" style="margin-top:12px;"></p>
+            <div id="alertas-content"><div class="empty"><div class="icone">📡</div><p>Carregando alertas...</p></div></div>
+            <p class="txt-atu" id="alertas-data" style="margin-top:12px;"></p>
         </div>
-
         <div class="card">
             <div class="card-titulo">ℹ️ Sobre os Alertas</div>
-            <div style="font-size:13px; color:#64748b; line-height:1.8;">
-                <p>🔴 <strong>Urgente</strong> — Sistema parado ou com falha grave. Acione o técnico.</p>
-                <p style="margin-top:8px;">⚠️ <strong>Atenção</strong> — Geração muito abaixo do normal. Verificar.</p>
+            <div style="font-size:13px;color:#64748b;line-height:1.8;">
+                <p>🔴 <strong>Urgente</strong> — Sistema parado ou falha grave. Acionar técnico.</p>
+                <p style="margin-top:8px;">⚠️ <strong>Atenção</strong> — Geração muito abaixo do normal.</p>
+                <p style="margin-top:8px;">☁️ <strong>Clima</strong> — Baixa geração por condições climáticas (normal).</p>
                 <p style="margin-top:8px;">📉 <strong>Informativo</strong> — Queda moderada. Monitorar.</p>
                 <p style="margin-top:8px;">✅ <strong>Normal</strong> — Sistema operando normalmente.</p>
             </div>
         </div>
-
     </div>
 
 </div>
@@ -525,11 +331,12 @@
     let dadosGeracaoReal = [];
     let grafico = null;
     let intervalo = null;
+    let contaAberta = null;
 
     function irPara(aba) {
         document.querySelectorAll(".aba").forEach(a => a.classList.remove("ativa"));
         document.querySelectorAll(".pagina").forEach(pg => pg.classList.remove("ativa"));
-        const idx = {inicio:0, geracao:1, conta:2, alertas:3};
+        const idx = {inicio:0,geracao:1,conta:2,alertas:3};
         document.querySelectorAll(".aba")[idx[aba]].classList.add("ativa");
         document.getElementById(`pag-${aba}`).classList.add("ativa");
     }
@@ -543,29 +350,18 @@
                 idCliente = d.id;
                 document.getElementById("hdr-nome").textContent = d.nome || "—";
                 document.getElementById("hdr-sub").textContent = [d.distribuidora, d.numero_uc].filter(Boolean).join(" • ") || "—";
-                document.getElementById("subtitulo").textContent = "Meu Sistema Solar";
             } catch(e) { erroAcesso(); return; }
         } else if (nomeParam) {
             document.getElementById("hdr-nome").textContent = decodeURIComponent(nomeParam);
         }
         if (!idCliente) { erroAcesso(); return; }
 
-        await Promise.all([
-            ligarMonitoramento(),
-            buscarGeracaoEsperada(),
-            buscarGeracaoReal(),
-            buscarAlertas(),
-            buscarHistoricoContas()
-        ]);
+        await Promise.all([ligarMonitoramento(), buscarGeracaoEsperada(), buscarGeracaoReal(), buscarAlertas(), buscarHistoricoContas()]);
         desenharGrafico();
     }
 
     function erroAcesso() {
-        document.body.innerHTML = `<div style="text-align:center;padding:80px 20px;font-family:sans-serif;">
-            <div style="font-size:60px;margin-bottom:20px;">🔒</div>
-            <h2 style="color:#334155;margin-bottom:10px;">Link inválido ou expirado</h2>
-            <p style="color:#64748b;">Solicite um novo link ao seu integrador solar.</p>
-        </div>`;
+        document.body.innerHTML = `<div style="text-align:center;padding:80px 20px;font-family:sans-serif;"><div style="font-size:60px;margin-bottom:20px;">🔒</div><h2 style="color:#334155;margin-bottom:10px;">Link inválido ou expirado</h2><p style="color:#64748b;">Solicite um novo link ao seu integrador solar.</p></div>`;
     }
 
     async function ligarMonitoramento() {
@@ -590,18 +386,11 @@
             const h = new Date().getHours();
             const dot = document.getElementById("dot-status");
             const txt = document.getElementById("status-txt");
-            if (h < 6 || h >= 19) {
-                dot.className = "dot cinza";
-                txt.textContent = "Período noturno — aguardando amanhecer 🌙";
-            } else if (pv > 0.05) {
-                dot.className = "dot pulsando";
-                txt.textContent = "Sistema gerando energia ✅";
-            } else {
-                dot.className = "dot vermelho";
-                txt.textContent = "Sistema sem geração no momento ⚠️";
-            }
+            if (h < 6 || h >= 19) { dot.className = "dot cinza"; txt.textContent = "Período noturno 🌙"; }
+            else if (pv > 0.05) { dot.className = "dot pulsando"; txt.textContent = "Sistema gerando energia ✅"; }
+            else { dot.className = "dot vermelho"; txt.textContent = "Sistema sem geração ⚠️"; }
             const agora = new Date().toLocaleTimeString("pt-BR", {hour:"2-digit",minute:"2-digit",second:"2-digit"});
-            document.getElementById("txt-atualizacao").textContent = `Última atualização: ${agora} — Atualiza a cada 30s`;
+            document.getElementById("txt-atu").textContent = `Última atualização: ${agora} — Atualiza a cada 30s`;
         } catch(e) {
             document.getElementById("pv-power").textContent = "--";
             document.getElementById("dot-status").className = "dot cinza";
@@ -627,6 +416,13 @@
         } catch(e) {}
     }
 
+    function corBarra(pct) {
+        if (pct === null) return "rgba(147,197,253,0.8)"; // azul = aguardando
+        if (pct >= 90) return "rgba(74,222,128,0.85)";   // verde = normal
+        if (pct >= 70) return "rgba(251,146,60,0.85)";    // laranja = abaixo
+        return "rgba(248,113,113,0.85)";                   // vermelho = crítico
+    }
+
     function desenharGrafico() {
         if (!dadosGeracao.length) return;
         document.getElementById("card-grafico").style.display = "block";
@@ -637,14 +433,20 @@
 
         const mesesExibir = dadosGeracaoReal.length > 0
             ? [...dadosGeracaoReal].sort((a,b) => a.ano!==b.ano?a.ano-b.ano:a.mes_num-b.mes_num).slice(-12)
-            : dadosGeracao.map(d => ({...d, ano: new Date().getFullYear()}));
+            : dadosGeracao.map(d => ({...d,ano:new Date().getFullYear()}));
 
-        const labels = mesesExibir.map(m => {
-            const e = dadosGeracao.find(d => d.mes_num===m.mes_num);
-            return `${e?.mes||m.mes}/${String(m.ano).slice(2)}`;
-        });
+        const labels = mesesExibir.map(m => { const e = dadosGeracao.find(d => d.mes_num===m.mes_num); return `${e?.mes||m.mes}/${String(m.ano).slice(2)}`; });
         const esperados = mesesExibir.map(m => dadosGeracao.find(d => d.mes_num===m.mes_num)?.kwh_esperado||0);
         const gerados = mesesExibir.map(m => realMap[`${m.mes_num}/${m.ano}`]??null);
+
+        // Cores dinâmicas baseadas na performance
+        const coresGerado = mesesExibir.map((m, i) => {
+            const esp = esperados[i];
+            const ger = gerados[i];
+            if (ger === null) return "rgba(200,200,200,0.3)";
+            const pct = esp > 0 ? (ger / esp * 100) : null;
+            return corBarra(pct);
+        });
 
         if (grafico) grafico.destroy();
         const ctx = document.getElementById("grafico-geracao").getContext("2d");
@@ -653,31 +455,31 @@
             data: {
                 labels,
                 datasets: [
-                    {label:"Esperado",data:esperados,backgroundColor:"rgba(147,197,253,0.8)",borderColor:"#3b82f6",borderWidth:1,borderRadius:4},
-                    {label:"Gerado",data:gerados,backgroundColor:"rgba(74,222,128,0.8)",borderColor:"#16a34a",borderWidth:1,borderRadius:4}
+                    {label:"Esperado",data:esperados,backgroundColor:"rgba(147,197,253,0.5)",borderColor:"#3b82f6",borderWidth:1,borderRadius:4},
+                    {label:"Gerado",data:gerados,backgroundColor:coresGerado,borderColor:coresGerado.map(c=>c.replace("0.85","1").replace("0.3","0.5")),borderWidth:1,borderRadius:4}
                 ]
             },
             options: {responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,title:{display:true,text:"kWh"}}}}
         });
 
-        document.getElementById("tbody-geracao").innerHTML = mesesExibir.map(m => {
-            const e = dadosGeracao.find(d => d.mes_num===m.mes_num);
-            const esp = e?.kwh_esperado||0;
-            const ger = realMap[`${m.mes_num}/${m.ano}`];
-            const diff = ger!=null?(ger-esp).toFixed(1):null;
+        document.getElementById("tbody-geracao").innerHTML = mesesExibir.map((m,i) => {
+            const esp = esperados[i];
+            const ger = gerados[i];
             const pct = ger!=null&&esp>0?(ger/esp*100):null;
+            const diff = ger!=null?(ger-esp).toFixed(1):null;
             let badge = '<span class="badge-tab ag">⏳ Aguardando</span>';
-            if (ger!=null&&ger>0) {
-                if (pct>=95) badge='<span class="badge-tab ex">✅ Excelente</span>';
+            if (pct!==null) {
+                if (pct>=90) badge='<span class="badge-tab ex">✅ Excelente</span>';
                 else if (pct>=80) badge='<span class="badge-tab bm">✅ Bom</span>';
                 else if (pct>=70) badge='<span class="badge-tab ab">⚠️ Abaixo</span>';
                 else badge='<span class="badge-tab cr">🔴 Crítico</span>';
             }
+            const pctTxt = pct!==null?`${pct.toFixed(0)}%`:"—";
             return `<tr>
-                <td><strong>${e?.mes||m.mes}/${m.ano}</strong></td>
+                <td><strong>${labels[i]}</strong></td>
                 <td>${esp}</td>
                 <td>${ger!=null?ger:"—"}</td>
-                <td>${diff!=null?(diff>0?"+":"")+diff+" kWh":"—"}</td>
+                <td>${pctTxt}</td>
                 <td>${badge}</td>
             </tr>`;
         }).join("");
@@ -690,27 +492,15 @@
             const d = await r.json();
             const alertas = d.alertas || [];
             const cls = {urgente:"urgente",atencao:"atencao",informativo:"informativo",normal:"normal"};
-            const html = alertas.map(a => `
-                <div class="alerta-item ${cls[a.tipo]||'informativo'}">
-                    <div class="alerta-icone">${a.icone}</div>
-                    <div>
-                        <div class="alerta-titulo">${a.titulo}</div>
-                        <div class="alerta-msg">${a.mensagem}</div>
-                        <div class="alerta-acao">🔧 ${a.acao}</div>
-                    </div>
-                </div>`).join("");
+            const html = alertas.map(a => `<div class="alerta-item ${cls[a.tipo]||'informativo'}"><div class="alerta-icone">${a.icone}</div><div><div class="alerta-titulo">${a.titulo}</div><div class="alerta-msg">${a.mensagem}</div><div class="alerta-acao">🔧 ${a.acao}</div></div></div>`).join("");
             document.getElementById("alertas-content").innerHTML = html || '<div class="empty"><div class="icone">✅</div><p>Nenhum alerta no momento.</p></div>';
             if (d.data_analise) {
-                document.getElementById("alertas-data").textContent = `Análise: ${new Date(d.data_analise).toLocaleDateString("pt-BR")} • Ontem: ${d.geracao_ontem_kwh} kWh • Média 7 dias: ${d.media_7_dias_kwh} kWh`;
+                document.getElementById("alertas-data").textContent = `Análise: ${new Date(d.data_analise).toLocaleDateString("pt-BR")} • Ontem: ${d.geracao_ontem_kwh} kWh • Média 7 dias: ${d.media_7_dias_kwh} kWh • Média diária esperada: ${d.media_diaria_esperada_kwh} kWh`;
             }
             const imp = alertas.filter(a => a.tipo==="urgente"||a.tipo==="atencao");
             if (imp.length > 0) {
                 document.getElementById("card-alertas-home").style.display = "block";
-                document.getElementById("alertas-home-content").innerHTML = imp.map(a => `
-                    <div class="alerta-item ${cls[a.tipo]}">
-                        <div class="alerta-icone">${a.icone}</div>
-                        <div><div class="alerta-titulo">${a.titulo}</div><div class="alerta-msg">${a.mensagem}</div></div>
-                    </div>`).join("");
+                document.getElementById("alertas-home").innerHTML = imp.map(a => `<div class="alerta-item ${cls[a.tipo]}"><div class="alerta-icone">${a.icone}</div><div><div class="alerta-titulo">${a.titulo}</div><div class="alerta-msg">${a.mensagem}</div></div></div>`).join("");
             }
         } catch(e) {
             document.getElementById("alertas-content").innerHTML = '<div class="empty"><div class="icone">📡</div><p>Não foi possível carregar os alertas.</p></div>';
@@ -725,21 +515,65 @@
             if (!contas.length) return;
             mostrarResumoInicio(contas[0]);
             document.getElementById("card-historico").style.display = "block";
-            document.getElementById("lista-historico").innerHTML = contas.map(c => `
-                <div class="hist-item ${c.status_sistema==='SUPERAVITÁRIO'?'super':'defi'}">
-                    <div>
-                        <div class="hist-mes">${c.mes_referencia}</div>
-                        <div class="hist-detalhe">
-                            Fatura: R$ ${parseFloat(c.valor_fatura||0).toFixed(2)}
-                            • Injetado: ${parseFloat(c.energia_injetada_kwh||0).toFixed(0)} kWh
-                            ${c.consumo_total_kwh>0?'• Consumo Total: '+parseFloat(c.consumo_total_kwh).toFixed(0)+' kWh':''}
-                        </div>
-                    </div>
-                    <span class="hist-badge ${c.status_sistema==='SUPERAVITÁRIO'?'super':'defi'}">
-                        ${c.status_sistema==='SUPERAVITÁRIO'?'✅ Superavitário':'⚠️ Deficitário'}
-                    </span>
-                </div>`).join("");
+            renderizarHistorico(contas);
         } catch(e) {}
+    }
+
+    function renderizarHistorico(contas) {
+        document.getElementById("lista-historico").innerHTML = contas.map(c => {
+            const isSuper = c.status_sistema === 'SUPERAVITÁRIO';
+            const dataFmt = c.criado_em ? new Date(c.criado_em).toLocaleDateString("pt-BR") : "";
+            return `
+            <div class="conta-item ${isSuper?'super':'defi'}" id="conta-${c.id}">
+                <div class="conta-header" onclick="toggleConta(${c.id})">
+                    <div>
+                        <div class="conta-mes">${c.mes_referencia} <span style="font-size:11px;color:#94a3b8;font-weight:400;">${dataFmt}</span></div>
+                        <div class="conta-resumo">Fatura: R$ ${parseFloat(c.valor_fatura||0).toFixed(2)} • Injetado: ${parseFloat(c.energia_injetada_kwh||0).toFixed(0)} kWh${c.consumo_total_kwh>0?' • Consumo Total: '+parseFloat(c.consumo_total_kwh).toFixed(0)+' kWh':''}</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span class="conta-badge ${isSuper?'super':'defi'}">${isSuper?'✅ Superavitário':'⚠️ Deficitário'}</span>
+                        <span style="color:#94a3b8;">▼</span>
+                    </div>
+                </div>
+                <div class="conta-detalhe" id="detalhe-${c.id}">
+                    <div class="metricas">
+                        <div class="metrica az"><div class="val">${parseFloat(c.energia_injetada_kwh||0).toFixed(0)} kWh</div><div class="lbl">Injetado</div></div>
+                        <div class="metrica vd"><div class="val">${parseFloat(c.consumo_bruto_kwh||0).toFixed(0)} kWh</div><div class="lbl">Cons. Distribuidora</div></div>
+                        ${c.consumo_total_kwh>0?`<div class="metrica or"><div class="val">${parseFloat(c.consumo_total_kwh).toFixed(0)} kWh</div><div class="lbl">Consumo Total</div></div>`:''}
+                        <div class="metrica"><div class="val">${parseFloat(c.percentual_gerado||0).toFixed(0)}%</div><div class="lbl">Injetado vs Consumido</div></div>
+                    </div>
+                    ${c.analise_consumo?`<div class="box az" style="margin-top:12px;">💡 ${c.analise_consumo}</div>`:''}
+                    <div class="conta-acoes">
+                        <button class="btn-vm" onclick="excluirConta(${c.id}, '${c.mes_referencia}')">🗑️ Excluir esta conta</button>
+                    </div>
+                </div>
+            </div>`;
+        }).join("");
+    }
+
+    function toggleConta(id) {
+        const detalhe = document.getElementById(`detalhe-${id}`);
+        if (contaAberta && contaAberta !== id) {
+            document.getElementById(`detalhe-${contaAberta}`)?.classList.remove("aberto");
+        }
+        detalhe.classList.toggle("aberto");
+        contaAberta = detalhe.classList.contains("aberto") ? id : null;
+    }
+
+    async function excluirConta(id, mes) {
+        if (!confirm(`Deseja excluir a conta de ${mes}? Esta ação não pode ser desfeita.`)) return;
+        try {
+            const r = await fetch(`${API}/contas/${id}`, {method: "DELETE"});
+            if (r.ok) {
+                document.getElementById(`conta-${id}`)?.remove();
+                alert("✅ Conta excluída com sucesso!");
+                await buscarHistoricoContas();
+            } else {
+                alert("Erro ao excluir conta.");
+            }
+        } catch(e) {
+            alert("Erro de conexão ao excluir.");
+        }
     }
 
     function mostrarResumoInicio(c) {
@@ -767,68 +601,51 @@
         document.getElementById("loading-ia").style.display = "block";
         document.getElementById("resultado-conta").style.display = "none";
         document.getElementById("btn-enviar").disabled = true;
-
         const form = new FormData();
         form.append("arquivo", arquivo);
-
         try {
-            const r = await fetch(`${API}/contas/upload/${idCliente}`, {method:"POST", body:form});
+            const r = await fetch(`${API}/contas/upload/${idCliente}`, {method:"POST",body:form});
             const d = await r.json();
             const c = d.conta;
 
-            // Dados básicos
             document.getElementById("val-mes").textContent = c.mes_referencia || "—";
             document.getElementById("val-fatura").textContent = "R$ " + parseFloat(c.valor_fatura||0).toFixed(2);
             document.getElementById("val-injetado").textContent = parseFloat(c.energia_injetada_kwh||0).toFixed(2) + " kWh";
             document.getElementById("val-saldo").textContent = parseFloat(c.saldo_acumulado_kwh||0).toFixed(2) + " kWh";
             document.getElementById("val-mensagem").textContent = c.mensagem_cliente || "—";
 
-            // Status superavitário/deficitário
             const sup = c.status_sistema === "SUPERAVITÁRIO";
             document.getElementById("conta-status-badge").innerHTML = `<span class="conta-status ${sup?'super':'defi'}">${sup?'✅ SUPERAVITÁRIO — seu sistema injetou mais do que consumiu!':'⚠️ DEFICITÁRIO — seu sistema consumiu mais do que injetou.'}</span>`;
 
             if (c.leitura_por_media) document.getElementById("badge-media").style.display = "block";
 
-            // Planilha balanço energético
-            const geracaoTotal = parseFloat(c.geracao_total_kwh||0);
-            const consumoInstantaneo = parseFloat(c.consumo_instantaneo_kwh||0);
-            const energiaInjetada = parseFloat(c.energia_injetada_kwh||0);
-            const consumoRede = parseFloat(c.consumo_bruto_kwh||0);
-            const consumoTotal = parseFloat(c.consumo_total_kwh||0);
+            const gt = parseFloat(c.geracao_total_kwh||0);
+            const ci = parseFloat(c.consumo_instantaneo_kwh||0);
+            const ei = parseFloat(c.energia_injetada_kwh||0);
+            const cr = parseFloat(c.consumo_bruto_kwh||0);
+            const ct = parseFloat(c.consumo_total_kwh||0);
 
-            if (consumoTotal > 0 || consumoRede > 0) {
+            if (ct > 0 || cr > 0) {
                 document.getElementById("secao-balanco").style.display = "block";
-
-                if (geracaoTotal > 0) {
-                    document.getElementById("linha-gerado").style.display = "table-row";
-                    document.getElementById("plan-gerado").textContent = geracaoTotal.toFixed(2) + " kWh";
-                }
-                document.getElementById("plan-injetado").textContent = energiaInjetada.toFixed(2) + " kWh";
-                if (consumoInstantaneo > 0) {
-                    document.getElementById("linha-instantaneo").style.display = "table-row";
-                    document.getElementById("plan-instantaneo").textContent = consumoInstantaneo.toFixed(2) + " kWh";
-                }
-                document.getElementById("plan-rede").textContent = consumoRede.toFixed(2) + " kWh";
-                document.getElementById("plan-total").textContent = (consumoTotal > 0 ? consumoTotal : consumoRede).toFixed(2) + " kWh";
+                if (gt > 0) { document.getElementById("linha-gerado").style.display = "table-row"; document.getElementById("plan-gerado").textContent = gt.toFixed(2) + " kWh"; }
+                document.getElementById("plan-injetado").textContent = ei.toFixed(2) + " kWh";
+                if (ci > 0) { document.getElementById("linha-inst").style.display = "table-row"; document.getElementById("plan-inst").textContent = ci.toFixed(2) + " kWh"; }
+                document.getElementById("plan-rede").textContent = cr.toFixed(2) + " kWh";
+                document.getElementById("plan-total").textContent = (ct > 0 ? ct : cr).toFixed(2) + " kWh";
             }
 
-            // Análise inteligente de consumo
-            const boxAnalise = document.getElementById("box-analise-consumo");
+            const boxAnalise = document.getElementById("box-analise");
             if (c.analise_consumo) {
                 boxAnalise.style.display = "block";
                 const temAumento = c.aumento_consumo_pct && parseFloat(c.aumento_consumo_pct) > 20;
-                boxAnalise.innerHTML = `<div class="box-analise ${temAumento?'vermelho':'azul'}">
-                    ${temAumento?'📈':'💡'} ${c.analise_consumo}
-                </div>`;
+                boxAnalise.innerHTML = `<div class="box ${temAumento?'vm':'az'}">${temAumento?'📈':'💡'} ${c.analise_consumo}</div>`;
             }
 
             document.getElementById("resultado-conta").style.display = "block";
             mostrarResumoInicio(c);
             await buscarHistoricoContas();
-
         } catch(e) {
             alert("Erro ao processar a conta. Tente novamente.");
-            console.error(e);
         } finally {
             document.getElementById("loading-ia").style.display = "none";
             document.getElementById("btn-enviar").disabled = false;
