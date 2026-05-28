@@ -93,6 +93,13 @@ REGRAS CRÍTICAS DE EXTRAÇÃO:
    analise o período (Leitura Anterior → Leitura Atual) para determinar quantos meses foram acumulados.
    Período de 31 dias = 1 mês. Período de 60-62 dias = 2 meses. Etc.
 
+10. DATAS DE LEITURA: Extraia as datas exatas do campo "Datas de Leituras" ou "Leitura Anterior / Leitura Atual".
+    Exemplo: "Leitura Anterior: 13/04/2026 | Leitura Atual: 14/05/2026"
+    → data_leitura_anterior = "13/04/2026", data_leitura_atual = "14/05/2026"
+
+11. PRÓXIMA LEITURA: Extraia a data do campo "Próxima Leitura" se existir.
+    Exemplo: "Próxima Leitura: 15/06/2026" → data_proxima_leitura = "15/06/2026"
+
 Retorne EXATAMENTE neste formato JSON:
 {{
   "nome_cliente": "",
@@ -100,6 +107,9 @@ Retorne EXATAMENTE neste formato JSON:
   "distribuidora": "",
   "mes_referencia": "",
   "data_vencimento": "DD/MM/AAAA",
+  "data_leitura_anterior": "DD/MM/AAAA",
+  "data_leitura_atual": "DD/MM/AAAA",
+  "data_proxima_leitura": "DD/MM/AAAA",
   "consumo_bruto_kwh": 0.0,
   "consumo_kwh": 0.0,
   "consumo_rede_kwh": 0.0,
@@ -240,6 +250,45 @@ def foxess_get_mensal(api_key: str, serial: str, ano: int, mes: int) -> float:
         pass
     return 0.0
 
+def foxess_get_periodo(api_key: str, serial: str, data_inicio: date, data_fim: date) -> float:
+    """
+    Retorna geração total do período exato (data_inicio a data_fim).
+    Busca dia a dia dentro do período e soma — garante valor correto para contas
+    que cobrem partes de dois meses diferentes (ex: 13/04 a 14/05).
+    """
+    from datetime import timedelta
+    total = 0.0
+    data_atual = data_inicio
+    mes_atual = None
+    valores_mes = {}
+
+    # Agrupar dias por mês para fazer uma consulta por mês
+    while data_atual <= data_fim:
+        mes_ano = (data_atual.year, data_atual.month)
+        if mes_ano not in valores_mes:
+            valores_mes[mes_ano] = []
+        valores_mes[mes_ano].append(data_atual.day)
+        data_atual += timedelta(days=1)
+
+    # Para cada mês, buscar os dados e somar apenas os dias do período
+    for (ano, mes), dias in valores_mes.items():
+        body = {"sn": serial, "year": ano, "month": mes, "dimension": "day", "variables": ["generation"]}
+        try:
+            r = foxess_chamar_api(api_key, "op/v0/device/report/query", body)
+            if r.get("errno") == 0:
+                for item in r.get("result", []):
+                    if isinstance(item, dict) and item.get("variable") == "generation":
+                        valores = item.get("values", [])
+                        # valores[0] = dia 1, valores[1] = dia 2, etc.
+                        for dia in dias:
+                            idx = dia - 1  # índice baseado em zero
+                            if idx < len(valores) and valores[idx]:
+                                total += float(valores[idx])
+        except Exception:
+            pass
+
+    return round(total, 2)
+
 # ==================== BANCO HELPERS ====================
 
 def salvar_geracao_mensal(cliente_id: int, ano: int, mes: int, geracao_kwh: float, fonte: str = "foxess"):
@@ -285,6 +334,20 @@ def salvar_no_banco(dados, cliente_id):
         data_venc = datetime.strptime(dados["data_vencimento"], "%d/%m/%Y").date()
     except:
         pass
+    # Converter datas de leitura
+    data_leit_ant = None
+    data_leit_atu = None
+    data_prox_leit = None
+    try:
+        if dados.get("data_leitura_anterior"):
+            data_leit_ant = datetime.strptime(dados["data_leitura_anterior"], "%d/%m/%Y").date()
+        if dados.get("data_leitura_atual"):
+            data_leit_atu = datetime.strptime(dados["data_leitura_atual"], "%d/%m/%Y").date()
+        if dados.get("data_proxima_leitura"):
+            data_prox_leit = datetime.strptime(dados["data_proxima_leitura"], "%d/%m/%Y").date()
+    except:
+        pass
+
     cur.execute("""
         INSERT INTO contas (
             cliente_id, mes_referencia, data_vencimento,
@@ -292,8 +355,9 @@ def salvar_no_banco(dados, cliente_id):
             valor_fatura, modalidade_tarifaria, status_sistema,
             percentual_gerado, leitura_por_media, meses_acumulados, mensagem_cliente,
             geracao_total_kwh, consumo_instantaneo_kwh, consumo_total_kwh,
-            consumo_anterior_kwh, aumento_consumo_pct, analise_consumo
-        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            consumo_anterior_kwh, aumento_consumo_pct, analise_consumo,
+            data_leitura_anterior, data_leitura_atual, data_proxima_leitura
+        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         RETURNING id
     """, (
         cliente_id, dados.get("mes_referencia"), data_venc,
@@ -305,7 +369,8 @@ def salvar_no_banco(dados, cliente_id):
         dados.get("mensagem_cliente"), dados.get("geracao_total_kwh"),
         dados.get("consumo_instantaneo_kwh"), dados.get("consumo_total_kwh"),
         dados.get("consumo_anterior_kwh"), dados.get("aumento_consumo_pct"),
-        dados.get("analise_consumo")
+        dados.get("analise_consumo"),
+        data_leit_ant, data_leit_atu, data_prox_leit
     ))
     conta_id = cur.fetchone()[0]
     conn.commit()
@@ -528,32 +593,59 @@ async def upload_conta(cliente_id: int, arquivo: UploadFile = File(...)):
         geracao_total_kwh = None
         if inversor and inversor[0] and inversor[0].lower() == "foxess" and inversor[2]:
             try:
-                mes_ref = dados.get("mes_referencia", "")
-                meses_map = {"jan":1,"fev":2,"mar":3,"abr":4,"mai":5,"jun":6,"jul":7,"ago":8,"set":9,"out":10,"nov":11,"dez":12}
-                mes_num = next((n for k,n in meses_map.items() if k in mes_ref.lower()), None)
-                anos = re.findall(r'\d{4}', mes_ref)
-                ano_num = int(anos[0]) if anos else datetime.now().year
-                meses_acumulados = int(dados.get("meses_acumulados") or 1)
+                data_leit_ant_str = dados.get("data_leitura_anterior")
+                data_leit_atu_str = dados.get("data_leitura_atual")
 
-                if mes_num:
-                    geracao_total = 0.0
+                if data_leit_ant_str and data_leit_atu_str:
+                    # CORRETO: buscar geração pelo período EXATO da conta
+                    data_ini = datetime.strptime(data_leit_ant_str, "%d/%m/%Y").date()
+                    data_fim = datetime.strptime(data_leit_atu_str, "%d/%m/%Y").date()
+                    g = foxess_get_periodo(inversor[2], inversor[1], data_ini, data_fim)
+                    if g > 0:
+                        geracao_total_kwh = g
+                        # Salvar também na tabela mensal para o gráfico
+                        mes_ref = dados.get("mes_referencia", "")
+                        meses_map = {"jan":1,"fev":2,"mar":3,"abr":4,"mai":5,"jun":6,"jul":7,"ago":8,"set":9,"out":10,"nov":11,"dez":12}
+                        mes_num = next((n for k,n in meses_map.items() if k in mes_ref.lower()), None)
+                        anos = re.findall(r'\d{4}', mes_ref)
+                        ano_num = int(anos[0]) if anos else datetime.now().year
+                        if mes_num:
+                            salvar_geracao_mensal(cliente_id, ano_num, mes_num, g)
+                else:
+                    # Fallback: buscar por mês quando não há datas de leitura
+                    mes_ref = dados.get("mes_referencia", "")
+                    meses_map = {"jan":1,"fev":2,"mar":3,"abr":4,"mai":5,"jun":6,"jul":7,"ago":8,"set":9,"out":10,"nov":11,"dez":12}
+                    mes_num = next((n for k,n in meses_map.items() if k in mes_ref.lower()), None)
+                    anos = re.findall(r'\d{4}', mes_ref)
+                    ano_num = int(anos[0]) if anos else datetime.now().year
+                    meses_acumulados = int(dados.get("meses_acumulados") or 1)
+                    if mes_num:
+                        geracao_total = 0.0
+                        for i in range(meses_acumulados):
+                            mes_busca = mes_num - i
+                            ano_busca = ano_num
+                            if mes_busca <= 0:
+                                mes_busca += 12
+                                ano_busca -= 1
+                            g = foxess_get_mensal(inversor[2], inversor[1], ano_busca, mes_busca)
+                            if g > 0:
+                                geracao_total += g
+                                salvar_geracao_mensal(cliente_id, ano_busca, mes_busca, g)
+                        if geracao_total > 0:
+                            geracao_total_kwh = round(geracao_total, 2)
 
-                    # Buscar geração de cada mês acumulado separadamente
-                    for i in range(meses_acumulados):
-                        # Calcular mês e ano retroativamente
-                        mes_busca = mes_num - i
-                        ano_busca = ano_num
-                        if mes_busca <= 0:
-                            mes_busca += 12
-                            ano_busca -= 1
-
-                        g = foxess_get_mensal(inversor[2], inversor[1], ano_busca, mes_busca)
-                        if g > 0:
-                            geracao_total += g
-                            salvar_geracao_mensal(cliente_id, ano_busca, mes_busca, g)
-
-                    if geracao_total > 0:
-                        geracao_total_kwh = round(geracao_total, 2)
+                # Salvar próxima leitura no cadastro do cliente
+                if dados.get("data_proxima_leitura"):
+                    try:
+                        prox_leit = datetime.strptime(dados["data_proxima_leitura"], "%d/%m/%Y").date()
+                        conn2 = conectar_banco()
+                        cur2 = conn2.cursor()
+                        cur2.execute("UPDATE clientes SET proxima_leitura=%s WHERE id=%s", (prox_leit, cliente_id))
+                        conn2.commit()
+                        cur2.close()
+                        conn2.close()
+                    except Exception:
+                        pass
 
             except Exception:
                 pass
