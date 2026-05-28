@@ -135,7 +135,7 @@ def calcular_analise_consumo(dados: dict, geracao_total_kwh: float = None) -> di
 
     geracao_ajustada = None
     if geracao_total_kwh and geracao_total_kwh > 0:
-        geracao_ajustada = round(geracao_total_kwh * meses, 2) if meses > 1 else geracao_total_kwh
+        geracao_ajustada = geracao_total_kwh  # Geração já vem somada corretamente por todos os meses
 
     if geracao_ajustada and geracao_ajustada > 0:
         consumo_instantaneo = max(0, round(geracao_ajustada - energia_injetada, 2))
@@ -455,23 +455,6 @@ def excluir_conta(conta_id: int):
         cur.close()
         conn.close()
 
-@app.delete("/contas/{conta_id}")
-def excluir_conta(conta_id: int):
-    conn = conectar_banco()
-    cur = conn.cursor()
-    try:
-        cur.execute("DELETE FROM contas WHERE id=%s RETURNING id", (conta_id,))
-        deletado = cur.fetchone()
-        conn.commit()
-        if not deletado:
-            raise HTTPException(status_code=404, detail="Conta não encontrada")
-        return {"sucesso": True, "id": conta_id}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    finally:
-        cur.close()
-        conn.close()
-
 @app.get("/portal/{token_acesso}")
 def portal_cliente(token_acesso: str):
     conn = conectar_banco()
@@ -550,12 +533,28 @@ async def upload_conta(cliente_id: int, arquivo: UploadFile = File(...)):
                 mes_num = next((n for k,n in meses_map.items() if k in mes_ref.lower()), None)
                 anos = re.findall(r'\d{4}', mes_ref)
                 ano_num = int(anos[0]) if anos else datetime.now().year
+                meses_acumulados = int(dados.get("meses_acumulados") or 1)
+
                 if mes_num:
-                    g = foxess_get_mensal(inversor[2], inversor[1], ano_num, mes_num)
-                    if g > 0:
-                        geracao_total_kwh = g
-                        # Salvar na tabela mensal correta
-                        salvar_geracao_mensal(cliente_id, ano_num, mes_num, g)
+                    geracao_total = 0.0
+
+                    # Buscar geração de cada mês acumulado separadamente
+                    for i in range(meses_acumulados):
+                        # Calcular mês e ano retroativamente
+                        mes_busca = mes_num - i
+                        ano_busca = ano_num
+                        if mes_busca <= 0:
+                            mes_busca += 12
+                            ano_busca -= 1
+
+                        g = foxess_get_mensal(inversor[2], inversor[1], ano_busca, mes_busca)
+                        if g > 0:
+                            geracao_total += g
+                            salvar_geracao_mensal(cliente_id, ano_busca, mes_busca, g)
+
+                    if geracao_total > 0:
+                        geracao_total_kwh = round(geracao_total, 2)
+
             except Exception:
                 pass
 
