@@ -455,6 +455,23 @@ def excluir_conta(conta_id: int):
         cur.close()
         conn.close()
 
+@app.delete("/contas/{conta_id}")
+def excluir_conta(conta_id: int):
+    conn = conectar_banco()
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM contas WHERE id=%s RETURNING id", (conta_id,))
+        deletado = cur.fetchone()
+        conn.commit()
+        if not deletado:
+            raise HTTPException(status_code=404, detail="Conta não encontrada")
+        return {"sucesso": True, "id": conta_id}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
 @app.get("/portal/{token_acesso}")
 def portal_cliente(token_acesso: str):
     conn = conectar_banco()
