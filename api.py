@@ -75,10 +75,6 @@ REGRAS CRÍTICAS DE EXTRAÇÃO:
    Exemplo: "Energia ativa em kWh Ponta | 8557 | 10054 | 1 | 1497" → consumo_bruto_kwh = 1497.
    Exemplo: "Energia ativa em kWh Ponta | 10054 | 10930 | 1 | 876" → consumo_bruto_kwh = 876.
    NUNCA use "Consumo até 80kWh-BR" — é faixa tarifária zerada pelo governo, NÃO é consumo real!
-<<<<<<< HEAD
-=======
-   NUNCA use "Consumo acima de 80kWh-BR" isoladamente.
->>>>>>> 2956a17e0477fc26f32fa65179f1ad6f0876a001
    O consumo bruto real é SEMPRE: (Leitura Atual - Leitura Anterior) × Constante.
 
 5. CONSUMO FATURADO (kWh): Valor no histórico dos últimos 13 meses referente ao mês atual.
@@ -94,14 +90,8 @@ REGRAS CRÍTICAS DE EXTRAÇÃO:
 8. SALDO ACUMULADO (kWh): Campo "Saldo Acumulado". Se zero, retornar 0.
 
 9. MESES ACUMULADOS: Se houver "FATURAMENTO PELA MÉDIA" ou "LEITURA INFORMADA PELO CLIENTE",
-<<<<<<< HEAD
    analise o período (Leitura Anterior → Leitura Atual) para determinar quantos meses foram acumulados.
    Período de 31 dias = 1 mês. Período de 60-62 dias = 2 meses. Etc.
-=======
-   a conta pode cobrir mais de um mês. Analise o período (Leitura Anterior → Leitura Atual) para
-   determinar quantos meses foram acumulados. Ex: 13/03 a 13/04 = 1 mês. 13/02 a 13/04 = 2 meses.
-   Se o consumo bruto for muito alto (acima de 1.000 kWh residencial), provavelmente é leitura acumulada.
->>>>>>> 2956a17e0477fc26f32fa65179f1ad6f0876a001
 
 Retorne EXATAMENTE neste formato JSON:
 {{
@@ -127,11 +117,7 @@ Retorne EXATAMENTE neste formato JSON:
 
 - status_sistema: Se energia_injetada_kwh >= consumo_kwh → "SUPERAVITÁRIO", senão → "DEFICITÁRIO".
 - percentual_gerado: (energia_injetada_kwh / consumo_kwh) × 100.
-<<<<<<< HEAD
 - mensagem_cliente: Máximo 2 linhas. Linguagem simples. Se leitura acumulada, mencionar.
-=======
-- mensagem_cliente: Máximo 2 linhas. Linguagem simples. Se leitura acumulada, mencionar isso.
->>>>>>> 2956a17e0477fc26f32fa65179f1ad6f0876a001
 
 Texto da conta:
 {texto_pdf}"""
@@ -147,20 +133,9 @@ def calcular_analise_consumo(dados: dict, geracao_total_kwh: float = None) -> di
 
     resultado = {"geracao_total_kwh": None, "consumo_instantaneo_kwh": None, "consumo_total_kwh": None, "analise_consumo": None}
 
-<<<<<<< HEAD
     geracao_ajustada = None
     if geracao_total_kwh and geracao_total_kwh > 0:
         geracao_ajustada = round(geracao_total_kwh * meses, 2) if meses > 1 else geracao_total_kwh
-=======
-    # Se leitura acumulada de N meses, ajustar geração do inversor (que é mensal)
-    geracao_ajustada = None
-    if geracao_total_kwh and geracao_total_kwh > 0:
-        if meses > 1:
-            # Multiplicar geração mensal pelos meses acumulados
-            geracao_ajustada = round(geracao_total_kwh * meses, 2)
-        else:
-            geracao_ajustada = geracao_total_kwh
->>>>>>> 2956a17e0477fc26f32fa65179f1ad6f0876a001
 
     if geracao_ajustada and geracao_ajustada > 0:
         consumo_instantaneo = max(0, round(geracao_ajustada - energia_injetada, 2))
@@ -169,10 +144,6 @@ def calcular_analise_consumo(dados: dict, geracao_total_kwh: float = None) -> di
         resultado["consumo_instantaneo_kwh"] = consumo_instantaneo
         resultado["consumo_total_kwh"] = consumo_total
     else:
-<<<<<<< HEAD
-=======
-        # Sem pvPower: consumo total = leitura real do medidor
->>>>>>> 2956a17e0477fc26f32fa65179f1ad6f0876a001
         consumo_instantaneo = max(0, round(consumo_rede - energia_injetada, 2)) if consumo_rede > energia_injetada else 0
         resultado["consumo_total_kwh"] = round(consumo_rede, 2)
         resultado["consumo_instantaneo_kwh"] = consumo_instantaneo
@@ -192,7 +163,6 @@ def gerar_mensagem_consumo(dados: dict, consumo_anterior: float = None) -> str:
     periodo = f"nos últimos {meses} meses" if meses > 1 else f"em {mes}"
 
     if geracao_total > 0:
-<<<<<<< HEAD
         partes.append(f"☀️ {periodo.capitalize()}, seu sistema gerou {geracao_total:.1f} kWh. Desses, {consumo_instantaneo:.1f} kWh foram usados instantaneamente e {energia_injetada:.1f} kWh foram injetados na rede como créditos.")
     else:
         partes.append(f"⚡ {periodo.capitalize()}, seu sistema injetou {energia_injetada:.1f} kWh na rede como créditos. Sua casa consumiu {consumo_rede:.1f} kWh da distribuidora.")
@@ -202,53 +172,14 @@ def gerar_mensagem_consumo(dados: dict, consumo_anterior: float = None) -> str:
 
     if meses > 1:
         partes.append(f"⚠️ Esta conta cobre {meses} meses de leitura acumulada.")
-=======
-        partes.append(
-            f"☀️ {periodo.capitalize()}, seu sistema solar gerou {geracao_total:.1f} kWh. "
-            f"Desses, {consumo_instantaneo:.1f} kWh foram usados instantaneamente "
-            f"e {energia_injetada:.1f} kWh foram injetados na rede como créditos."
-        )
-    else:
-        partes.append(
-            f"⚡ {periodo.capitalize()}, seu sistema injetou {energia_injetada:.1f} kWh na rede como créditos. "
-            f"Sua casa consumiu {consumo_rede:.1f} kWh da distribuidora."
-        )
-
-    if consumo_total > 0 and consumo_rede > 0:
-        partes.append(
-            f"📊 Consumo total da casa: {consumo_total:.1f} kWh "
-            f"({consumo_instantaneo:.1f} kWh do solar + {consumo_rede:.1f} kWh da rede)."
-        )
->>>>>>> 2956a17e0477fc26f32fa65179f1ad6f0876a001
-
-    if meses > 1:
-        partes.append(
-            f"⚠️ Esta conta cobre {meses} meses de leitura acumulada — os valores são referentes ao período completo."
-        )
 
     if consumo_anterior and consumo_anterior > 0 and consumo_total > 0:
-<<<<<<< HEAD
         ant_ajustado = consumo_anterior * meses if meses > 1 else consumo_anterior
         variacao = ((consumo_total - ant_ajustado) / ant_ajustado) * 100
         if variacao > 20:
             partes.append(f"📈 ATENÇÃO: Consumo aumentou {variacao:.0f}% em relação ao período anterior ({ant_ajustado:.1f} → {consumo_total:.1f} kWh). O sistema solar está funcionando normalmente — verifique novos equipamentos ligados.")
         elif variacao < -10:
             partes.append(f"✅ Consumo reduziu {abs(variacao):.0f}% — ótimo!")
-=======
-        consumo_anterior_ajustado = consumo_anterior * meses if meses > 1 else consumo_anterior
-        variacao = ((consumo_total - consumo_anterior_ajustado) / consumo_anterior_ajustado) * 100
-        if variacao > 20:
-            partes.append(
-                f"📈 ATENÇÃO: Seu consumo aumentou {variacao:.0f}% em relação ao período anterior "
-                f"({consumo_anterior_ajustado:.1f} kWh → {consumo_total:.1f} kWh). "
-                f"Seu sistema solar está funcionando normalmente — o aumento se deve ao maior consumo de energia, "
-                f"não a falha no sistema. Verifique se novos equipamentos foram ligados."
-            )
-        elif variacao > 5:
-            partes.append(f"📊 Consumo aumentou {variacao:.0f}% em relação ao período anterior.")
-        elif variacao < -10:
-            partes.append(f"✅ Consumo reduziu {abs(variacao):.0f}% — solar + eficiência energética funcionando!")
->>>>>>> 2956a17e0477fc26f32fa65179f1ad6f0876a001
 
     return " ".join(partes)
 
@@ -271,11 +202,6 @@ def consultar_clima(latitude: float, longitude: float, data_inicio: str, data_fi
             resultado = {}
             for i, d in enumerate(datas):
                 resultado[d] = {
-<<<<<<< HEAD
-=======
-                    "cloudcover_pct": nuvens[i] if i < len(nuvens) else None,
-                    "precipitation_mm": chuva[i] if i < len(chuva) else None,
->>>>>>> 2956a17e0477fc26f32fa65179f1ad6f0876a001
                     "dia_nublado": (nuvens[i] > 70) if i < len(nuvens) and nuvens[i] is not None else False,
                     "dia_chuvoso": (chuva[i] > 5) if i < len(chuva) and chuva[i] is not None else False
                 }
@@ -291,11 +217,7 @@ def foxess_chamar_api(api_key: str, path: str, body: dict):
     signature_raw = fr"/{path}\r\n{api_key}\r\n{timestamp}"
     signature = hashlib.md5(signature_raw.encode("utf-8")).hexdigest()
     headers = {"Token": api_key, "Lang": "en", "Timestamp": timestamp, "Signature": signature,
-<<<<<<< HEAD
                "Content-Type": "application/json", "User-Agent": "Mozilla/5.0"}
-=======
-               "Content-Type": "application/json", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
->>>>>>> 2956a17e0477fc26f32fa65179f1ad6f0876a001
     try:
         resp = requests.post(f"https://www.foxesscloud.com/{path}", json=body, headers=headers, timeout=30)
         return resp.json()
@@ -391,41 +313,6 @@ def salvar_no_banco(dados, cliente_id):
     conn.close()
     return conta_id
 
-<<<<<<< HEAD
-=======
-def buscar_geracao_dia(cliente_id: int, data_busca):
-    conn = conectar_banco()
-    cur = conn.cursor()
-    cur.execute("SELECT COALESCE(SUM(geracao_kwh),0) FROM historico_geracao WHERE cliente_id=%s AND data=%s", (cliente_id, data_busca))
-    r = cur.fetchone()
-    cur.close()
-    conn.close()
-    return float(r[0]) if r[0] else 0.0
-
-def buscar_geracao_periodo(cliente_id: int, data_inicio, data_fim):
-    conn = conectar_banco()
-    cur = conn.cursor()
-    cur.execute("SELECT data, SUM(geracao_kwh) FROM historico_geracao WHERE cliente_id=%s AND data BETWEEN %s AND %s GROUP BY data ORDER BY data", (cliente_id, data_inicio, data_fim))
-    r = cur.fetchall()
-    cur.close()
-    conn.close()
-    return [{"data": str(x[0]), "total_kwh": float(x[1])} for x in r]
-
-def salvar_historico_banco(cliente_id: int, dados_mensais: list):
-    conn = conectar_banco()
-    cur = conn.cursor()
-    for m in dados_mensais:
-        dias = monthrange(m["ano"], m["mes_num"])[1]
-        val_dia = m["geracao_kwh"] / dias
-        for d in range(1, dias + 1):
-            dt = datetime(m["ano"], m["mes_num"], d).date()
-            cur.execute("INSERT INTO historico_geracao (cliente_id,data,geracao_kwh) VALUES (%s,%s,%s) ON CONFLICT (cliente_id,data) DO UPDATE SET geracao_kwh=EXCLUDED.geracao_kwh",
-                        (cliente_id, dt, round(val_dia, 2)))
-    conn.commit()
-    cur.close()
-    conn.close()
-
->>>>>>> 2956a17e0477fc26f32fa65179f1ad6f0876a001
 # ==================== ROTAS ====================
 
 @app.get("/")
@@ -716,18 +603,12 @@ def monitoramento(cliente_id: int):
         except:
             variaveis[item["variable"]] = 0.0
     return {"marca":marca,"serial":serial,"status":"online",
-<<<<<<< HEAD
             "geracao_atual_kw":variaveis.get("pvPower",0.0),
             "injetado_rede_kw":variaveis.get("feedinPower",0.0),
             "consumo_rede_kw":variaveis.get("gridConsumptionPower",0.0),
             "consumo_casa_kw":variaveis.get("loadsPower",0.0),
             "potencia_total_kw":variaveis.get("generationPower",0.0),
             "timestamp":datetime.utcnow().isoformat()}
-=======
-            "geracao_atual_kw":variaveis.get("pvPower",0.0),"injetado_rede_kw":variaveis.get("feedinPower",0.0),
-            "consumo_rede_kw":variaveis.get("gridConsumptionPower",0.0),"consumo_casa_kw":variaveis.get("loadsPower",0.0),
-            "potencia_total_kw":variaveis.get("generationPower",0.0),"timestamp":datetime.utcnow().isoformat()}
->>>>>>> 2956a17e0477fc26f32fa65179f1ad6f0876a001
 
 @app.get("/clientes/{cliente_id}/monitoramento/mensal")
 def monitoramento_mensal(cliente_id: int):
@@ -740,7 +621,6 @@ def monitoramento_mensal(cliente_id: int):
     cur = conn.cursor()
     cur.execute("SELECT nome,marca_inversor,serial_inversor,api_key_inversor FROM clientes WHERE id=%s", (cliente_id,))
     cliente = cur.fetchone()
-<<<<<<< HEAD
 
     # Primeiro tenta tabela mensal correta
     cur.execute("""
@@ -748,9 +628,6 @@ def monitoramento_mensal(cliente_id: int):
         WHERE cliente_id=%s AND (ano > EXTRACT(YEAR FROM CURRENT_DATE)-2)
         ORDER BY ano, mes
     """, (cliente_id,))
-=======
-    cur.execute("SELECT EXTRACT(YEAR FROM data)::int,EXTRACT(MONTH FROM data)::int,SUM(geracao_kwh) FROM historico_geracao WHERE cliente_id=%s AND data>=CURRENT_DATE-INTERVAL '12 months' GROUP BY 1,2 ORDER BY 1,2", (cliente_id,))
->>>>>>> 2956a17e0477fc26f32fa65179f1ad6f0876a001
     resultados = cur.fetchall()
     cur.close()
     conn.close()
@@ -799,25 +676,16 @@ def verificar_anomalias(cliente_id: int):
     ultimos7 = buscar_geracao_periodo(cliente_id, hoje-timedelta(days=8), ontem)
     media7 = sum(d["total_kwh"] for d in ultimos7)/len(ultimos7) if ultimos7 else 0.0
 
-<<<<<<< HEAD
-=======
-    # Média diária esperada baseada no projeto
->>>>>>> 2956a17e0477fc26f32fa65179f1ad6f0876a001
     media_diaria_esperada = 0.0
     if potencia_kwp and performance_ratio:
         hsp = {1:5.2,2:5.4,3:5.1,4:4.8,5:4.5,6:4.3,7:4.5,8:5.0,9:4.9,10:4.8,11:4.9,12:5.0}
         media_diaria_esperada = float(potencia_kwp) * hsp.get(hoje.month, 5.0) * float(performance_ratio)
 
-<<<<<<< HEAD
-=======
-    # Alerta de 3 dias consecutivos abaixo da média
->>>>>>> 2956a17e0477fc26f32fa65179f1ad6f0876a001
     alerta_consecutivo = None
     if media_diaria_esperada > 0 and len(ultimos7) >= 3:
         ultimos3 = ultimos7[-3:]
         dias_baixos = [d for d in ultimos3 if d["total_kwh"] < media_diaria_esperada * 0.7]
         if len(dias_baixos) == 3:
-<<<<<<< HEAD
             clima = {}
             if latitude and longitude:
                 clima = consultar_clima(float(latitude), float(longitude), ultimos3[0]["data"], ultimos3[-1]["data"])
@@ -827,31 +695,12 @@ def verificar_anomalias(cliente_id: int):
                 alerta_consecutivo = {"tipo":"informativo","icone":"☁️",
                     "titulo":"Geração Baixa por Condições Climáticas",
                     "mensagem":f"Geração abaixo da média por 3 dias ({media_3d:.1f} kWh/dia vs esperado {media_diaria_esperada:.1f} kWh/dia). O período teve nebulosidade ou chuva — isso é normal!",
-=======
-            data_inicio = ultimos3[0]["data"]
-            data_fim = ultimos3[-1]["data"]
-            clima = {}
-            if latitude and longitude:
-                clima = consultar_clima(float(latitude), float(longitude), data_inicio, data_fim)
-            dias_ruins = sum(1 for d in ultimos3 if clima.get(d["data"], {}).get("dia_nublado", False) or clima.get(d["data"], {}).get("dia_chuvoso", False))
-            media_3dias = sum(d["total_kwh"] for d in ultimos3) / 3
-
-            if dias_ruins >= 2:
-                alerta_consecutivo = {"tipo":"informativo","icone":"☁️",
-                    "titulo":"Geração Baixa por Condições Climáticas",
-                    "mensagem":f"Geração abaixo da média por 3 dias ({media_3dias:.1f} kWh/dia vs esperado {media_diaria_esperada:.1f} kWh/dia), mas o período teve muita nebulosidade ou chuva. Isso é normal!",
->>>>>>> 2956a17e0477fc26f32fa65179f1ad6f0876a001
                     "acao":"Aguardar melhora climática. Se continuar após dias ensolarados, contate o integrador."}
             else:
                 alerta_consecutivo = {"tipo":"atencao","icone":"⚠️",
                     "titulo":"3 Dias Consecutivos com Geração Abaixo da Média",
-<<<<<<< HEAD
                     "mensagem":f"Geração abaixo do esperado por 3 dias ({media_3d:.1f} kWh/dia vs esperado {media_diaria_esperada:.1f} kWh/dia). O tempo estava bom — pode ser problema técnico.",
                     "acao":"Verificar sombra, sujeira nos painéis ou problema no inversor. Contate seu integrador."}
-=======
-                    "mensagem":f"Geração abaixo do esperado por 3 dias consecutivos ({media_3dias:.1f} kWh/dia vs esperado {media_diaria_esperada:.1f} kWh/dia). O tempo estava bom — pode haver problema técnico.",
-                    "acao":"Verificar sombra nos painéis, sujeira acumulada ou problema no inversor. Contate seu integrador."}
->>>>>>> 2956a17e0477fc26f32fa65179f1ad6f0876a001
 
     alertas = []
     if alerta_consecutivo:
@@ -859,17 +708,12 @@ def verificar_anomalias(cliente_id: int):
 
     if g_ontem < 0.5:
         alertas.append({"tipo":"urgente","icone":"🔴","titulo":"Sistema Parado",
-<<<<<<< HEAD
             "mensagem":f"Seu sistema não gerou energia significativa ontem ({g_ontem:.1f} kWh).",
-=======
-            "mensagem":f"Seu sistema não gerou energia significativa ontem ({g_ontem:.1f} kWh). Pode ser disjuntor desarmado ou falha no inversor.",
->>>>>>> 2956a17e0477fc26f32fa65179f1ad6f0876a001
             "acao":"Verificar disjuntor CA e acionar o técnico imediatamente."})
     elif media7 > 0 and g_ontem < media7*0.4:
         clima_ontem = {}
         if latitude and longitude:
             clima_ontem = consultar_clima(float(latitude), float(longitude), str(ontem), str(ontem))
-<<<<<<< HEAD
         dia_ruim = clima_ontem.get(str(ontem), {}).get("dia_nublado") or clima_ontem.get(str(ontem), {}).get("dia_chuvoso")
         if dia_ruim:
             alertas.append({"tipo":"informativo","icone":"☁️","titulo":"Geração Baixa — Dia Nublado/Chuvoso",
@@ -883,21 +727,6 @@ def verificar_anomalias(cliente_id: int):
         alertas.append({"tipo":"informativo","icone":"📉","titulo":"Geração Abaixo da Média",
             "mensagem":f"Ontem: {g_ontem:.1f} kWh vs média: {media7:.1f} kWh.",
             "acao":"Monitorar. Se continuar, agendar limpeza preventiva."})
-=======
-        dia_ruim = clima_ontem.get(str(ontem), {}).get("dia_nublado", False) or clima_ontem.get(str(ontem), {}).get("dia_chuvoso", False)
-        if dia_ruim:
-            alertas.append({"tipo":"informativo","icone":"☁️","titulo":"Geração Baixa — Dia Nublado/Chuvoso",
-                "mensagem":f"Ontem seu sistema gerou apenas {g_ontem:.1f} kWh — condições climáticas desfavoráveis na sua região. Isso é normal!",
-                "acao":"Nenhuma ação necessária. Monitorar nos próximos dias ensolarados."})
-        else:
-            alertas.append({"tipo":"atencao","icone":"⚠️","titulo":"Geração Muito Abaixo do Normal",
-                "mensagem":f"Ontem: {g_ontem:.1f} kWh vs média 7 dias: {media7:.1f} kWh. Queda de {((media7-g_ontem)/media7*100):.0f}%. O tempo estava bom.",
-                "acao":"Verificar sombreamento, sujeira nos painéis ou problema no inversor."})
-    elif media7 > 0 and g_ontem < media7*0.7:
-        alertas.append({"tipo":"informativo","icone":"📉","titulo":"Geração Abaixo da Média",
-            "mensagem":f"Ontem: {g_ontem:.1f} kWh vs média: {media7:.1f} kWh.",
-            "acao":"Monitorar nos próximos dias. Se continuar, agendar limpeza preventiva."})
->>>>>>> 2956a17e0477fc26f32fa65179f1ad6f0876a001
 
     if not alertas and g_ontem > 0:
         alertas.append({"tipo":"normal","icone":"✅","titulo":"Sistema Operando Normalmente",
@@ -905,11 +734,7 @@ def verificar_anomalias(cliente_id: int):
 
     if media7 == 0 and g_ontem == 0:
         alertas = [{"tipo":"informativo","icone":"📡","titulo":"Coletando Dados",
-<<<<<<< HEAD
             "mensagem":"Aguardando coleta de dados de geração.","acao":"Em alguns dias teremos estatísticas."}]
-=======
-            "mensagem":"Aguardando coleta de dados de geração.","acao":"Em alguns dias teremos estatísticas completas."}]
->>>>>>> 2956a17e0477fc26f32fa65179f1ad6f0876a001
 
     return {"cliente_id":cliente_id,"cliente_nome":nome,"data_analise":hoje.isoformat(),
             "geracao_ontem_kwh":round(g_ontem,1),"media_7_dias_kwh":round(media7,1),
