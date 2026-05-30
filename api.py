@@ -74,8 +74,13 @@ REGRAS CRÍTICAS DE EXTRAÇÃO:
    Use o campo "FATURADO" ou "Consumo kWh" da linha "Energia ativa em kWh".
    Exemplo: "Energia ativa em kWh Ponta | 8557 | 10054 | 1 | 1497" → consumo_bruto_kwh = 1497.
    Exemplo: "Energia ativa em kWh Ponta | 10054 | 10930 | 1 | 876" → consumo_bruto_kwh = 876.
-   NUNCA use "Consumo até 80kWh-BR" — é faixa tarifária zerada pelo governo, NÃO é consumo real!
-   O consumo bruto real é SEMPRE: (Leitura Atual - Leitura Anterior) × Constante.
+   NUNCA some os itens de fatura — eles são apenas tarifas cobradas, não consumo adicional!
+   NUNCA use "Consumo até 80kWh-BR" — é a faixa de tarifa social ISENTA pelo governo (MP1300/25),
+   já está incluída na leitura do medidor e NÃO deve ser somada ao consumo.
+   NUNCA use "Consumo acima de 80kWh-BR" isoladamente — use sempre a leitura do medidor.
+   O consumo bruto real é SEMPRE apenas: (Leitura Atual - Leitura Anterior) × Constante.
+   Para a conta de Maio/2026 da Graciana: medidor mostra 876 kWh → consumo_bruto_kwh = 876.
+   Para a conta de Abril/2026 da Graciana: medidor mostra 1497 kWh → consumo_bruto_kwh = 1497.
 
 5. CONSUMO FATURADO (kWh): Valor no histórico dos últimos 13 meses referente ao mês atual.
    É MENOR que consumo bruto em sistemas GD. Ex: ABR/26 = 420,63 kWh; MAI/26 = 277,45 kWh.
