@@ -272,18 +272,18 @@ def foxess_get_periodo(api_key: str, serial: str, data_inicio: date, data_fim: d
 
     # Para cada mês, buscar os dados e somar apenas os dias do período
     for (ano, mes), dias in valores_mes.items():
-        body = {"sn": serial, "year": ano, "month": mes, "dimension": "day", "variables": ["generation"]}
+        body = {"sn": serial, "year": ano, "month": mes, "dimension": "month", "variables": ["generation"]}
         try:
             r = foxess_chamar_api(api_key, "op/v0/device/report/query", body)
             if r.get("errno") == 0:
                 for item in r.get("result", []):
-                    if isinstance(item, dict) and item.get("variable") == "generation":
-                        valores = item.get("values", [])
-                        # valores[0] = dia 1, valores[1] = dia 2, etc.
-                        for dia in dias:
-                            idx = dia - 1  # índice baseado em zero
-                            if idx < len(valores) and valores[idx]:
-                                total += float(valores[idx])
+    if isinstance(item, dict) and item.get("variable") == "generation":
+        valores = item.get("values", [])
+        # Com dimension=month, values é lista de dias do mês
+        for dia in dias:
+            idx = dia - 1
+            if idx < len(valores) and valores[idx] is not None:
+                total += float(valores[idx])
         except Exception:
             pass
 
