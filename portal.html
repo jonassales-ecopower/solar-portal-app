@@ -296,10 +296,10 @@
                                 <td style="text-align:right;" class="cor-az" id="plan-injetado">—</td>
                                 <td style="color:#64748b;font-size:12px;">Sobra enviada à distribuidora como créditos</td>
                             </tr>
-                            <tr id="linha-inst" style="display:none;">
+                            <tr id="linha-inst">
                                 <td>🏠 <strong>Consumo Instantâneo</strong></td>
                                 <td style="text-align:right;" class="cor-az" id="plan-inst">—</td>
-                                <td style="color:#64748b;font-size:12px;">Solar consumido na hora em que foi gerado</td>
+                                <td style="color:#64748b;font-size:12px;" id="plan-inst-obs">Solar consumido na hora em que foi gerado</td>
                             </tr>
                             <tr>
                                 <td>🌙 <strong>Consumo da Distribuidora</strong></td>
@@ -693,18 +693,37 @@
             const ei = parseFloat(c.energia_injetada_kwh||0);
             const cr = parseFloat(c.consumo_bruto_kwh||0);
             const ct = parseFloat(c.consumo_total_kwh||0);
+            const leituraMedia = c.leitura_por_media;
+            const injetadoMaiorQueGerado = gt > 0 && ei > gt;
 
             if (ct > 0 || cr > 0) {
                 document.getElementById("secao-balanco").style.display = "block";
+
+                // Mostrar geração se disponível
                 if (gt > 0) {
                     document.getElementById("linha-gerado").style.display = "table-row";
                     document.getElementById("plan-gerado").textContent = gt.toFixed(2) + " kWh";
                 }
+
                 document.getElementById("plan-injetado").textContent = ei.toFixed(2) + " kWh";
-                if (ci > 0) {
-                    document.getElementById("linha-inst").style.display = "table-row";
+
+                // Consumo instantâneo — sempre visível
+                if (injetadoMaiorQueGerado) {
+                    // Injetado > Gerado: conta acumulada impede cálculo preciso
+                    document.getElementById("plan-inst").textContent = "—";
+                    document.getElementById("plan-inst").className = "";
+                    document.getElementById("plan-inst-obs").innerHTML =
+                        "<span style='color:#d97706;'>⚠️ Não calculável — conta com leitura acumulada de mais de um mês. O injetado registrado (" + ei.toFixed(0) + " kWh) cobre mais de um mês, enquanto a geração do inversor (" + gt.toFixed(0) + " kWh) é de apenas um mês.</span>";
+                } else if (gt > 0) {
                     document.getElementById("plan-inst").textContent = ci.toFixed(2) + " kWh";
+                    document.getElementById("plan-inst").className = "cor-az";
+                    document.getElementById("plan-inst-obs").textContent = "Solar consumido na hora em que foi gerado";
+                } else {
+                    document.getElementById("plan-inst").textContent = "—";
+                    document.getElementById("plan-inst").className = "";
+                    document.getElementById("plan-inst-obs").textContent = "Disponível quando o inversor estiver configurado";
                 }
+
                 document.getElementById("plan-rede").textContent = cr.toFixed(2) + " kWh";
                 document.getElementById("plan-total").textContent = (ct > 0 ? ct : cr).toFixed(2) + " kWh";
             }
