@@ -704,18 +704,29 @@
                 document.getElementById("secao-balanco").style.display = "block";
 
                 // Período de leitura
+                // Função para converter data YYYY-MM-DD sem erro de fuso horário
+                function fmtData(str) {
+                    if (!str) return null;
+                    const [y,m,d] = str.split("-");
+                    return `${d}/${m}/${y}`;
+                }
+
                 if (c.data_leitura_anterior && c.data_leitura_atual) {
-                    const dtAnt = new Date(c.data_leitura_anterior).toLocaleDateString("pt-BR");
-                    const dtAtu = new Date(c.data_leitura_atual).toLocaleDateString("pt-BR");
-                    const diffMs = new Date(c.data_leitura_atual) - new Date(c.data_leitura_anterior);
-                    const diffDias = Math.round(diffMs / (1000*60*60*24));
+                    const dtAnt = fmtData(c.data_leitura_anterior);
+                    const dtAtu = fmtData(c.data_leitura_atual);
+                    // Calcular diferença sem fuso horário
+                    const [y1,m1,d1] = c.data_leitura_anterior.split("-").map(Number);
+                    const [y2,m2,d2] = c.data_leitura_atual.split("-").map(Number);
+                    const dt1 = new Date(y1, m1-1, d1);
+                    const dt2 = new Date(y2, m2-1, d2);
+                    const diffDias = Math.round((dt2 - dt1) / (1000*60*60*24));
                     document.getElementById("txt-periodo-leitura").innerHTML =
                         `📅 <strong>Período de leitura:</strong> ${dtAnt} a ${dtAtu} (${diffDias} dias)`;
                 }
 
                 // Próxima leitura
                 if (c.data_proxima_leitura) {
-                    const dtProx = new Date(c.data_proxima_leitura).toLocaleDateString("pt-BR");
+                    const dtProx = fmtData(c.data_proxima_leitura);
                     const elProx = document.getElementById("txt-proxima-leitura");
                     elProx.style.display = "block";
                     elProx.innerHTML =
