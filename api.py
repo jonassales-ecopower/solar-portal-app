@@ -847,3 +847,30 @@ def verificar_anomalias(cliente_id: int):
     return {"cliente_id":cliente_id,"cliente_nome":nome,"data_analise":hoje.isoformat(),
             "geracao_ontem_kwh":round(g_ontem,1),"media_7_dias_kwh":round(media7,1),
             "media_diaria_esperada_kwh":round(media_diaria_esperada,1),"alertas":alertas}
+
+@app.get("/clientes/{cliente_id}/diagnostico-periodo")
+def diagnostico_periodo(cliente_id: int, data_inicio: str, data_fim: str):
+    """Rota de diagnóstico — ver retorno exato da FoxESS para período."""
+    conn = conectar_banco()
+    cur = conn.cursor()
+    cur.execute("SELECT serial_inversor, api_key_inversor FROM clientes WHERE id=%s", (cliente_id,))
+    c = cur.fetchone()
+    cur.close()
+    conn.close()
+    if not c:
+        raise HTTPException(status_code=404, detail="Cliente não encontrado")
+    serial, api_key = c
+
+    # Testar consulta diária de março
+    body_mar = {"sn": serial, "year": 2026, "month": 3, "dimension": "day", "variables": ["generation"]}
+    resp_mar = foxess_chamar_api(api_key, "op/v0/device/report/query", body_mar)
+
+    # Testar consulta diária de abril
+    body_abr = {"sn": serial, "year": 2026, "month": 4, "dimension": "day", "variables": ["generation"]}
+    resp_abr = foxess_chamar_api(api_key, "op/v0/device/report/query", body_abr)
+
+    return {
+        "marco_raw": resp_mar,
+        "abril_raw": resp_abr
+    }
+
