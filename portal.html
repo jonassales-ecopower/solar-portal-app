@@ -282,6 +282,11 @@
                 </div>
 
                 <div id="secao-balanco" style="display:none;">
+                    <!-- Período de leitura e próxima leitura -->
+                    <div id="bloco-periodo" style="background:#f0fdf4;border-left:4px solid #22c55e;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:13px;">
+                        <div id="txt-periodo-leitura" style="color:#166534;margin-bottom:4px;"></div>
+                        <div id="txt-proxima-leitura" style="display:none;color:#d97706;margin-top:6px;"></div>
+                    </div>
                     <p style="font-size:13px;font-weight:700;color:#334155;margin-bottom:10px;">⚡ Balanço Energético do Período</p>
                     <table class="planilha">
                         <thead><tr><th>Descrição</th><th style="text-align:right;">Quantidade</th><th>O que significa</th></tr></thead>
@@ -693,13 +698,31 @@
             const ei = parseFloat(c.energia_injetada_kwh||0);
             const cr = parseFloat(c.consumo_bruto_kwh||0);
             const ct = parseFloat(c.consumo_total_kwh||0);
-            const leituraMedia = c.leitura_por_media;
             const injetadoMaiorQueGerado = gt > 0 && ei > gt;
 
             if (ct > 0 || cr > 0) {
                 document.getElementById("secao-balanco").style.display = "block";
 
-                // Mostrar geração se disponível
+                // Período de leitura
+                if (c.data_leitura_anterior && c.data_leitura_atual) {
+                    const dtAnt = new Date(c.data_leitura_anterior).toLocaleDateString("pt-BR");
+                    const dtAtu = new Date(c.data_leitura_atual).toLocaleDateString("pt-BR");
+                    const diffMs = new Date(c.data_leitura_atual) - new Date(c.data_leitura_anterior);
+                    const diffDias = Math.round(diffMs / (1000*60*60*24));
+                    document.getElementById("txt-periodo-leitura").innerHTML =
+                        `📅 <strong>Período de leitura:</strong> ${dtAnt} a ${dtAtu} (${diffDias} dias)`;
+                }
+
+                // Próxima leitura
+                if (c.data_proxima_leitura) {
+                    const dtProx = new Date(c.data_proxima_leitura).toLocaleDateString("pt-BR");
+                    const elProx = document.getElementById("txt-proxima-leitura");
+                    elProx.style.display = "block";
+                    elProx.innerHTML =
+                        `🔔 <strong>Próxima leitura: ${dtProx}</strong> — informe sua leitura pelo app da distribuidora para evitar cobrança estimada!`;
+                }
+
+                // Geração
                 if (gt > 0) {
                     document.getElementById("linha-gerado").style.display = "table-row";
                     document.getElementById("plan-gerado").textContent = gt.toFixed(2) + " kWh";
@@ -707,13 +730,12 @@
 
                 document.getElementById("plan-injetado").textContent = ei.toFixed(2) + " kWh";
 
-                // Consumo instantâneo — sempre visível
+                // Consumo Instantâneo — sempre visível
                 if (injetadoMaiorQueGerado) {
-                    // Injetado > Gerado: conta acumulada impede cálculo preciso
                     document.getElementById("plan-inst").textContent = "—";
                     document.getElementById("plan-inst").className = "";
                     document.getElementById("plan-inst-obs").innerHTML =
-                        "<span style='color:#d97706;'>⚠️ Não calculável — conta com leitura acumulada de mais de um mês. O injetado registrado (" + ei.toFixed(0) + " kWh) cobre mais de um mês, enquanto a geração do inversor (" + gt.toFixed(0) + " kWh) é de apenas um mês.</span>";
+                        `<span style='color:#d97706;'>⚠️ Não calculável — conta com leitura acumulada. O injetado (${ei.toFixed(0)} kWh) cobre mais de um mês, enquanto a geração do inversor (${gt.toFixed(0)} kWh) é de apenas um mês.</span>`;
                 } else if (gt > 0) {
                     document.getElementById("plan-inst").textContent = ci.toFixed(2) + " kWh";
                     document.getElementById("plan-inst").className = "cor-az";

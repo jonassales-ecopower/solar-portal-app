@@ -79,8 +79,6 @@ REGRAS CRÍTICAS DE EXTRAÇÃO:
    já está incluída na leitura do medidor e NÃO deve ser somada ao consumo.
    NUNCA use "Consumo acima de 80kWh-BR" isoladamente — use sempre a leitura do medidor.
    O consumo bruto real é SEMPRE apenas: (Leitura Atual - Leitura Anterior) × Constante.
-   Para a conta de Maio/2026 da Graciana: medidor mostra 876 kWh → consumo_bruto_kwh = 876.
-   Para a conta de Abril/2026 da Graciana: medidor mostra 1497 kWh → consumo_bruto_kwh = 1497.
 
 5. CONSUMO FATURADO (kWh): Valor no histórico dos últimos 13 meses referente ao mês atual.
    É MENOR que consumo bruto em sistemas GD. Ex: ABR/26 = 420,63 kWh; MAI/26 = 277,45 kWh.
@@ -142,26 +140,21 @@ Texto da conta:
     resposta = cliente_ia.chat.completions.create(model="openrouter/auto", messages=[{"role": "user", "content": prompt}])
     return resposta.choices[0].message.content
 
-# ==================== CÁLCULO DE CONSUMO ====================
+# ==================== CÁLCULO ====================
 
 def calcular_analise_consumo(dados: dict, geracao_total_kwh: float = None) -> dict:
     energia_injetada = float(dados.get("energia_injetada_kwh") or 0)
     consumo_rede = float(dados.get("consumo_bruto_kwh") or dados.get("consumo_rede_kwh") or 0)
-
     resultado = {"geracao_total_kwh": None, "consumo_instantaneo_kwh": None, "consumo_total_kwh": None, "analise_consumo": None}
-
     if geracao_total_kwh and geracao_total_kwh > 0:
         consumo_instantaneo = max(0, round(geracao_total_kwh - energia_injetada, 2))
-        consumo_total = round(consumo_instantaneo + consumo_rede, 2)
         resultado["geracao_total_kwh"] = geracao_total_kwh
         resultado["consumo_instantaneo_kwh"] = consumo_instantaneo
-        resultado["consumo_total_kwh"] = consumo_total
+        resultado["consumo_total_kwh"] = round(consumo_instantaneo + consumo_rede, 2)
     else:
-        # Sem geração do inversor: consumo total = leitura do medidor
         consumo_instantaneo = max(0, round(consumo_rede - energia_injetada, 2)) if consumo_rede > energia_injetada else 0
         resultado["consumo_total_kwh"] = round(consumo_rede, 2)
         resultado["consumo_instantaneo_kwh"] = consumo_instantaneo
-
     return resultado
 
 def gerar_mensagem_consumo(dados: dict, consumo_anterior: float = None) -> str:
@@ -173,20 +166,15 @@ def gerar_mensagem_consumo(dados: dict, consumo_anterior: float = None) -> str:
     mes = dados.get("mes_referencia", "este mês")
     meses = int(dados.get("meses_acumulados") or 1)
     partes = []
-
     periodo = f"nos últimos {meses} meses" if meses > 1 else f"em {mes}"
-
     if geracao_total > 0:
         partes.append(f"☀️ {periodo.capitalize()}, seu sistema gerou {geracao_total:.1f} kWh. Desses, {consumo_instantaneo:.1f} kWh foram usados instantaneamente e {energia_injetada:.1f} kWh foram injetados na rede como créditos.")
     else:
         partes.append(f"⚡ {periodo.capitalize()}, seu sistema injetou {energia_injetada:.1f} kWh na rede como créditos. Sua casa consumiu {consumo_rede:.1f} kWh da distribuidora.")
-
     if consumo_total > 0 and consumo_rede > 0:
         partes.append(f"📊 Consumo total da casa: {consumo_total:.1f} kWh ({consumo_instantaneo:.1f} kWh do solar + {consumo_rede:.1f} kWh da rede).")
-
     if meses > 1:
         partes.append(f"⚠️ Esta conta cobre {meses} meses de leitura acumulada.")
-
     if consumo_anterior and consumo_anterior > 0 and consumo_total > 0:
         ant_ajustado = consumo_anterior * meses if meses > 1 else consumo_anterior
         variacao = ((consumo_total - ant_ajustado) / ant_ajustado) * 100
@@ -194,7 +182,6 @@ def gerar_mensagem_consumo(dados: dict, consumo_anterior: float = None) -> str:
             partes.append(f"📈 ATENÇÃO: Consumo aumentou {variacao:.0f}% em relação ao período anterior ({ant_ajustado:.1f} → {consumo_total:.1f} kWh). O sistema solar está funcionando normalmente — verifique novos equipamentos ligados.")
         elif variacao < -10:
             partes.append(f"✅ Consumo reduziu {abs(variacao):.0f}% — ótimo!")
-
     return " ".join(partes)
 
 # ==================== CLIMA ====================
@@ -242,7 +229,7 @@ def foxess_get_realtime(api_key: str, serial: str) -> dict:
     return foxess_chamar_api(api_key, "op/v0/device/real/query", {"sn": serial, "variables": []})
 
 def foxess_get_mensal(api_key: str, serial: str, ano: int, mes: int) -> float:
-    """Retorna geração total real do mês diretamente da FoxESS."""
+    """Retorna geração total REAL do mês completo (01 ao último dia do mês)."""
     body = {"sn": serial, "year": ano, "month": mes, "dimension": "month", "variables": ["generation"]}
     try:
         r = foxess_chamar_api(api_key, "op/v0/device/report/query", body)
@@ -256,14 +243,12 @@ def foxess_get_mensal(api_key: str, serial: str, ano: int, mes: int) -> float:
 
 def foxess_get_periodo(api_key: str, serial: str, data_inicio: date, data_fim: date) -> float:
     """
-    Retorna geração total do período exato (data_inicio a data_fim).
-    Usa dimension=month e filtra apenas os dias do período.
-    Ex: conta de 13/03 a 13/04 busca março (dias 13-31) + abril (dias 1-13).
+    Retorna geração total do PERÍODO EXATO da conta (data_leitura_anterior a data_leitura_atual).
+    Usado apenas para o balanço energético da conta — NÃO para o gráfico mensal.
+    Usa dimension=month e filtra apenas os dias do período por índice.
     """
     total = 0.0
     dias_por_mes = {}
-
-    # Agrupar dias por mês
     data_atual = data_inicio
     while data_atual <= data_fim:
         mes_ano = (data_atual.year, data_atual.month)
@@ -272,7 +257,6 @@ def foxess_get_periodo(api_key: str, serial: str, data_inicio: date, data_fim: d
         dias_por_mes[mes_ano].append(data_atual.day)
         data_atual += timedelta(days=1)
 
-    # Para cada mês, buscar dados com dimension=month e somar apenas os dias do período
     for (ano, mes), dias in dias_por_mes.items():
         body = {"sn": serial, "year": ano, "month": mes, "dimension": "month", "variables": ["generation"]}
         try:
@@ -281,20 +265,18 @@ def foxess_get_periodo(api_key: str, serial: str, data_inicio: date, data_fim: d
                 for item in r.get("result", []):
                     if isinstance(item, dict) and item.get("variable") == "generation":
                         valores = item.get("values", [])
-                        # valores[0] = dia 1, valores[1] = dia 2, etc.
                         for dia in dias:
                             idx = dia - 1
                             if idx < len(valores) and valores[idx] is not None:
                                 total += float(valores[idx])
         except Exception:
             pass
-
     return round(total, 2)
 
 # ==================== BANCO HELPERS ====================
 
 def salvar_geracao_mensal(cliente_id: int, ano: int, mes: int, geracao_kwh: float, fonte: str = "foxess"):
-    """Salva o total mensal real sem distribuir por dia."""
+    """Salva o total mensal COMPLETO (01 ao último dia do mês) — usado pelo gráfico."""
     conn = conectar_banco()
     cur = conn.cursor()
     cur.execute("""
@@ -316,7 +298,7 @@ def buscar_geracao_dia(cliente_id: int, data_busca):
     conn.close()
     return float(r[0]) if r[0] else 0.0
 
-def buscar_geracao_periodo(cliente_id: int, data_inicio, data_fim):
+def buscar_geracao_periodo_banco(cliente_id: int, data_inicio, data_fim):
     conn = conectar_banco()
     cur = conn.cursor()
     cur.execute("SELECT data, SUM(geracao_kwh) FROM historico_geracao WHERE cliente_id=%s AND data BETWEEN %s AND %s GROUP BY data ORDER BY data", (cliente_id, data_inicio, data_fim))
@@ -333,7 +315,6 @@ def salvar_no_banco(dados, cliente_id):
         data_venc = datetime.strptime(dados["data_vencimento"], "%d/%m/%Y").date()
     except:
         pass
-
     data_leit_ant = None
     data_leit_atu = None
     data_prox_leit = None
@@ -346,7 +327,6 @@ def salvar_no_banco(dados, cliente_id):
             data_prox_leit = datetime.strptime(dados["data_proxima_leitura"], "%d/%m/%Y").date()
     except:
         pass
-
     cur.execute("""
         INSERT INTO contas (
             cliente_id, mes_referencia, data_vencimento,
@@ -602,29 +582,27 @@ async def upload_conta(cliente_id: int, arquivo: UploadFile = File(...)):
             try:
                 data_leit_ant_str = dados.get("data_leitura_anterior")
                 data_leit_atu_str = dados.get("data_leitura_atual")
+                mes_ref = dados.get("mes_referencia", "")
+                meses_map = {"jan":1,"fev":2,"mar":3,"abr":4,"mai":5,"jun":6,"jul":7,"ago":8,"set":9,"out":10,"nov":11,"dez":12}
+                mes_num = next((n for k,n in meses_map.items() if k in mes_ref.lower()), None)
+                anos = re.findall(r'\d{4}', mes_ref)
+                ano_num = int(anos[0]) if anos else datetime.now().year
 
                 if data_leit_ant_str and data_leit_atu_str:
-                    # CORRETO: buscar geração pelo período EXATO da conta dia a dia
+                    # 1. Geração do PERÍODO EXATO → usado no balanço energético da conta
                     data_ini = datetime.strptime(data_leit_ant_str, "%d/%m/%Y").date()
                     data_fim = datetime.strptime(data_leit_atu_str, "%d/%m/%Y").date()
-                    g = foxess_get_periodo(inversor[2], inversor[1], data_ini, data_fim)
-                    if g > 0:
-                        geracao_total_kwh = g
-                        # Salvar na tabela mensal para o gráfico
-                        mes_ref = dados.get("mes_referencia", "")
-                        meses_map = {"jan":1,"fev":2,"mar":3,"abr":4,"mai":5,"jun":6,"jul":7,"ago":8,"set":9,"out":10,"nov":11,"dez":12}
-                        mes_num = next((n for k,n in meses_map.items() if k in mes_ref.lower()), None)
-                        anos = re.findall(r'\d{4}', mes_ref)
-                        ano_num = int(anos[0]) if anos else datetime.now().year
-                        if mes_num:
-                            salvar_geracao_mensal(cliente_id, ano_num, mes_num, g)
+                    g_periodo = foxess_get_periodo(inversor[2], inversor[1], data_ini, data_fim)
+                    if g_periodo > 0:
+                        geracao_total_kwh = g_periodo
+
+                    # 2. Geração do MÊS COMPLETO → usado no gráfico (separado!)
+                    if mes_num:
+                        g_mensal = foxess_get_mensal(inversor[2], inversor[1], ano_num, mes_num)
+                        if g_mensal > 0:
+                            salvar_geracao_mensal(cliente_id, ano_num, mes_num, g_mensal)
                 else:
-                    # Fallback: buscar por mês quando não há datas de leitura
-                    mes_ref = dados.get("mes_referencia", "")
-                    meses_map = {"jan":1,"fev":2,"mar":3,"abr":4,"mai":5,"jun":6,"jul":7,"ago":8,"set":9,"out":10,"nov":11,"dez":12}
-                    mes_num = next((n for k,n in meses_map.items() if k in mes_ref.lower()), None)
-                    anos = re.findall(r'\d{4}', mes_ref)
-                    ano_num = int(anos[0]) if anos else datetime.now().year
+                    # Fallback sem datas de leitura
                     meses_acumulados = int(dados.get("meses_acumulados") or 1)
                     if mes_num:
                         geracao_total = 0.0
@@ -740,15 +718,12 @@ def monitoramento_mensal(cliente_id: int):
     resultados = cur.fetchall()
     cur.close()
     conn.close()
-
     if resultados:
         mensal = [{"ano":r[0],"mes_num":r[1],"mes":nomes[r[1]],"geracao_kwh":float(r[2])} for r in resultados if float(r[2])>0]
         if mensal:
             return {"cliente_id":cliente_id,"mensal":mensal[-12:],"total_periodo":round(sum(m["geracao_kwh"] for m in mensal),2),"fonte":"banco"}
-
     if not cliente or not cliente[1] or cliente[1].lower()!="foxess" or not cliente[3]:
         return {"cliente_id":cliente_id,"mensal":[],"total_periodo":0,"fonte":"nenhuma"}
-
     serial, api_key = cliente[2], cliente[3]
     hoje = datetime.now()
     dados_por_mes = []
@@ -758,11 +733,9 @@ def monitoramento_mensal(cliente_id: int):
         if total > 0:
             salvar_geracao_mensal(cliente_id, dm.year, dm.month, total)
             dados_por_mes.append({"ano":dm.year,"mes_num":dm.month,"mes":nomes[dm.month],"geracao_kwh":total})
-
     if dados_por_mes:
         dados_por_mes = sorted(dados_por_mes, key=lambda x:(x["ano"],x["mes_num"]))
         return {"cliente_id":cliente_id,"mensal":dados_por_mes,"total_periodo":round(sum(m["geracao_kwh"] for m in dados_por_mes),2),"fonte":"foxess"}
-
     return {"cliente_id":cliente_id,"mensal":[],"total_periodo":0,"fonte":"nenhuma"}
 
 @app.get("/clientes/{cliente_id}/verificar-anomalias")
@@ -775,19 +748,16 @@ def verificar_anomalias(cliente_id: int):
     conn.close()
     if not cliente:
         raise HTTPException(status_code=404, detail="Cliente não encontrado")
-
     nome, latitude, longitude, potencia_kwp, performance_ratio = cliente
     hoje = date.today()
     ontem = hoje - timedelta(days=1)
     g_ontem = buscar_geracao_dia(cliente_id, ontem)
-    ultimos7 = buscar_geracao_periodo(cliente_id, hoje-timedelta(days=8), ontem)
+    ultimos7 = buscar_geracao_periodo_banco(cliente_id, hoje-timedelta(days=8), ontem)
     media7 = sum(d["total_kwh"] for d in ultimos7)/len(ultimos7) if ultimos7 else 0.0
-
     media_diaria_esperada = 0.0
     if potencia_kwp and performance_ratio:
         hsp = {1:5.2,2:5.4,3:5.1,4:4.8,5:4.5,6:4.3,7:4.5,8:5.0,9:4.9,10:4.8,11:4.9,12:5.0}
         media_diaria_esperada = float(potencia_kwp) * hsp.get(hoje.month, 5.0) * float(performance_ratio)
-
     alerta_consecutivo = None
     if media_diaria_esperada > 0 and len(ultimos7) >= 3:
         ultimos3 = ultimos7[-3:]
@@ -808,11 +778,9 @@ def verificar_anomalias(cliente_id: int):
                     "titulo":"3 Dias Consecutivos com Geração Abaixo da Média",
                     "mensagem":f"Geração abaixo do esperado por 3 dias ({media_3d:.1f} kWh/dia vs esperado {media_diaria_esperada:.1f} kWh/dia). O tempo estava bom — pode ser problema técnico.",
                     "acao":"Verificar sombra, sujeira nos painéis ou problema no inversor. Contate seu integrador."}
-
     alertas = []
     if alerta_consecutivo:
         alertas.append(alerta_consecutivo)
-
     if g_ontem < 0.5:
         alertas.append({"tipo":"urgente","icone":"🔴","titulo":"Sistema Parado",
             "mensagem":f"Seu sistema não gerou energia significativa ontem ({g_ontem:.1f} kWh).",
@@ -834,33 +802,12 @@ def verificar_anomalias(cliente_id: int):
         alertas.append({"tipo":"informativo","icone":"📉","titulo":"Geração Abaixo da Média",
             "mensagem":f"Ontem: {g_ontem:.1f} kWh vs média: {media7:.1f} kWh.",
             "acao":"Monitorar. Se continuar, agendar limpeza preventiva."})
-
     if not alertas and g_ontem > 0:
         alertas.append({"tipo":"normal","icone":"✅","titulo":"Sistema Operando Normalmente",
             "mensagem":f"Ontem seu sistema gerou {g_ontem:.1f} kWh.","acao":"Nenhuma ação necessária."})
-
     if media7 == 0 and g_ontem == 0:
         alertas = [{"tipo":"informativo","icone":"📡","titulo":"Coletando Dados",
             "mensagem":"Aguardando coleta de dados de geração.","acao":"Em alguns dias teremos estatísticas."}]
-
     return {"cliente_id":cliente_id,"cliente_nome":nome,"data_analise":hoje.isoformat(),
             "geracao_ontem_kwh":round(g_ontem,1),"media_7_dias_kwh":round(media7,1),
             "media_diaria_esperada_kwh":round(media_diaria_esperada,1),"alertas":alertas}
-
-@app.get("/clientes/{cliente_id}/diagnostico-periodo")
-def diagnostico_periodo(cliente_id: int, data_inicio: str, data_fim: str):
-    """Rota de diagnóstico — ver retorno exato da FoxESS para período."""
-    conn = conectar_banco()
-    cur = conn.cursor()
-    cur.execute("SELECT serial_inversor,api_key_inversor FROM clientes WHERE id=%s", (cliente_id,))
-    c = cur.fetchone()
-    cur.close()
-    conn.close()
-    if not c:
-        raise HTTPException(status_code=404, detail="Cliente não encontrado")
-    serial, api_key = c
-    body_mar = {"sn": serial, "year": 2026, "month": 3, "dimension": "month", "variables": ["generation"]}
-    resp_mar = foxess_chamar_api(api_key, "op/v0/device/report/query", body_mar)
-    body_abr = {"sn": serial, "year": 2026, "month": 4, "dimension": "month", "variables": ["generation"]}
-    resp_abr = foxess_chamar_api(api_key, "op/v0/device/report/query", body_abr)
-    return {"marco_raw": resp_mar, "abril_raw": resp_abr}
