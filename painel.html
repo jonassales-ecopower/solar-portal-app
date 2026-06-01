@@ -227,6 +227,57 @@
             color: #16a34a;
             margin-top: 4px;
         }
+
+        /* ===== MOBILE ===== */
+        @media (max-width: 640px) {
+            header { padding: 14px 16px; flex-wrap: wrap; gap: 8px; }
+            header h1 { font-size: 16px; }
+            header > div:last-child { gap: 8px; }
+            .container { margin: 14px auto; padding: 0 12px; }
+            .card { padding: 14px; margin-bottom: 14px; }
+            .card h2 { font-size: 13px; margin-bottom: 14px; }
+            .grid-2 { grid-template-columns: 1fr; gap: 0; }
+            button.pequeno { padding: 8px 12px; font-size: 12px; }
+
+            .card-monitoramento .stat-number { font-size: 22px; }
+            .card-monitoramento .stat-item { min-width: 58px; }
+            .card-monitoramento .stat-label { font-size: 11px; }
+
+            /* Tabela → Cards */
+            table, thead, tbody, th, td, tr { display: block; }
+            thead { display: none; }
+            tr {
+                border: 1px solid #e2e8f0;
+                border-radius: 10px;
+                margin-bottom: 10px;
+                padding: 12px 14px;
+                background: white;
+            }
+            tr:hover td { background: transparent; }
+            td {
+                border: none;
+                padding: 5px 0;
+                font-size: 13px;
+                border-bottom: 1px solid #f5f5f5;
+            }
+            td:last-child { border-bottom: none; padding-top: 8px; }
+            td::before {
+                content: attr(data-label);
+                font-weight: 700;
+                color: #64748b;
+                font-size: 10px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                display: block;
+                margin-bottom: 2px;
+            }
+            td[data-label="Ações"]::before { display: none; }
+
+            .modal { padding: 18px; }
+            .modal-acoes { flex-direction: column; }
+            .modal-acoes button { width: 100%; margin-top: 0; }
+            .dica, .dica-roxo { font-size: 11px; }
+        }
     </style>
 </head>
 <body>
@@ -851,12 +902,12 @@
             }
             return `
                 <tr>
-                    <td><strong>${c.nome}</strong></td>
-                    <td>${c.numero_uc || "—"}</td>
-                    <td>${c.distribuidora || "—"}</td>
-                    <td>${c.tipo_gd || "—"}</td>
-                    <td>${statusHtml}</td>
-                    <td>
+                    <td data-label="Nome"><strong>${c.nome}</strong></td>
+                    <td data-label="UC">${c.numero_uc || "—"}</td>
+                    <td data-label="Distribuidora">${c.distribuidora || "—"}</td>
+                    <td data-label="Tipo GD">${c.tipo_gd || "—"}</td>
+                    <td data-label="Monitoramento">${statusHtml}</td>
+                    <td data-label="Ações">
                         <div class="acoes">
                             <button class="pequeno" onclick="verContas(${c.id}, '${c.nome}')">Ver Contas</button>
                             <button class="azul pequeno" onclick="obterLink(${c.id}, '${c.nome}')">🔗 Link</button>
