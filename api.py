@@ -346,21 +346,35 @@ def consultar_clima(latitude: float, longitude: float, data_inicio: str, data_fi
 
 # ==================== FOXESS OLD API (login com credenciais) ====================
 
-def foxess_old_login(email: str, senha: str) -> str:
+def foxess_old_login(usuario: str, senha: str) -> tuple:
+    """Retorna (token, erro_detalhe)."""
     senha_md5 = hashlib.md5(senha.encode("utf-8")).hexdigest()
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+        "Origin": "https://www.foxesscloud.com",
+        "Referer": "https://www.foxesscloud.com/",
+        "timezone": "America/Sao_Paulo",
+        "lang": "pt",
+    }
+    payload = {"user": usuario, "password": senha_md5, "lang": "pt", "appVersion": "1.3.0"}
     try:
         resp = requests.post(
             "https://www.foxesscloud.com/c/v0/user/login",
-            json={"user": email, "password": senha_md5, "lang": "en", "appVersion": "1.3.0"},
-            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Content-Type": "application/json"},
-            timeout=30
+            json=payload, headers=headers, timeout=30
         )
-        d = resp.json()
+        raw = resp.text[:300]
+        try:
+            d = resp.json()
+        except Exception:
+            return "", f"HTTP {resp.status_code} — resposta não-JSON: {raw}"
         if d.get("errno") == 0:
-            return d.get("result", {}).get("token", "")
-    except Exception:
-        pass
-    return ""
+            return d.get("result", {}).get("token", ""), None
+        return "", f"HTTP {resp.status_code} errno={d.get('errno')} msg={d.get('msg')}"
+    except Exception as e:
+        return "", f"Exceção de rede: {str(e)}"
 
 def foxess_old_listar_dispositivos(token: str) -> list:
     try:
@@ -380,9 +394,9 @@ def foxess_old_listar_dispositivos(token: str) -> list:
 
 def foxess_old_get_realtime(email: str, senha: str, sn: str) -> dict:
     """Monitoramento via credenciais (old API) — sem necessidade de API key."""
-    token = foxess_old_login(email, senha)
+    token, erro = foxess_old_login(email, senha)
     if not token:
-        return {"errno": 1, "msg": "Falha no login FoxESS — verifique e-mail e senha"}
+        return {"errno": 1, "msg": f"Falha no login FoxESS — {erro}"}
     try:
         resp = requests.post(
             "https://www.foxesscloud.com/c/v0/device/real/query",
@@ -798,22 +812,9 @@ def foxess_buscar_dispositivos(cliente_id: int, dados: dict, integrador: dict = 
     senha = dados.get("senha", "").strip()
     if not email or not senha:
         raise HTTPException(status_code=400, detail="E-mail e senha são obrigatórios")
-    senha_md5 = hashlib.md5(senha.encode("utf-8")).hexdigest()
-    try:
-        resp = requests.post(
-            "https://www.foxesscloud.com/c/v0/user/login",
-            json={"user": email, "password": senha_md5, "lang": "en", "appVersion": "1.3.0"},
-            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Content-Type": "application/json"},
-            timeout=30
-        )
-        d = resp.json()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro de conexão com FoxESS: {str(e)}")
-    if d.get("errno") != 0:
-        raise HTTPException(status_code=401, detail=f"Resposta FoxESS: {d}")
-    token = d.get("result", {}).get("token", "")
+    token, erro = foxess_old_login(email, senha)
     if not token:
-        raise HTTPException(status_code=401, detail=f"Token não retornado: {d}")
+        raise HTTPException(status_code=401, detail=f"Login FoxESS falhou: {erro}")
     dispositivos = foxess_old_listar_dispositivos(token)
     if not dispositivos:
         raise HTTPException(status_code=404, detail="Nenhum inversor encontrado nesta conta FoxESS")
@@ -1112,4 +1113,3 @@ def admin_teste_email(dados: dict):
         timeout=10
     )
     return {"status_code": resp.status_code, "sendgrid_response": resp.text or "enviado", "enviado_para": email, "remetente": ALERT_EMAIL_FROM}
-
