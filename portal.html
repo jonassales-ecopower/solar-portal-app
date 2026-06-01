@@ -152,10 +152,84 @@
         .empty .icone { font-size: 48px; margin-bottom: 12px; }
         .empty p { font-size: 14px; }
 
-        @media (max-width: 600px) {
-            .geracao-hero .kw-num { font-size: 48px; }
-            .metricas { grid-template-columns: repeat(2, 1fr); }
+        /* ===== RESPONSIVO MOBILE (Android/iPhone) ===== */
+        @media (max-width: 640px) {
+            /* Header */
+            header { padding: 0 16px; }
+            .header-brand h1 { font-size: 16px; }
+            .header-brand .sol { font-size: 22px; }
             .header-cliente { display: none; }
+
+            /* Abas — texto menor e mais compacto */
+            .aba { padding: 12px 14px; font-size: 12px; }
+
+            /* Container */
+            .container { padding: 16px 12px; }
+
+            /* Cards */
+            .card { padding: 16px; border-radius: 12px; }
+            .card-titulo { font-size: 12px; margin-bottom: 14px; }
+
+            /* Hero geração */
+            .geracao-hero { padding: 24px 16px; border-radius: 12px; }
+            .geracao-hero .kw-num { font-size: 52px; }
+            .geracao-hero .kw-label { font-size: 14px; }
+            .status-pill { font-size: 12px; padding: 5px 12px; }
+
+            /* Métricas — 2 colunas no mobile */
+            .metricas { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+            .metrica { padding: 12px 8px; }
+            .metrica .val { font-size: 17px; }
+            .metrica .lbl { font-size: 10px; }
+
+            /* Planilha balanço — adaptar para mobile */
+            .planilha { font-size: 12px; }
+            .planilha thead th { padding: 8px 8px; font-size: 11px; }
+            .planilha tbody td { padding: 8px 8px; font-size: 12px; }
+            /* Ocultar coluna "O que significa" no mobile */
+            .planilha thead th:last-child,
+            .planilha tbody td:last-child { display: none; }
+
+            /* Status conta */
+            .conta-status { font-size: 12px; padding: 6px 12px; }
+
+            /* Upload */
+            .upload-zone { padding: 24px 16px; }
+            .upload-zone .icone { font-size: 36px; }
+            .btn { font-size: 14px; padding: 12px; }
+            .btn-del { font-size: 11px; padding: 5px 10px; }
+
+            /* Alertas */
+            .alerta-titulo { font-size: 13px; }
+            .alerta-msg { font-size: 12px; }
+            .alerta-acao { font-size: 11px; }
+
+            /* Histórico de contas */
+            .conta-mes { font-size: 13px; }
+            .conta-resumo { font-size: 11px; }
+            .conta-badge { font-size: 10px; padding: 2px 8px; }
+
+            /* Gráfico — tabela oculta no mobile, só gráfico */
+            .tabela-ger { display: none; }
+            .legenda-graf { gap: 10px; }
+            .legenda-item { font-size: 11px; }
+
+            /* Card orientação leitura */
+            .card-roxo-leitura { padding: 12px; }
+            .card-roxo-leitura p { font-size: 12px; }
+
+            /* Boxes de análise */
+            .box { font-size: 13px; padding: 12px 14px; line-height: 1.6; }
+
+            /* Caixas de período */
+            #bloco-periodo { font-size: 12px; padding: 10px 12px; }
+        }
+
+        @media (max-width: 380px) {
+            .geracao-hero .kw-num { font-size: 44px; }
+            .metricas { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+            .metrica .val { font-size: 15px; }
+            .aba { padding: 10px 10px; font-size: 11px; }
         }
     </style>
 </head>
