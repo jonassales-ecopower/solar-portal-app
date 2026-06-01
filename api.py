@@ -862,7 +862,7 @@ def verificar_anomalias(cliente_id: int):
             "geracao_ontem_kwh":round(g_ontem,1),"media_7_dias_kwh":round(media7,1),
             "media_diaria_esperada_kwh":round(media_diaria_esperada,1),"alertas":alertas}
 
-@app.post("/admin/verificar-offline")
+@app.api_route("/admin/verificar-offline", methods=["GET", "POST"])
 def admin_verificar_offline():
     verificar_clientes_offline()
     return {"status": "ok"}
