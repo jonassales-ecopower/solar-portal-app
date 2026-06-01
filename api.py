@@ -808,17 +808,16 @@ def atualizar_inversor(cliente_id: int, dados: dict, integrador: dict = Depends(
 
 @app.post("/clientes/{cliente_id}/foxess/buscar")
 def foxess_buscar_dispositivos(cliente_id: int, dados: dict, integrador: dict = Depends(obter_integrador_atual)):
-    email = dados.get("email", "").strip()
-    senha = dados.get("senha", "").strip()
-    if not email or not senha:
-        raise HTTPException(status_code=400, detail="E-mail e senha são obrigatórios")
-    token, erro = foxess_old_login(email, senha)
-    if not token:
-        raise HTTPException(status_code=401, detail=f"Login FoxESS falhou: {erro}")
-    dispositivos = foxess_old_listar_dispositivos(token)
-    if not dispositivos:
+    api_key = dados.get("api_key", "").strip()
+    if not api_key:
+        raise HTTPException(status_code=400, detail="API Key é obrigatória")
+    data = foxess_chamar_api(api_key, "op/v0/device/list", {"currentPage": 1, "pageSize": 20})
+    if data.get("errno") != 0:
+        raise HTTPException(status_code=401, detail=f"API Key inválida ou sem permissão: {data.get('msg')}")
+    devices = data.get("result", {}).get("devices", [])
+    if not devices:
         raise HTTPException(status_code=404, detail="Nenhum inversor encontrado nesta conta FoxESS")
-    return {"dispositivos": dispositivos}
+    return {"dispositivos": [{"sn": d.get("deviceSN"), "modelo": d.get("productType", "Inversor"), "status": d.get("status", 0)} for d in devices if d.get("deviceSN")]}
 
 @app.post("/contas/upload/{cliente_id}")
 async def upload_conta(cliente_id: int, arquivo: UploadFile = File(...)):
