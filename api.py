@@ -372,6 +372,99 @@ def foxess_get_mensal(api_key: str, serial: str, ano: int, mes: int) -> float:
         pass
     return 0.0
 
+# ==================== GROWATT ====================
+
+def growatt_get_realtime(api_key: str, serial: str) -> dict:
+    try:
+        headers = {"token": api_key, "Content-Type": "application/json"}
+        resp = requests.post(
+            "https://openapi.growatt.com/v1/device/inverter/last_inverter_info",
+            headers=headers, json={"inverterSn": serial}, timeout=30
+        )
+        data = resp.json()
+        if data.get("code") == 0:
+            inv = data.get("data", {}).get("inverterData", {})
+            pac_kw = round(float(inv.get("pac", 0) or 0) / 1000, 3)
+            return {"errno": 0, "pac_kw": pac_kw, "status_code": int(inv.get("status", 0) or 0)}
+        return {"errno": 1, "msg": data.get("msg", "Erro Growatt API")}
+    except Exception as e:
+        return {"errno": 1, "msg": str(e)}
+
+def growatt_get_mensal(api_key: str, serial: str, ano: int, mes: int) -> float:
+    try:
+        headers = {"token": api_key, "Content-Type": "application/json"}
+        resp = requests.post(
+            "https://openapi.growatt.com/v1/device/inverter/month",
+            headers=headers, json={"inverterSn": serial, "year": str(ano), "month": str(mes).zfill(2)},
+            timeout=30
+        )
+        data = resp.json()
+        if data.get("code") == 0:
+            energy = data.get("data", {}).get("energy", [])
+            return round(sum(float(d.get("energy", 0) or 0) for d in energy), 2)
+    except Exception:
+        pass
+    return 0.0
+
+# ==================== SOLARMAN / DEYE ====================
+
+def solarman_get_token(app_id: str, app_secret: str) -> str:
+    try:
+        resp = requests.post(
+            "https://globalapi.solarmanpv.com/account/v1.0/token",
+            params={"language": "en"},
+            json={"appId": app_id, "appSecret": app_secret,
+                  "nonce": secrets.token_hex(8), "timestamp": int(time.time())},
+            timeout=30
+        )
+        d = resp.json()
+        if d.get("success"):
+            return d.get("access_token", "")
+    except Exception:
+        pass
+    return ""
+
+def solarman_get_realtime(app_id: str, app_secret: str, serial: str) -> dict:
+    token = solarman_get_token(app_id, app_secret)
+    if not token:
+        return {"errno": 1, "msg": "Token Solarman inválido — verifique App ID e App Secret"}
+    try:
+        resp = requests.post(
+            "https://globalapi.solarmanpv.com/device/v1.0/currentData",
+            params={"language": "en"},
+            headers={"Authorization": f"Bearer {token}"},
+            json={"deviceSn": serial},
+            timeout=30
+        )
+        d = resp.json()
+        if d.get("success"):
+            vals = {i["key"]: float(i.get("value") or 0) for i in d.get("dataList", []) if i.get("key")}
+            pac_kw = round(vals.get("AC_Active_Power", vals.get("Total_DC_Power", vals.get("DC_Power", 0))) / 1000, 3)
+            return {"errno": 0, "pac_kw": pac_kw, "device_state": d.get("deviceState", 0)}
+        return {"errno": 1, "msg": d.get("msg", "Erro Solarman")}
+    except Exception as e:
+        return {"errno": 1, "msg": str(e)}
+
+def solarman_get_mensal(app_id: str, app_secret: str, serial: str, ano: int, mes: int) -> float:
+    token = solarman_get_token(app_id, app_secret)
+    if not token:
+        return 0.0
+    try:
+        resp = requests.post(
+            "https://globalapi.solarmanpv.com/device/v1.0/historicalData",
+            params={"language": "en"},
+            headers={"Authorization": f"Bearer {token}"},
+            json={"deviceSn": serial, "timeType": 2, "time": f"{ano}-{str(mes).zfill(2)}"},
+            timeout=30
+        )
+        d = resp.json()
+        if d.get("success"):
+            vals = {i["key"]: float(i.get("value") or 0) for i in d.get("dataList", []) if i.get("key")}
+            return round(vals.get("E_Total", vals.get("Generating_Capacity_Month", 0)), 2)
+    except Exception:
+        pass
+    return 0.0
+
 # ==================== BANCO HELPERS ====================
 
 def salvar_no_banco(dados, cliente_id):
@@ -716,20 +809,47 @@ def monitoramento(cliente_id: int):
     if not c or not c[2]:
         raise HTTPException(status_code=404, detail="Inversor não configurado")
     marca, serial, api_key = c
-    if marca.lower() != "foxess":
-        raise HTTPException(status_code=400, detail="Marca não suportada ainda")
-    data = foxess_get_realtime(api_key, serial)
-    if data.get("errno") != 0:
-        raise HTTPException(status_code=400, detail=f"Erro Foxess: {data.get('msg')}")
-    resultado = data.get("result", [])
-    if not resultado:
-        raise HTTPException(status_code=404, detail="Sem dados")
-    variaveis = {}
-    for item in resultado[0].get("datas", []):
+    marca_lower = marca.lower()
+
+    geracao_kw = injetado_kw = consumo_rede_kw = consumo_casa_kw = potencia_kw = 0.0
+
+    if marca_lower == "foxess":
+        data = foxess_get_realtime(api_key, serial)
+        if data.get("errno") != 0:
+            raise HTTPException(status_code=400, detail=f"Erro FoxESS: {data.get('msg')}")
+        resultado = data.get("result", [])
+        if not resultado:
+            raise HTTPException(status_code=404, detail="Sem dados FoxESS")
+        variaveis = {}
+        for item in resultado[0].get("datas", []):
+            try: variaveis[item["variable"]] = float(item.get("value") or 0)
+            except: variaveis[item["variable"]] = 0.0
+        geracao_kw    = variaveis.get("pvPower", 0.0)
+        injetado_kw   = variaveis.get("feedinPower", 0.0)
+        consumo_rede_kw  = variaveis.get("gridConsumptionPower", 0.0)
+        consumo_casa_kw  = variaveis.get("loadsPower", 0.0)
+        potencia_kw   = variaveis.get("generationPower", 0.0)
+
+    elif marca_lower == "growatt":
+        data = growatt_get_realtime(api_key, serial)
+        if data.get("errno") != 0:
+            raise HTTPException(status_code=400, detail=f"Erro Growatt: {data.get('msg')}")
+        geracao_kw = potencia_kw = data.get("pac_kw", 0.0)
+
+    elif marca_lower == "deye":
         try:
-            variaveis[item["variable"]] = float(item.get("value") or 0)
-        except:
-            variaveis[item["variable"]] = 0.0
+            creds = json.loads(api_key)
+            app_id, app_secret = creds["app_id"], creds["app_secret"]
+        except Exception:
+            raise HTTPException(status_code=400, detail="Credenciais Deye inválidas — reconfigure o inversor com App ID e App Secret")
+        data = solarman_get_realtime(app_id, app_secret, serial)
+        if data.get("errno") != 0:
+            raise HTTPException(status_code=400, detail=f"Erro Solarman/Deye: {data.get('msg')}")
+        geracao_kw = potencia_kw = data.get("pac_kw", 0.0)
+
+    else:
+        raise HTTPException(status_code=400, detail=f"Marca '{marca}' ainda não suportada. Suportadas: FoxESS, Growatt, Deye")
+
     try:
         conn2 = conectar_banco()
         cur2 = conn2.cursor()
@@ -739,10 +859,11 @@ def monitoramento(cliente_id: int):
         conn2.close()
     except Exception:
         pass
-    return {"marca":marca,"serial":serial,"status":"online",
-            "geracao_atual_kw":variaveis.get("pvPower",0.0),"injetado_rede_kw":variaveis.get("feedinPower",0.0),
-            "consumo_rede_kw":variaveis.get("gridConsumptionPower",0.0),"consumo_casa_kw":variaveis.get("loadsPower",0.0),
-            "potencia_total_kw":variaveis.get("generationPower",0.0),"timestamp":datetime.utcnow().isoformat()}
+
+    return {"marca": marca, "serial": serial, "status": "online",
+            "geracao_atual_kw": geracao_kw, "injetado_rede_kw": injetado_kw,
+            "consumo_rede_kw": consumo_rede_kw, "consumo_casa_kw": consumo_casa_kw,
+            "potencia_total_kw": potencia_kw, "timestamp": datetime.utcnow().isoformat()}
 
 @app.get("/clientes/{cliente_id}/monitoramento/mensal")
 def monitoramento_mensal(cliente_id: int):
