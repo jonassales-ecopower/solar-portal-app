@@ -873,5 +873,18 @@ def admin_teste_email(dados: dict):
     nome = dados.get("nome", "Integrador")
     if not email:
         raise HTTPException(status_code=400, detail="Email obrigatório")
-    enviar_email_offline(email, nome, "Sistema de Teste — Solar Portal")
-    return {"status": "ok", "enviado_para": email}
+    if not SENDGRID_API_KEY:
+        raise HTTPException(status_code=500, detail="SENDGRID_API_KEY não configurada")
+    html = f"<h2>✅ Teste Solar Portal</h2><p>Olá {nome}, o alerta de email está funcionando!</p>"
+    resp = requests.post(
+        "https://api.sendgrid.com/v3/mail/send",
+        json={
+            "personalizations": [{"to": [{"email": email}]}],
+            "from": {"email": ALERT_EMAIL_FROM, "name": "Solar Portal"},
+            "subject": "✅ Teste — Solar Portal alerta funcionando",
+            "content": [{"type": "text/html", "value": html}]
+        },
+        headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
+        timeout=10
+    )
+    return {"status_code": resp.status_code, "sendgrid_response": resp.text or "enviado", "enviado_para": email, "remetente": ALERT_EMAIL_FROM}
