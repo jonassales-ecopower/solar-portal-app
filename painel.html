@@ -513,6 +513,35 @@
             </select>
         </div>
 
+        <!-- Busca automática FoxESS -->
+        <div id="foxess-busca" style="display:none;">
+            <div class="dica-roxo">
+                ⚡ <strong>Busca automática:</strong> informe as credenciais do cliente no FoxESS Cloud.<br>
+                O número de série é preenchido automaticamente. A API Key também, se disponível — caso contrário, você precisará obtê-la manualmente na <strong>versão antiga</strong> do portal (instruções abaixo do campo).
+            </div>
+            <div class="grid-2">
+                <div class="campo">
+                    <label>E-mail FoxESS do cliente</label>
+                    <input type="email" id="foxess-email" placeholder="cliente@email.com">
+                </div>
+                <div class="campo">
+                    <label>Senha FoxESS</label>
+                    <input type="password" id="foxess-senha" placeholder="••••••">
+                </div>
+            </div>
+            <button class="azul pequeno" id="btn-foxess-buscar" onclick="foxessBuscar()">🔍 Buscar Dispositivos</button>
+            <p class="info" id="foxess-buscando" style="display:none; margin-top:6px;">🔄 Buscando dispositivos...</p>
+            <p class="erro" id="foxess-erro-busca"></p>
+            <div id="foxess-dispositivos" style="display:none;" class="campo">
+                <label>Inversor encontrado</label>
+                <select id="foxess-select-device" onchange="foxessSelecionarDispositivo()">
+                    <option value="">Selecione o inversor...</option>
+                </select>
+            </div>
+            <hr class="separador">
+            <p style="font-size:11px; color:#888; margin-bottom:8px;">Ou preencha manualmente:</p>
+        </div>
+
         <div class="campo">
             <label>Número de Série do Inversor *</label>
             <input type="text" id="inv-serial" placeholder="Ex: J0MF502043LK010">
@@ -554,6 +583,7 @@
     let clienteInversorId = null;
     let modoManual = false;
     let intervaloMonitoramento = null;
+    let foxessCredenciais = null;
 
     if (token) {
         mostrarPainel();
@@ -768,8 +798,15 @@
         document.getElementById("inv-api-key").value = "";
         document.getElementById("inv-deye-app-id").value = "";
         document.getElementById("inv-deye-app-secret").value = "";
+        document.getElementById("foxess-email").value = "";
+        document.getElementById("foxess-senha").value = "";
+        document.getElementById("foxess-buscando").style.display = "none";
+        document.getElementById("foxess-erro-busca").textContent = "";
+        document.getElementById("foxess-dispositivos").style.display = "none";
+        document.getElementById("foxess-busca").style.display = "none";
         document.getElementById("instrucoes-api").innerHTML = "";
         document.getElementById("instrucoes-api-deye").innerHTML = "";
+        foxessCredenciais = null;
         document.getElementById("campo-api-key").style.display = "block";
         document.getElementById("campos-deye").style.display = "none";
         document.getElementById("erro-inversor").textContent = "";
@@ -777,19 +814,70 @@
         document.getElementById("modal-inversor").classList.add("ativo");
     }
 
+    async function foxessBuscar() {
+        const email = document.getElementById("foxess-email").value.trim();
+        const senha = document.getElementById("foxess-senha").value;
+        const erroEl = document.getElementById("foxess-erro-busca");
+        erroEl.textContent = "";
+        document.getElementById("foxess-dispositivos").style.display = "none";
+        if (!email || !senha) { erroEl.textContent = "Preencha e-mail e senha FoxESS"; return; }
+        document.getElementById("foxess-buscando").style.display = "block";
+        document.getElementById("btn-foxess-buscar").disabled = true;
+        try {
+            const resp = await fetch(`${API}/clientes/${clienteInversorId}/foxess/buscar`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json", "Authorization": `Bearer ${token}`},
+                body: JSON.stringify({email, senha})
+            });
+            const data = await resp.json();
+            if (resp.ok) {
+                foxessCredenciais = {email, senha};
+                const sel = document.getElementById("foxess-select-device");
+                sel.innerHTML = '<option value="">Selecione o inversor...</option>';
+                data.dispositivos.forEach(d => {
+                    const opt = document.createElement("option");
+                    opt.value = d.sn;
+                    opt.textContent = `${d.sn} — ${d.modelo || "Inversor"}`;
+                    sel.appendChild(opt);
+                });
+                document.getElementById("foxess-dispositivos").style.display = "block";
+                if (data.dispositivos.length === 1) { sel.selectedIndex = 1; foxessSelecionarDispositivo(); }
+            } else {
+                erroEl.textContent = data.detail || "Erro ao buscar dispositivos";
+            }
+        } catch(e) { erroEl.textContent = "Erro de conexão"; }
+        finally {
+            document.getElementById("foxess-buscando").style.display = "none";
+            document.getElementById("btn-foxess-buscar").disabled = false;
+        }
+    }
+
+    function foxessSelecionarDispositivo() {
+        const sel = document.getElementById("foxess-select-device");
+        const sn = sel.value;
+        if (sn) {
+            document.getElementById("inv-serial").value = sn;
+            document.getElementById("inv-api-key").value = "";
+            document.getElementById("instrucoes-api").innerHTML = `<p class="sucesso" style="margin-top:4px;">✅ Inversor selecionado! As credenciais serão salvas — <strong>API Key não é necessária</strong>.</p>`;
+        }
+    }
+
     function atualizarInstrucoes() {
         const marca = document.getElementById("inv-marca").value;
         const isDeye = marca === "deye";
+        const isFoxess = marca === "foxess";
+        document.getElementById("foxess-busca").style.display = isFoxess ? "block" : "none";
         document.getElementById("campo-api-key").style.display = isDeye ? "none" : "block";
         document.getElementById("campos-deye").style.display = isDeye ? "block" : "none";
 
         const instrucoes = {
             foxess: `<div class="dica-roxo">
-                📋 <strong>Como obter a chave FoxESS:</strong><br>
-                1. Acesse <a href="https://www.foxesscloud.com" target="_blank" style="color:#7c3aed;">foxesscloud.com</a><br>
-                2. Faça login → clique no seu perfil (canto superior direito)<br>
+                📋 <strong>A API Key só aparece na versão antiga do FoxESS Cloud:</strong><br>
+                1. Acesse <a href="https://www.foxesscloud.com" target="_blank" style="color:#7c3aed;">foxesscloud.com</a> (versão antiga — <strong>não</strong> o portal v2.0)<br>
+                2. Faça login com a conta do cliente → clique no <strong>perfil</strong> (canto superior direito)<br>
                 3. Vá em <strong>User Profile → API Management</strong><br>
-                4. Clique em <strong>Generate API Key</strong> e copie a chave
+                4. Clique em <strong>Generate API Key</strong> e copie a chave gerada<br>
+                <span style="color:#dc2626; font-weight:600;">⚠️ O portal novo (v2.0) não mostra a API Key — use sempre o link acima.</span>
             </div>`,
             growatt: `<div class="dica-roxo">
                 📋 <strong>Como obter o token Growatt:</strong><br>
@@ -844,13 +932,16 @@
             apiKey = JSON.stringify({ app_id: appId, app_secret: appSecret });
         } else {
             apiKey = document.getElementById("inv-api-key").value.trim();
-            if (!apiKey) { document.getElementById("erro-inversor").textContent = "Chave de API é obrigatória"; return; }
+            const temCredenciais = marca === "foxess" && foxessCredenciais;
+            if (!apiKey && !temCredenciais) { document.getElementById("erro-inversor").textContent = "Use a busca automática acima ou informe a Chave de API"; return; }
         }
 
         const dados = {
             marca_inversor: marca,
             serial_inversor: serial,
-            api_key_inversor: apiKey
+            api_key_inversor: apiKey,
+            inversor_usuario: foxessCredenciais?.email || null,
+            inversor_senha: foxessCredenciais?.senha || null
         };
 
         try {
