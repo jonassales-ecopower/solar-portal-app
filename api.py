@@ -798,9 +798,22 @@ def foxess_buscar_dispositivos(cliente_id: int, dados: dict, integrador: dict = 
     senha = dados.get("senha", "").strip()
     if not email or not senha:
         raise HTTPException(status_code=400, detail="E-mail e senha são obrigatórios")
-    token = foxess_old_login(email, senha)
+    senha_md5 = hashlib.md5(senha.encode("utf-8")).hexdigest()
+    try:
+        resp = requests.post(
+            "https://www.foxesscloud.com/c/v0/user/login",
+            json={"user": email, "password": senha_md5, "lang": "en", "appVersion": "1.3.0"},
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Content-Type": "application/json"},
+            timeout=30
+        )
+        d = resp.json()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro de conexão com FoxESS: {str(e)}")
+    if d.get("errno") != 0:
+        raise HTTPException(status_code=401, detail=f"Resposta FoxESS: {d}")
+    token = d.get("result", {}).get("token", "")
     if not token:
-        raise HTTPException(status_code=401, detail="Login FoxESS inválido — verifique e-mail e senha")
+        raise HTTPException(status_code=401, detail=f"Token não retornado: {d}")
     dispositivos = foxess_old_listar_dispositivos(token)
     if not dispositivos:
         raise HTTPException(status_code=404, detail="Nenhum inversor encontrado nesta conta FoxESS")
@@ -1099,3 +1112,4 @@ def admin_teste_email(dados: dict):
         timeout=10
     )
     return {"status_code": resp.status_code, "sendgrid_response": resp.text or "enviado", "enviado_para": email, "remetente": ALERT_EMAIL_FROM}
+
