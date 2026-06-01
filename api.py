@@ -37,6 +37,8 @@ def inicializar_banco():
     try:
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS ultima_leitura_em TIMESTAMP")
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS alerta_offline_em TIMESTAMP")
+        cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS inversor_usuario TEXT")
+        cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS inversor_senha TEXT")
         conn.commit()
     except Exception:
         conn.rollback()
@@ -341,6 +343,63 @@ def consultar_clima(latitude: float, longitude: float, data_inicio: str, data_fi
     except Exception:
         pass
     return {}
+
+# ==================== FOXESS OLD API (login com credenciais) ====================
+
+def foxess_old_login(email: str, senha: str) -> str:
+    senha_md5 = hashlib.md5(senha.encode("utf-8")).hexdigest()
+    try:
+        resp = requests.post(
+            "https://www.foxesscloud.com/c/v0/user/login",
+            json={"user": email, "password": senha_md5, "lang": "en", "appVersion": "1.3.0"},
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Content-Type": "application/json"},
+            timeout=30
+        )
+        d = resp.json()
+        if d.get("errno") == 0:
+            return d.get("result", {}).get("token", "")
+    except Exception:
+        pass
+    return ""
+
+def foxess_old_listar_dispositivos(token: str) -> list:
+    try:
+        resp = requests.post(
+            "https://www.foxesscloud.com/c/v0/device/list",
+            json={"currentPage": 1, "pageSize": 20, "queryDate": {"begin": 0, "end": 0}},
+            headers={"token": token, "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Content-Type": "application/json"},
+            timeout=30
+        )
+        d = resp.json()
+        if d.get("errno") == 0:
+            return [{"sn": dev.get("deviceSN"), "modelo": dev.get("productType", "Inversor")}
+                    for dev in d.get("result", {}).get("devices", []) if dev.get("deviceSN")]
+    except Exception:
+        pass
+    return []
+
+def foxess_old_get_realtime(email: str, senha: str, sn: str) -> dict:
+    """Monitoramento via credenciais (old API) — sem necessidade de API key."""
+    token = foxess_old_login(email, senha)
+    if not token:
+        return {"errno": 1, "msg": "Falha no login FoxESS — verifique e-mail e senha"}
+    try:
+        resp = requests.post(
+            "https://www.foxesscloud.com/c/v0/device/real/query",
+            json={"deviceSN": sn, "variables": ["pvPower", "loadsPower", "feedinPower", "gridConsumptionPower", "generationPower"]},
+            headers={"token": token, "Content-Type": "application/json", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
+            timeout=30
+        )
+        d = resp.json()
+        if d.get("errno") == 0:
+            variaveis = {}
+            for item in (d.get("result") or [{}])[0].get("datas", []):
+                try: variaveis[item["variable"]] = float(item.get("value") or 0)
+                except: pass
+            return {"errno": 0, "variaveis": variaveis}
+        return {"errno": 1, "msg": d.get("msg", "Sem dados FoxESS")}
+    except Exception as e:
+        return {"errno": 1, "msg": str(e)}
 
 # ==================== FOXESS ====================
 
@@ -712,18 +771,40 @@ def atualizar_inversor(cliente_id: int, dados: dict, integrador: dict = Depends(
     conn = conectar_banco()
     cur = conn.cursor()
     try:
-        cur.execute("UPDATE clientes SET marca_inversor=%s,serial_inversor=%s,api_key_inversor=%s WHERE id=%s AND integrador_id=%s RETURNING id,nome",
-                    (dados.get("marca_inversor"),dados.get("serial_inversor"),dados.get("api_key_inversor"),cliente_id,integrador["id"]))
+        cur.execute("""
+            UPDATE clientes SET
+                marca_inversor=%s, serial_inversor=%s, api_key_inversor=%s,
+                inversor_usuario=%s, inversor_senha=%s
+            WHERE id=%s AND integrador_id=%s RETURNING id,nome
+        """, (
+            dados.get("marca_inversor"), dados.get("serial_inversor"), dados.get("api_key_inversor"),
+            dados.get("inversor_usuario"), dados.get("inversor_senha"),
+            cliente_id, integrador["id"]
+        ))
         c = cur.fetchone()
         conn.commit()
         if not c:
             raise HTTPException(status_code=404, detail="Cliente não encontrado")
-        return {"sucesso":True,"id":c[0],"nome":c[1]}
+        return {"sucesso": True, "id": c[0], "nome": c[1]}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     finally:
         cur.close()
         conn.close()
+
+@app.post("/clientes/{cliente_id}/foxess/buscar")
+def foxess_buscar_dispositivos(cliente_id: int, dados: dict, integrador: dict = Depends(obter_integrador_atual)):
+    email = dados.get("email", "").strip()
+    senha = dados.get("senha", "").strip()
+    if not email or not senha:
+        raise HTTPException(status_code=400, detail="E-mail e senha são obrigatórios")
+    token = foxess_old_login(email, senha)
+    if not token:
+        raise HTTPException(status_code=401, detail="Login FoxESS inválido — verifique e-mail e senha")
+    dispositivos = foxess_old_listar_dispositivos(token)
+    if not dispositivos:
+        raise HTTPException(status_code=404, detail="Nenhum inversor encontrado nesta conta FoxESS")
+    return {"dispositivos": dispositivos}
 
 @app.post("/contas/upload/{cliente_id}")
 async def upload_conta(cliente_id: int, arquivo: UploadFile = File(...)):
@@ -802,33 +883,42 @@ def geracao_esperada(cliente_id: int):
 def monitoramento(cliente_id: int):
     conn = conectar_banco()
     cur = conn.cursor()
-    cur.execute("SELECT marca_inversor,serial_inversor,api_key_inversor FROM clientes WHERE id=%s", (cliente_id,))
+    cur.execute("SELECT marca_inversor,serial_inversor,api_key_inversor,inversor_usuario,inversor_senha FROM clientes WHERE id=%s", (cliente_id,))
     c = cur.fetchone()
     cur.close()
     conn.close()
-    if not c or not c[2]:
+    if not c or (not c[2] and not c[3]):
         raise HTTPException(status_code=404, detail="Inversor não configurado")
-    marca, serial, api_key = c
+    marca, serial, api_key, inv_usuario, inv_senha = c
     marca_lower = marca.lower()
 
     geracao_kw = injetado_kw = consumo_rede_kw = consumo_casa_kw = potencia_kw = 0.0
 
     if marca_lower == "foxess":
-        data = foxess_get_realtime(api_key, serial)
-        if data.get("errno") != 0:
-            raise HTTPException(status_code=400, detail=f"Erro FoxESS: {data.get('msg')}")
-        resultado = data.get("result", [])
-        if not resultado:
-            raise HTTPException(status_code=404, detail="Sem dados FoxESS")
-        variaveis = {}
-        for item in resultado[0].get("datas", []):
-            try: variaveis[item["variable"]] = float(item.get("value") or 0)
-            except: variaveis[item["variable"]] = 0.0
-        geracao_kw    = variaveis.get("pvPower", 0.0)
-        injetado_kw   = variaveis.get("feedinPower", 0.0)
-        consumo_rede_kw  = variaveis.get("gridConsumptionPower", 0.0)
-        consumo_casa_kw  = variaveis.get("loadsPower", 0.0)
-        potencia_kw   = variaveis.get("generationPower", 0.0)
+        # Prioridade: credenciais (email+senha) → dispensa API key
+        if inv_usuario and inv_senha:
+            data = foxess_old_get_realtime(inv_usuario, inv_senha, serial)
+            if data.get("errno") != 0:
+                raise HTTPException(status_code=400, detail=f"Erro FoxESS: {data.get('msg')}")
+            variaveis = data.get("variaveis", {})
+        elif api_key:
+            raw = foxess_get_realtime(api_key, serial)
+            if raw.get("errno") != 0:
+                raise HTTPException(status_code=400, detail=f"Erro FoxESS: {raw.get('msg')}")
+            resultado = raw.get("result", [])
+            if not resultado:
+                raise HTTPException(status_code=404, detail="Sem dados FoxESS")
+            variaveis = {}
+            for item in resultado[0].get("datas", []):
+                try: variaveis[item["variable"]] = float(item.get("value") or 0)
+                except: variaveis[item["variable"]] = 0.0
+        else:
+            raise HTTPException(status_code=404, detail="Configure e-mail/senha ou API Key do FoxESS")
+        geracao_kw      = variaveis.get("pvPower", 0.0)
+        injetado_kw     = variaveis.get("feedinPower", 0.0)
+        consumo_rede_kw = variaveis.get("gridConsumptionPower", 0.0)
+        consumo_casa_kw = variaveis.get("loadsPower", 0.0)
+        potencia_kw     = variaveis.get("generationPower", 0.0)
 
     elif marca_lower == "growatt":
         data = growatt_get_realtime(api_key, serial)
