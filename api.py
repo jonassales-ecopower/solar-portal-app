@@ -866,3 +866,12 @@ def verificar_anomalias(cliente_id: int):
 def admin_verificar_offline():
     verificar_clientes_offline()
     return {"status": "ok"}
+
+@app.post("/admin/teste-email")
+def admin_teste_email(dados: dict):
+    email = dados.get("email", "")
+    nome = dados.get("nome", "Integrador")
+    if not email:
+        raise HTTPException(status_code=400, detail="Email obrigatório")
+    enviar_email_offline(email, nome, "Sistema de Teste — Solar Portal")
+    return {"status": "ok", "enviado_para": email}
