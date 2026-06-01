@@ -519,10 +519,22 @@
             <p style="font-size:11px; color:#888; margin-top:4px;">Encontrado na etiqueta do inversor ou no aplicativo do fabricante.</p>
         </div>
 
-        <div class="campo">
+        <div class="campo" id="campo-api-key">
             <label>Chave de API *</label>
             <input type="text" id="inv-api-key" placeholder="Cole aqui a chave de API do fabricante">
             <div id="instrucoes-api" style="margin-top:8px;"></div>
+        </div>
+
+        <div id="campos-deye" style="display:none;">
+            <div class="campo">
+                <label>App ID *</label>
+                <input type="text" id="inv-deye-app-id" placeholder="App ID do portal Solarman">
+            </div>
+            <div class="campo">
+                <label>App Secret *</label>
+                <input type="text" id="inv-deye-app-secret" placeholder="App Secret do portal Solarman">
+                <div id="instrucoes-api-deye" style="margin-top:8px;"></div>
+            </div>
         </div>
 
         <div class="modal-acoes">
@@ -754,7 +766,12 @@
         document.getElementById("inv-marca").value = "";
         document.getElementById("inv-serial").value = "";
         document.getElementById("inv-api-key").value = "";
+        document.getElementById("inv-deye-app-id").value = "";
+        document.getElementById("inv-deye-app-secret").value = "";
         document.getElementById("instrucoes-api").innerHTML = "";
+        document.getElementById("instrucoes-api-deye").innerHTML = "";
+        document.getElementById("campo-api-key").style.display = "block";
+        document.getElementById("campos-deye").style.display = "none";
         document.getElementById("erro-inversor").textContent = "";
         document.getElementById("sucesso-inversor").style.display = "none";
         document.getElementById("modal-inversor").classList.add("ativo");
@@ -762,6 +779,10 @@
 
     function atualizarInstrucoes() {
         const marca = document.getElementById("inv-marca").value;
+        const isDeye = marca === "deye";
+        document.getElementById("campo-api-key").style.display = isDeye ? "none" : "block";
+        document.getElementById("campos-deye").style.display = isDeye ? "block" : "none";
+
         const instrucoes = {
             foxess: `<div class="dica-roxo">
                 📋 <strong>Como obter a chave FoxESS:</strong><br>
@@ -771,16 +792,10 @@
                 4. Clique em <strong>Generate API Key</strong> e copie a chave
             </div>`,
             growatt: `<div class="dica-roxo">
-                📋 <strong>Como obter a chave Growatt:</strong><br>
+                📋 <strong>Como obter o token Growatt:</strong><br>
                 1. Acesse <a href="https://openapi.growatt.com" target="_blank" style="color:#7c3aed;">openapi.growatt.com</a><br>
-                2. Registre-se como desenvolvedor<br>
-                3. Crie uma aplicação para obter o token de acesso
-            </div>`,
-            deye: `<div class="dica-roxo">
-                📋 <strong>Como obter a chave Deye:</strong><br>
-                1. Acesse o portal <a href="https://seu.deye.com.cn" target="_blank" style="color:#7c3aed;">SolarmanPV</a><br>
-                2. Vá em <strong>Configurações → API</strong><br>
-                3. Gere o token de acesso
+                2. Faça login com sua conta Growatt<br>
+                3. Vá em <strong>Account → API Token</strong> e copie o token
             </div>`,
             weg: `<div class="dica-roxo">
                 📋 <strong>Como obter a chave WEG/SunWEG:</strong><br>
@@ -794,20 +809,43 @@
                 2. Vá em <strong>Account → API Access</strong><br>
                 3. Solicite acesso à API e copie o token
             </div>`,
+            solis: `<div class="dica-roxo">
+                📋 <strong>Como obter a chave Solis:</strong><br>
+                1. Acesse <a href="https://www.soliscloud.com" target="_blank" style="color:#7c3aed;">soliscloud.com</a><br>
+                2. Vá em <strong>Conta → Gestão de API</strong><br>
+                3. Gere uma nova chave de acesso
+            </div>`,
         };
+        const instrucaoDeye = `<div class="dica-roxo">
+            📋 <strong>Como obter App ID e App Secret Deye:</strong><br>
+            1. Acesse <a href="https://open.solarmanpv.com" target="_blank" style="color:#7c3aed;">open.solarmanpv.com</a><br>
+            2. Faça login com sua conta SolarmanPV / Deye<br>
+            3. Vá em <strong>Manage Apps → Create App</strong><br>
+            4. Copie o <strong>App ID</strong> e o <strong>App Secret</strong> gerados
+        </div>`;
         document.getElementById("instrucoes-api").innerHTML = instrucoes[marca] || "";
+        document.getElementById("instrucoes-api-deye").innerHTML = isDeye ? instrucaoDeye : "";
     }
 
     async function salvarInversor() {
         const marca = document.getElementById("inv-marca").value;
         const serial = document.getElementById("inv-serial").value.trim();
-        const apiKey = document.getElementById("inv-api-key").value.trim();
 
         document.getElementById("erro-inversor").textContent = "";
 
         if (!marca) { document.getElementById("erro-inversor").textContent = "Selecione a marca do inversor"; return; }
         if (!serial) { document.getElementById("erro-inversor").textContent = "Número de série é obrigatório"; return; }
-        if (!apiKey) { document.getElementById("erro-inversor").textContent = "Chave de API é obrigatória"; return; }
+
+        let apiKey = "";
+        if (marca === "deye") {
+            const appId = document.getElementById("inv-deye-app-id").value.trim();
+            const appSecret = document.getElementById("inv-deye-app-secret").value.trim();
+            if (!appId || !appSecret) { document.getElementById("erro-inversor").textContent = "App ID e App Secret são obrigatórios para Deye"; return; }
+            apiKey = JSON.stringify({ app_id: appId, app_secret: appSecret });
+        } else {
+            apiKey = document.getElementById("inv-api-key").value.trim();
+            if (!apiKey) { document.getElementById("erro-inversor").textContent = "Chave de API é obrigatória"; return; }
+        }
 
         const dados = {
             marca_inversor: marca,
