@@ -99,7 +99,7 @@
 
         /* ===== DASHBOARD DARK ===== */
         #secao-dashboard, #secao-detalhe {
-            background: #080e1a;
+            background: #0f172a;
             min-height: calc(100vh - 54px);
             padding: 20px 24px;
         }
@@ -107,11 +107,11 @@
         /* KPI summary bar */
         .kpi-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
         .kpi-chip {
-            background: #111827; border: 1px solid #1f2937; border-radius: 8px;
+            background: #1e293b; border: 1px solid #334155; border-radius: 8px;
             padding: 10px 16px; display: flex; flex-direction: column; align-items: center; min-width: 90px;
         }
         .kpi-chip .kv { font-size: 22px; font-weight: 800; color: #f1f5f9; line-height: 1; }
-        .kpi-chip .kl { font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: 0.6px; margin-top: 3px; }
+        .kpi-chip .kl { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.6px; margin-top: 3px; }
         .kpi-chip.c-green .kv { color: #10b981; }
         .kpi-chip.c-yellow .kv { color: #f59e0b; }
         .kpi-chip.c-red .kv { color: #ef4444; }
@@ -120,16 +120,16 @@
         .kpi-refresh { display: flex; align-items: center; gap: 8px; }
         .pulse-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #10b981; animation: pulse 2s ease-in-out infinite; }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
-        #countdown-txt { font-size: 11px; color: #334155; }
+        #countdown-txt { font-size: 11px; color: #64748b; }
 
         /* Fleet plant cards */
         .plant-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
         .plant-card {
-            background: #111827; border: 1px solid #1a2335; border-radius: 10px;
+            background: #1e293b; border: 1px solid #334155; border-radius: 10px;
             padding: 16px; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
             position: relative; overflow: hidden;
         }
-        .plant-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,0.5); border-color: #2d3f5c; }
+        .plant-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,0.5); border-color: #475569; }
         .plant-card::before { content: ""; position: absolute; left: 0; top: 0; width: 3px; height: 100%; border-radius: 10px 0 0 10px; }
         .plant-card.st-online::before { background: #10b981; }
         .plant-card.st-alerta::before { background: #f59e0b; }
@@ -142,12 +142,12 @@
         .badge-offline { background: rgba(239,68,68,0.12); color: #ef4444; }
         .badge-config { background: rgba(100,116,139,0.12); color: #475569; }
         .plant-kw { font-size: 34px; font-weight: 800; color: #f1f5f9; line-height: 1; }
-        .plant-kw-unit { font-size: 12px; color: #475569; margin-bottom: 10px; margin-top: 2px; }
+        .plant-kw-unit { font-size: 12px; color: #64748b; margin-bottom: 10px; margin-top: 2px; }
         .plant-bar-wrap { margin: 8px 0 4px; }
-        .plant-bar-bg { background: #1e293b; border-radius: 4px; height: 5px; }
+        .plant-bar-bg { background: #0f172a; border-radius: 4px; height: 5px; }
         .plant-bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s; }
-        .plant-bar-label { display: flex; justify-content: space-between; font-size: 10px; color: #334155; margin-top: 3px; }
-        .plant-ts { font-size: 10px; color: #334155; margin-top: 10px; }
+        .plant-bar-label { display: flex; justify-content: space-between; font-size: 10px; color: #64748b; margin-top: 3px; }
+        .plant-ts { font-size: 10px; color: #64748b; margin-top: 10px; }
         .plant-actions { display: flex; gap: 6px; margin-top: 10px; }
         .plant-btn { background: rgba(255,255,255,0.05); border: 1px solid #1f2937; color: #64748b; padding: 5px 10px; font-size: 11px; border-radius: 6px; cursor: pointer; width: auto; margin: 0; transition: all 0.15s; }
         .plant-btn:hover { background: rgba(255,255,255,0.1); color: #94a3b8; }
@@ -158,20 +158,20 @@
         .det-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; flex-wrap: wrap; gap: 10px; }
         .det-header-left { display: flex; align-items: center; gap: 12px; }
         .btn-back {
-            background: #111827; border: 1px solid #1f2937; color: #64748b;
+            background: #1e293b; border: 1px solid #334155; color: #94a3b8;
             padding: 7px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; width: auto; margin: 0;
         }
         .btn-back:hover { border-color: #334155; color: #94a3b8; }
         .det-title { font-size: 18px; font-weight: 700; color: #f1f5f9; }
-        .det-sub { font-size: 11px; color: #334155; margin-top: 2px; }
+        .det-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
 
         /* Stat panels row */
         .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }
-        .stat-box { background: #111827; border: 1px solid #1a2335; border-radius: 10px; padding: 16px 14px; }
+        .stat-box { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 16px 14px; }
         .stat-box .sb-icon { font-size: 18px; margin-bottom: 6px; }
         .stat-box .sb-val { font-size: 26px; font-weight: 800; color: #f1f5f9; line-height: 1; }
-        .stat-box .sb-unit { font-size: 11px; color: #334155; margin-top: 1px; }
-        .stat-box .sb-lbl { font-size: 10px; color: #334155; margin-top: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-box .sb-unit { font-size: 11px; color: #64748b; margin-top: 1px; }
+        .stat-box .sb-lbl { font-size: 10px; color: #64748b; margin-top: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
         .stat-box.hi .sb-val { color: #f59e0b; }
         .stat-box.green .sb-val { color: #10b981; }
         .stat-box.blue .sb-val { color: #60a5fa; }
@@ -179,8 +179,8 @@
 
         /* Chart panels */
         .charts-row { display: grid; grid-template-columns: 280px 1fr; gap: 12px; margin-bottom: 12px; }
-        .cpanel { background: #111827; border: 1px solid #1a2335; border-radius: 10px; padding: 18px; }
-        .cpanel-title { font-size: 10px; font-weight: 700; color: #334155; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 14px; }
+        .cpanel { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 18px; }
+        .cpanel-title { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 14px; }
 
         /* Power flow SVG */
         .flow-wrap { display: flex; align-items: center; justify-content: center; min-height: 220px; }
@@ -188,13 +188,13 @@
         @keyframes dashflow-rev { to { stroke-dashoffset: 30; } }
         .sf-active { stroke-dasharray: 8 5; animation: dashflow 0.65s linear infinite; }
         .sf-reverse { stroke-dasharray: 8 5; animation: dashflow-rev 0.65s linear infinite; }
-        .sf-idle { opacity: 0.1; }
+        .sf-idle { opacity: 0.15; }
 
         /* Daily chart (full width row) */
-        .chart-full { background: #111827; border: 1px solid #1a2335; border-radius: 10px; padding: 18px; margin-bottom: 12px; }
+        .chart-full { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 18px; margin-bottom: 12px; }
 
         /* Alerts */
-        .alerts-wrap { background: #111827; border: 1px solid #1a2335; border-radius: 10px; padding: 18px; }
+        .alerts-wrap { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 18px; }
         .alert-row { display: flex; gap: 12px; padding: 12px; border-radius: 8px; margin-bottom: 8px; }
         .alert-row:last-child { margin-bottom: 0; }
         .alert-row.normal { background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.15); }
@@ -205,6 +205,8 @@
         .alert-titulo { font-size: 13px; font-weight: 600; color: #e2e8f0; }
         .alert-msg { font-size: 12px; color: #64748b; margin-top: 3px; line-height: 1.5; }
         .alert-acao { font-size: 11px; color: #3b82f6; margin-top: 4px; font-style: italic; }
+        .alert-date { font-size: 10px; color: #475569; margin-top: 5px; }
+        .alert-date-ref { font-weight: 600; color: #64748b; }
 
         /* ===== CLIENTES (LIGHT) ===== */
         #secao-clientes { background: #f0f4f8; min-height: calc(100vh - 54px); padding: 24px; }
@@ -221,7 +223,7 @@
         /* Loading spinner */
         .spin { display: inline-block; animation: spin 0.9s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .empty-state { text-align: center; padding: 50px 20px; color: #334155; }
+        .empty-state { text-align: center; padding: 50px 20px; color: #64748b; }
         .empty-state .e-icon { font-size: 36px; margin-bottom: 12px; }
         .empty-state p { font-size: 14px; }
 
@@ -815,9 +817,9 @@ async function atualizarDetalhe() {
         // Alerts
         if (anomaliaResp.ok) {
             const a = await anomaliaResp.json();
-            renderAlertas(a.alertas || []);
+            renderAlertas(a.alertas || [], a.data_analise);
         } else {
-            document.getElementById('alerts-content').innerHTML = '<p style="color:#334155; font-size:13px;">Sem dados suficientes para análise.</p>';
+            document.getElementById('alerts-content').innerHTML = '<p style="color:#64748b; font-size:13px;">Sem dados suficientes para análise.</p>';
         }
 
     } catch(e) {
@@ -844,28 +846,28 @@ function renderFluxo(d) {
     document.getElementById('flow-wrap').innerHTML = `
     <svg viewBox="0 0 300 250" width="100%" style="max-height:210px;" xmlns="http://www.w3.org/2000/svg">
         <!-- PV → Inversor -->
-        <line x1="150" y1="54" x2="150" y2="86" stroke="${pv>0.05?'#f59e0b':'#1f2937'}" stroke-width="3" stroke-linecap="round" class="${aPV}"/>
+        <line x1="150" y1="54" x2="150" y2="86" stroke="${pv>0.05?'#f59e0b':'#334155'}" stroke-width="3" stroke-linecap="round" class="${aPV}"/>
         <!-- Inv → Casa -->
-        <line x1="130" y1="123" x2="72" y2="163" stroke="${casa>0.05?'#10b981':'#1f2937'}" stroke-width="3" stroke-linecap="round" class="${aCasa}"/>
+        <line x1="130" y1="123" x2="72" y2="163" stroke="${casa>0.05?'#10b981':'#334155'}" stroke-width="3" stroke-linecap="round" class="${aCasa}"/>
         <!-- Inv → Rede -->
-        <line x1="170" y1="123" x2="228" y2="163" stroke="${(inj>0.05||rede>0.05)?'#60a5fa':'#1f2937'}" stroke-width="3" stroke-linecap="round" class="${aRede}"/>
+        <line x1="170" y1="123" x2="228" y2="163" stroke="${(inj>0.05||rede>0.05)?'#60a5fa':'#334155'}" stroke-width="3" stroke-linecap="round" class="${aRede}"/>
 
         <!-- PV node -->
-        <circle cx="150" cy="32" r="22" fill="#0d1526" stroke="${cPV}" stroke-width="2"/>
+        <circle cx="150" cy="32" r="22" fill="#1e293b" stroke="${cPV}" stroke-width="2"/>
         <text x="150" y="27" text-anchor="middle" fill="${cPV}" font-size="11" font-weight="700" font-family="Segoe UI,sans-serif">PV</text>
         <text x="150" y="40" text-anchor="middle" fill="#e2e8f0" font-size="10" font-weight="700" font-family="Segoe UI,sans-serif">${pv.toFixed(2)} kW</text>
 
         <!-- Inversor box -->
-        <rect x="108" y="88" width="84" height="32" rx="8" fill="#0d1526" stroke="#334155" stroke-width="1.5"/>
-        <text x="150" y="108" text-anchor="middle" fill="#475569" font-size="10" font-weight="700" font-family="Segoe UI,sans-serif" letter-spacing="1">INVERSOR</text>
+        <rect x="108" y="88" width="84" height="32" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1.5"/>
+        <text x="150" y="108" text-anchor="middle" fill="#94a3b8" font-size="10" font-weight="700" font-family="Segoe UI,sans-serif" letter-spacing="1">INVERSOR</text>
 
         <!-- Casa node -->
-        <circle cx="56" cy="186" r="24" fill="#0d1526" stroke="${cCasa}" stroke-width="2"/>
+        <circle cx="56" cy="186" r="24" fill="#1e293b" stroke="${cCasa}" stroke-width="2"/>
         <text x="56" y="181" text-anchor="middle" fill="${cCasa}" font-size="10" font-weight="700" font-family="Segoe UI,sans-serif">CASA</text>
         <text x="56" y="196" text-anchor="middle" fill="#e2e8f0" font-size="10" font-weight="700" font-family="Segoe UI,sans-serif">${casa.toFixed(2)} kW</text>
 
         <!-- Rede node -->
-        <circle cx="244" cy="186" r="24" fill="#0d1526" stroke="${cRede}" stroke-width="2"/>
+        <circle cx="244" cy="186" r="24" fill="#1e293b" stroke="${cRede}" stroke-width="2"/>
         <text x="244" y="181" text-anchor="middle" fill="${cRede}" font-size="10" font-weight="700" font-family="Segoe UI,sans-serif">REDE</text>
         <text x="244" y="196" text-anchor="middle" fill="#e2e8f0" font-size="10" font-weight="700" font-family="Segoe UI,sans-serif">${redeLabel}</text>
     </svg>`;
@@ -952,18 +954,31 @@ function renderChartDiario(dados) {
     });
 }
 
-function renderAlertas(alertas) {
+function fmtDataBR(iso) {
+    if (!iso) return '';
+    if (iso.includes(' a ')) {
+        return iso.split(' a ').map(fmtDataBR).join(' a ');
+    }
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+}
+
+function renderAlertas(alertas, dataAnalise) {
+    const header = dataAnalise
+        ? `<div style="font-size:11px; color:#475569; margin-bottom:12px;">Análise realizada em <strong style="color:#64748b;">${fmtDataBR(dataAnalise)}</strong></div>`
+        : '';
     if (!alertas.length) {
-        document.getElementById('alerts-content').innerHTML = '<p style="color:#334155; font-size:13px;">Sem alertas no momento.</p>';
+        document.getElementById('alerts-content').innerHTML = header + '<p style="color:#64748b; font-size:13px;">Sem alertas no momento.</p>';
         return;
     }
-    document.getElementById('alerts-content').innerHTML = alertas.map(a => `
+    document.getElementById('alerts-content').innerHTML = header + alertas.map(a => `
         <div class="alert-row ${a.tipo}">
             <div class="alert-icon">${a.icone}</div>
-            <div>
+            <div style="flex:1;">
                 <div class="alert-titulo">${a.titulo}</div>
                 <div class="alert-msg">${a.mensagem}</div>
                 ${a.acao ? `<div class="alert-acao">${a.acao}</div>` : ''}
+                ${a.data_referencia ? `<div class="alert-date">📅 Referente a: <span class="alert-date-ref">${fmtDataBR(a.data_referencia)}</span></div>` : ''}
             </div>
         </div>`).join('');
 }

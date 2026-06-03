@@ -979,25 +979,45 @@ def monitoramento_mensal(cliente_id: int):
     resultados = cur.fetchall()
     cur.close()
     conn.close()
-    if resultados:
-        mensal = [{"ano":r[0],"mes_num":r[1],"mes":nomes[r[1]],"geracao_kwh":round(float(r[2]),2)} for r in resultados if float(r[2])>0]
-        if mensal:
-            return {"cliente_id":cliente_id,"mensal":mensal[-12:],"total_periodo":round(sum(m["geracao_kwh"] for m in mensal),2),"fonte":"banco"}
-    if not cliente or not cliente[1] or cliente[1].lower()!="foxess" or not cliente[3]:
-        return {"cliente_id":cliente_id,"mensal":[],"total_periodo":0,"fonte":"nenhuma"}
-    serial, api_key = cliente[2], cliente[3]
+
+    # Monta dicionário com dados do banco indexados por (ano, mes)
+    banco = {(int(r[0]), int(r[1])): round(float(r[2]), 2) for r in resultados if float(r[2]) > 0}
     hoje = datetime.now()
-    dados_por_mes = []
-    for i in range(12):
-        dm = hoje - timedelta(days=30*i)
-        total = foxess_get_mensal(api_key, serial, dm.year, dm.month)
-        if total > 0:
-            dados_por_mes.append({"ano":dm.year,"mes_num":dm.month,"mes":nomes[dm.month],"geracao_kwh":total})
-    if dados_por_mes:
-        salvar_historico_banco(cliente_id, dados_por_mes)
-        dados_por_mes = sorted(dados_por_mes, key=lambda x:(x["ano"],x["mes_num"]))
-        return {"cliente_id":cliente_id,"mensal":dados_por_mes,"total_periodo":round(sum(m["geracao_kwh"] for m in dados_por_mes),2),"fonte":"foxess"}
-    return {"cliente_id":cliente_id,"mensal":[],"total_periodo":0,"fonte":"nenhuma"}
+
+    # Sempre atualiza mês atual e mês anterior direto na FoxESS (evita dados parciais/desatualizados)
+    if cliente and cliente[1] and cliente[1].lower() == "foxess" and cliente[3]:
+        serial, api_key = cliente[2], cliente[3]
+        prev = (hoje.replace(day=1) - timedelta(days=1))
+        for ano, mes in [(hoje.year, hoje.month), (prev.year, prev.month)]:
+            total = foxess_get_mensal(api_key, serial, ano, mes)
+            if total > 0:
+                banco[(ano, mes)] = total
+        # Persiste os valores atualizados
+        novos = [{"ano": k[0], "mes_num": k[1], "geracao_kwh": v}
+                 for k, v in banco.items()
+                 if k in {(hoje.year, hoje.month), (prev.year, prev.month)}]
+        if novos:
+            salvar_historico_banco(cliente_id, novos)
+
+        # Se banco ainda vazio, busca todos os 12 meses da API
+        if not banco:
+            for i in range(12):
+                dm = hoje - timedelta(days=30 * i)
+                total = foxess_get_mensal(api_key, serial, dm.year, dm.month)
+                if total > 0:
+                    banco[(dm.year, dm.month)] = total
+            if banco:
+                salvar_historico_banco(cliente_id, [{"ano": k[0], "mes_num": k[1], "geracao_kwh": v} for k, v in banco.items()])
+
+    if not banco:
+        return {"cliente_id": cliente_id, "mensal": [], "total_periodo": 0, "fonte": "nenhuma"}
+
+    mensal = sorted(
+        [{"ano": k[0], "mes_num": k[1], "mes": nomes[k[1]], "geracao_kwh": v} for k, v in banco.items()],
+        key=lambda x: (x["ano"], x["mes_num"])
+    )
+    mensal = mensal[-12:]
+    return {"cliente_id": cliente_id, "mensal": mensal, "total_periodo": round(sum(m["geracao_kwh"] for m in mensal), 2), "fonte": "foxess"}
 
 @app.get("/clientes/{cliente_id}/verificar-anomalias")
 def verificar_anomalias(cliente_id: int):
@@ -1041,21 +1061,25 @@ def verificar_anomalias(cliente_id: int):
                 alerta_consecutivo = {"tipo":"informativo","icone":"☁️",
                     "titulo":"Geração Baixa por Condições Climáticas",
                     "mensagem":f"Geração abaixo da média por 3 dias ({media_3dias:.1f} kWh/dia vs esperado {media_diaria_esperada:.1f} kWh/dia), mas o período teve muita nebulosidade ou chuva. Isso é normal!",
-                    "acao":"Aguardar melhora climática. Se continuar após dias ensolarados, contate o integrador."}
+                    "acao":"Aguardar melhora climática. Se continuar após dias ensolarados, contate o integrador.",
+                    "data_referencia": f"{data_inicio} a {data_fim}"}
             else:
                 alerta_consecutivo = {"tipo":"atencao","icone":"⚠️",
                     "titulo":"3 Dias Consecutivos com Geração Abaixo da Média",
                     "mensagem":f"Geração abaixo do esperado por 3 dias consecutivos ({media_3dias:.1f} kWh/dia vs esperado {media_diaria_esperada:.1f} kWh/dia). O tempo estava bom — pode haver problema técnico.",
-                    "acao":"Verificar sombra nos painéis, sujeira acumulada ou problema no inversor. Contate seu integrador."}
+                    "acao":"Verificar sombra nos painéis, sujeira acumulada ou problema no inversor. Contate seu integrador.",
+                    "data_referencia": f"{data_inicio} a {data_fim}"}
 
     alertas = []
     if alerta_consecutivo:
         alertas.append(alerta_consecutivo)
 
+    dr = str(ontem)
     if g_ontem < 0.5:
         alertas.append({"tipo":"urgente","icone":"🔴","titulo":"Sistema Parado",
             "mensagem":f"Seu sistema não gerou energia significativa ontem ({g_ontem:.1f} kWh). Pode ser disjuntor desarmado ou falha no inversor.",
-            "acao":"Verificar disjuntor CA e acionar o técnico imediatamente."})
+            "acao":"Verificar disjuntor CA e acionar o técnico imediatamente.",
+            "data_referencia": dr})
     elif media7 > 0 and g_ontem < media7*0.4:
         clima_ontem = {}
         if latitude and longitude:
@@ -1064,23 +1088,28 @@ def verificar_anomalias(cliente_id: int):
         if dia_ruim:
             alertas.append({"tipo":"informativo","icone":"☁️","titulo":"Geração Baixa — Dia Nublado/Chuvoso",
                 "mensagem":f"Ontem seu sistema gerou apenas {g_ontem:.1f} kWh — condições climáticas desfavoráveis na sua região. Isso é normal!",
-                "acao":"Nenhuma ação necessária. Monitorar nos próximos dias ensolarados."})
+                "acao":"Nenhuma ação necessária. Monitorar nos próximos dias ensolarados.",
+                "data_referencia": dr})
         else:
             alertas.append({"tipo":"atencao","icone":"⚠️","titulo":"Geração Muito Abaixo do Normal",
                 "mensagem":f"Ontem: {g_ontem:.1f} kWh vs média 7 dias: {media7:.1f} kWh. Queda de {((media7-g_ontem)/media7*100):.0f}%. O tempo estava bom.",
-                "acao":"Verificar sombreamento, sujeira nos painéis ou problema no inversor."})
+                "acao":"Verificar sombreamento, sujeira nos painéis ou problema no inversor.",
+                "data_referencia": dr})
     elif media7 > 0 and g_ontem < media7*0.7:
         alertas.append({"tipo":"informativo","icone":"📉","titulo":"Geração Abaixo da Média",
             "mensagem":f"Ontem: {g_ontem:.1f} kWh vs média: {media7:.1f} kWh.",
-            "acao":"Monitorar nos próximos dias. Se continuar, agendar limpeza preventiva."})
+            "acao":"Monitorar nos próximos dias. Se continuar, agendar limpeza preventiva.",
+            "data_referencia": dr})
 
     if not alertas and g_ontem > 0:
         alertas.append({"tipo":"normal","icone":"✅","titulo":"Sistema Operando Normalmente",
-            "mensagem":f"Ontem seu sistema gerou {g_ontem:.1f} kWh.","acao":"Nenhuma ação necessária."})
+            "mensagem":f"Ontem seu sistema gerou {g_ontem:.1f} kWh.","acao":"Nenhuma ação necessária.",
+            "data_referencia": dr})
 
     if media7 == 0 and g_ontem == 0:
         alertas = [{"tipo":"informativo","icone":"📡","titulo":"Coletando Dados",
-            "mensagem":"Aguardando coleta de dados de geração.","acao":"Em alguns dias teremos estatísticas completas."}]
+            "mensagem":"Aguardando coleta de dados de geração.","acao":"Em alguns dias teremos estatísticas completas.",
+            "data_referencia": None}]
 
     return {"cliente_id":cliente_id,"cliente_nome":nome,"data_analise":hoje.isoformat(),
             "geracao_ontem_kwh":round(g_ontem,1),"media_7_dias_kwh":round(media7,1),
