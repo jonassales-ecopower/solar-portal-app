@@ -4,58 +4,46 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Solar Portal — Painel do Integrador</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; color: #333; }
+        body { font-family: 'Segoe UI', sans-serif; color: #333; }
 
+        /* ===== HEADER ===== */
         header {
-            background: linear-gradient(135deg, #1e293b, #334155);
+            background: linear-gradient(135deg, #0f172a, #1e293b);
             color: white;
-            padding: 20px 30px;
+            padding: 0 24px;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            height: 54px;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.4);
         }
-        header h1 { font-size: 20px; }
-        header p { font-size: 13px; opacity: 0.7; }
-
-        .container { max-width: 1200px; margin: 30px auto; padding: 0 20px; }
-
-        .card {
-            background: white;
-            border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        .header-left { display: flex; align-items: center; gap: 20px; }
+        .header-logo { font-size: 17px; font-weight: 700; color: #f1f5f9; white-space: nowrap; }
+        .header-logo span { color: #f59e0b; }
+        .nav-tabs { display: flex; gap: 2px; }
+        .nav-tab {
+            padding: 7px 14px; border-radius: 6px; font-size: 13px; font-weight: 600;
+            cursor: pointer; color: #64748b; border: none; background: none;
+            font-family: 'Segoe UI', sans-serif; transition: all 0.2s;
         }
-        .card h2 { font-size: 16px; color: #666; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
+        .nav-tab:hover { color: #e2e8f0; background: rgba(255,255,255,0.07); }
+        .nav-tab.ativa { color: #f1f5f9; background: rgba(245,158,11,0.15); border-bottom: 2px solid #f59e0b; border-radius: 6px 6px 0 0; }
+        .header-right { display: flex; align-items: center; gap: 12px; }
+        .header-user { font-size: 12px; color: #64748b; }
 
-        #tela-auth { max-width: 420px; margin: 60px auto; }
-
-        .campo { margin-bottom: 12px; }
-        .campo label { display: block; font-size: 12px; color: #666; margin-bottom: 4px; font-weight: 600; }
-        input, select {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 14px;
-            font-family: 'Segoe UI', sans-serif;
-            background: white;
-        }
-        input:focus, select:focus { outline: none; border-color: #f59e0b; }
-
+        /* ===== SHARED BUTTONS ===== */
         button {
             background: linear-gradient(135deg, #1e293b, #334155);
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            width: 100%;
-            margin-top: 5px;
+            color: white; border: none; padding: 12px 20px;
+            border-radius: 8px; font-size: 14px; font-weight: 600;
+            cursor: pointer; width: 100%; margin-top: 5px;
+            font-family: 'Segoe UI', sans-serif;
         }
         button:hover { opacity: 0.9; }
         button.secundario { background: white; color: #333; border: 1px solid #ddd; margin-top: 0; }
@@ -65,354 +53,383 @@
         button.roxo { background: linear-gradient(135deg, #7c3aed, #6d28d9); }
         button.vermelho { background: linear-gradient(135deg, #dc2626, #b91c1c); }
         button.pequeno { width: auto; padding: 8px 16px; font-size: 13px; margin-top: 0; }
+        button.ghost {
+            width: auto; padding: 6px 12px; font-size: 12px; margin-top: 0;
+            background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 6px; color: #94a3b8;
+        }
+        button.ghost:hover { background: rgba(255,255,255,0.15); color: #f1f5f9; }
 
-        table { width: 100%; border-collapse: collapse; }
-        th { background: #f8fafc; padding: 12px; text-align: left; font-size: 13px; color: #666; border-bottom: 1px solid #eee; }
-        td { padding: 12px; font-size: 14px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
-        tr:hover td { background: #fafafa; }
-
+        /* ===== AUTH ===== */
+        #tela-auth { max-width: 420px; margin: 60px auto; padding: 0 20px; background: #f0f4f8; min-height: 100vh; padding-top: 60px; }
+        .card { background: white; border-radius: 12px; padding: 25px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .campo { margin-bottom: 12px; }
+        .campo label { display: block; font-size: 12px; color: #666; margin-bottom: 4px; font-weight: 600; }
+        input, select {
+            width: 100%; padding: 12px; border: 1px solid #ddd;
+            border-radius: 8px; font-size: 14px; font-family: 'Segoe UI', sans-serif; background: white;
+        }
+        input:focus, select:focus { outline: none; border-color: #f59e0b; }
         .erro { color: #dc2626; font-size: 13px; margin-top: 6px; }
         .sucesso { color: #16a34a; font-size: 13px; margin-top: 6px; }
         .info { color: #2563eb; font-size: 12px; margin-top: 6px; }
-
-        #tela-painel { display: none; }
-        .acoes { display: flex; gap: 6px; flex-wrap: wrap; }
-
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 100;
-            align-items: center;
-            justify-content: center;
-        }
-        .modal-overlay.ativo { display: flex; }
-        .modal {
-            background: white;
-            border-radius: 12px;
-            padding: 30px;
-            max-width: 540px;
-            width: 90%;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-        .modal h3 { margin-bottom: 5px; font-size: 18px; }
-        .modal .subtitulo { font-size: 13px; color: #888; margin-bottom: 20px; }
-
-        .link-box {
-            background: #f1f5f9;
-            border-radius: 8px;
-            padding: 12px 14px;
-            font-size: 12px;
-            color: #475569;
-            word-break: break-all;
-            margin-top: 8px;
-            font-family: monospace;
-        }
-
-        .modal-acoes { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
-        .dica {
-            background: #fffbeb;
-            border: 1px solid #fbbf24;
-            border-radius: 8px;
-            padding: 10px 14px;
-            font-size: 12px;
-            color: #92400e;
-            margin-bottom: 15px;
-            line-height: 1.6;
-        }
-
-        .dica-roxo {
-            background: #f5f3ff;
-            border: 1px solid #8b5cf6;
-            border-radius: 8px;
-            padding: 10px 14px;
-            font-size: 12px;
-            color: #5b21b6;
-            margin-bottom: 15px;
-            line-height: 1.6;
-        }
-
-        .separador { border: none; border-top: 1px dashed #ddd; margin: 15px 0; }
-
-        .link-manual {
-            font-size: 12px;
-            color: #2563eb;
-            cursor: pointer;
-            text-decoration: underline;
-            background: none;
-            border: none;
-            padding: 0;
-            width: auto;
-            margin-top: 6px;
-            font-weight: normal;
-            display: block;
-        }
-
-        #campos-manuais { display: none; margin-top: 12px; }
-
-        /* Tabs de auth */
-        .auth-tabs {
-            display: flex;
-            border-bottom: 2px solid #e2e8f0;
-            margin-bottom: 24px;
-        }
-        .auth-tab {
-            flex: 1;
-            padding: 12px;
-            text-align: center;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 14px;
-            color: #94a3b8;
-            border-bottom: 3px solid transparent;
-            margin-bottom: -2px;
-            transition: all 0.2s;
-        }
+        .auth-tabs { display: flex; border-bottom: 2px solid #e2e8f0; margin-bottom: 24px; }
+        .auth-tab { flex: 1; padding: 12px; text-align: center; cursor: pointer; font-weight: 600; font-size: 14px; color: #94a3b8; border-bottom: 3px solid transparent; margin-bottom: -2px; }
         .auth-tab.ativa { color: #1e293b; border-bottom-color: #f59e0b; }
         .auth-form { display: none; }
         .auth-form.ativa { display: block; }
+        .divisor-auth { text-align: center; color: #94a3b8; font-size: 12px; margin: 16px 0; position: relative; }
+        .divisor-auth::before, .divisor-auth::after { content: ""; position: absolute; top: 50%; width: 40%; height: 1px; background: #e2e8f0; }
+        .divisor-auth::before { left: 0; } .divisor-auth::after { right: 0; }
 
-        /* Card de monitoramento */
-        .card-monitoramento {
-            background: linear-gradient(135deg, #1e293b, #334155);
-            color: white;
-        }
-        .card-monitoramento h3 { font-size: 16px; margin-bottom: 5px; }
-        .card-monitoramento .stats {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 15px;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-        .card-monitoramento .stat-item { text-align: center; flex: 1; min-width: 80px; }
-        .card-monitoramento .stat-number { font-size: 28px; font-weight: bold; display: block; }
-        .card-monitoramento .stat-label { font-size: 12px; opacity: 0.8; }
-        .status-normal { color: #4ade80; }
-        .status-alerta { color: #fbbf24; }
-        .status-problema { color: #f87171; }
-        .status-offline { color: #9ca3af; }
+        /* ===== MODALS ===== */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.65); z-index: 200; align-items: center; justify-content: center; }
+        .modal-overlay.ativo { display: flex; }
+        .modal { background: white; border-radius: 12px; padding: 30px; max-width: 540px; width: 90%; max-height: 90vh; overflow-y: auto; }
+        .modal h3 { margin-bottom: 5px; font-size: 18px; }
+        .modal .subtitulo { font-size: 13px; color: #888; margin-bottom: 20px; }
+        .link-box { background: #f1f5f9; border-radius: 8px; padding: 12px 14px; font-size: 12px; color: #475569; word-break: break-all; margin-top: 8px; font-family: monospace; }
+        .modal-acoes { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .dica { background: #fffbeb; border: 1px solid #fbbf24; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #92400e; margin-bottom: 15px; line-height: 1.6; }
+        .dica-roxo { background: #f5f3ff; border: 1px solid #8b5cf6; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #5b21b6; margin-bottom: 15px; line-height: 1.6; }
+        .separador { border: none; border-top: 1px dashed #ddd; margin: 15px 0; }
+        .link-manual { font-size: 12px; color: #2563eb; cursor: pointer; text-decoration: underline; background: none; border: none; padding: 0; width: auto; margin-top: 6px; font-weight: normal; display: block; }
+        #campos-manuais { display: none; margin-top: 12px; }
 
-        .divisor-auth {
-            text-align: center;
-            color: #94a3b8;
-            font-size: 12px;
-            margin: 16px 0;
-            position: relative;
+        /* ===== DASHBOARD DARK ===== */
+        #secao-dashboard, #secao-detalhe {
+            background: #080e1a;
+            min-height: calc(100vh - 54px);
+            padding: 20px 24px;
         }
-        .divisor-auth::before, .divisor-auth::after {
-            content: "";
-            position: absolute;
-            top: 50%;
-            width: 40%;
-            height: 1px;
-            background: #e2e8f0;
-        }
-        .divisor-auth::before { left: 0; }
-        .divisor-auth::after { right: 0; }
 
-        /* Badge de inversor configurado */
-        .badge-inversor {
-            display: inline-block;
-            font-size: 11px;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-weight: 600;
-            background: #f0fdf4;
-            color: #16a34a;
-            margin-top: 4px;
+        /* KPI summary bar */
+        .kpi-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .kpi-chip {
+            background: #111827; border: 1px solid #1f2937; border-radius: 8px;
+            padding: 10px 16px; display: flex; flex-direction: column; align-items: center; min-width: 90px;
         }
+        .kpi-chip .kv { font-size: 22px; font-weight: 800; color: #f1f5f9; line-height: 1; }
+        .kpi-chip .kl { font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: 0.6px; margin-top: 3px; }
+        .kpi-chip.c-green .kv { color: #10b981; }
+        .kpi-chip.c-yellow .kv { color: #f59e0b; }
+        .kpi-chip.c-red .kv { color: #ef4444; }
+        .kpi-chip.c-blue .kv { color: #60a5fa; }
+        .kpi-sep { flex: 1; }
+        .kpi-refresh { display: flex; align-items: center; gap: 8px; }
+        .pulse-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #10b981; animation: pulse 2s ease-in-out infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
+        #countdown-txt { font-size: 11px; color: #334155; }
+
+        /* Fleet plant cards */
+        .plant-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+        .plant-card {
+            background: #111827; border: 1px solid #1a2335; border-radius: 10px;
+            padding: 16px; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+            position: relative; overflow: hidden;
+        }
+        .plant-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,0.5); border-color: #2d3f5c; }
+        .plant-card::before { content: ""; position: absolute; left: 0; top: 0; width: 3px; height: 100%; border-radius: 10px 0 0 10px; }
+        .plant-card.st-online::before { background: #10b981; }
+        .plant-card.st-alerta::before { background: #f59e0b; }
+        .plant-card.st-offline::before { background: #ef4444; }
+        .plant-card.st-config::before { background: #334155; }
+        .plant-nome { font-size: 13px; font-weight: 700; color: #e2e8f0; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .plant-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; display: inline-block; margin-bottom: 12px; }
+        .badge-online { background: rgba(16,185,129,0.12); color: #10b981; }
+        .badge-alerta { background: rgba(245,158,11,0.12); color: #f59e0b; }
+        .badge-offline { background: rgba(239,68,68,0.12); color: #ef4444; }
+        .badge-config { background: rgba(100,116,139,0.12); color: #475569; }
+        .plant-kw { font-size: 34px; font-weight: 800; color: #f1f5f9; line-height: 1; }
+        .plant-kw-unit { font-size: 12px; color: #475569; margin-bottom: 10px; margin-top: 2px; }
+        .plant-bar-wrap { margin: 8px 0 4px; }
+        .plant-bar-bg { background: #1e293b; border-radius: 4px; height: 5px; }
+        .plant-bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s; }
+        .plant-bar-label { display: flex; justify-content: space-between; font-size: 10px; color: #334155; margin-top: 3px; }
+        .plant-ts { font-size: 10px; color: #334155; margin-top: 10px; }
+        .plant-actions { display: flex; gap: 6px; margin-top: 10px; }
+        .plant-btn { background: rgba(255,255,255,0.05); border: 1px solid #1f2937; color: #64748b; padding: 5px 10px; font-size: 11px; border-radius: 6px; cursor: pointer; width: auto; margin: 0; transition: all 0.15s; }
+        .plant-btn:hover { background: rgba(255,255,255,0.1); color: #94a3b8; }
+        .plant-btn.primary { background: rgba(245,158,11,0.12); border-color: rgba(245,158,11,0.25); color: #f59e0b; }
+        .plant-btn.primary:hover { background: rgba(245,158,11,0.2); }
+
+        /* ===== PLANT DETAIL ===== */
+        .det-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; flex-wrap: wrap; gap: 10px; }
+        .det-header-left { display: flex; align-items: center; gap: 12px; }
+        .btn-back {
+            background: #111827; border: 1px solid #1f2937; color: #64748b;
+            padding: 7px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; width: auto; margin: 0;
+        }
+        .btn-back:hover { border-color: #334155; color: #94a3b8; }
+        .det-title { font-size: 18px; font-weight: 700; color: #f1f5f9; }
+        .det-sub { font-size: 11px; color: #334155; margin-top: 2px; }
+
+        /* Stat panels row */
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }
+        .stat-box { background: #111827; border: 1px solid #1a2335; border-radius: 10px; padding: 16px 14px; }
+        .stat-box .sb-icon { font-size: 18px; margin-bottom: 6px; }
+        .stat-box .sb-val { font-size: 26px; font-weight: 800; color: #f1f5f9; line-height: 1; }
+        .stat-box .sb-unit { font-size: 11px; color: #334155; margin-top: 1px; }
+        .stat-box .sb-lbl { font-size: 10px; color: #334155; margin-top: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-box.hi .sb-val { color: #f59e0b; }
+        .stat-box.green .sb-val { color: #10b981; }
+        .stat-box.blue .sb-val { color: #60a5fa; }
+        .stat-box.red .sb-val { color: #ef4444; }
+
+        /* Chart panels */
+        .charts-row { display: grid; grid-template-columns: 280px 1fr; gap: 12px; margin-bottom: 12px; }
+        .cpanel { background: #111827; border: 1px solid #1a2335; border-radius: 10px; padding: 18px; }
+        .cpanel-title { font-size: 10px; font-weight: 700; color: #334155; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 14px; }
+
+        /* Power flow SVG */
+        .flow-wrap { display: flex; align-items: center; justify-content: center; min-height: 220px; }
+        @keyframes dashflow { to { stroke-dashoffset: -30; } }
+        @keyframes dashflow-rev { to { stroke-dashoffset: 30; } }
+        .sf-active { stroke-dasharray: 8 5; animation: dashflow 0.65s linear infinite; }
+        .sf-reverse { stroke-dasharray: 8 5; animation: dashflow-rev 0.65s linear infinite; }
+        .sf-idle { opacity: 0.1; }
+
+        /* Daily chart (full width row) */
+        .chart-full { background: #111827; border: 1px solid #1a2335; border-radius: 10px; padding: 18px; margin-bottom: 12px; }
+
+        /* Alerts */
+        .alerts-wrap { background: #111827; border: 1px solid #1a2335; border-radius: 10px; padding: 18px; }
+        .alert-row { display: flex; gap: 12px; padding: 12px; border-radius: 8px; margin-bottom: 8px; }
+        .alert-row:last-child { margin-bottom: 0; }
+        .alert-row.normal { background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.15); }
+        .alert-row.informativo { background: rgba(96,165,250,0.06); border: 1px solid rgba(96,165,250,0.15); }
+        .alert-row.atencao { background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.15); }
+        .alert-row.urgente { background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.15); }
+        .alert-icon { font-size: 18px; flex-shrink: 0; padding-top: 1px; }
+        .alert-titulo { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+        .alert-msg { font-size: 12px; color: #64748b; margin-top: 3px; line-height: 1.5; }
+        .alert-acao { font-size: 11px; color: #3b82f6; margin-top: 4px; font-style: italic; }
+
+        /* ===== CLIENTES (LIGHT) ===== */
+        #secao-clientes { background: #f0f4f8; min-height: calc(100vh - 54px); padding: 24px; }
+        .clientes-wrap { max-width: 1200px; margin: 0 auto; }
+        .lcard { background: white; border-radius: 12px; padding: 24px; margin-bottom: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+        .lcard h2 { font-size: 14px; color: #666; margin-bottom: 18px; text-transform: uppercase; letter-spacing: 1px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f8fafc; padding: 11px 12px; text-align: left; font-size: 12px; color: #666; border-bottom: 1px solid #eee; }
+        td { padding: 11px 12px; font-size: 13px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+        tr:hover td { background: #fafafa; }
+        .acoes { display: flex; gap: 6px; flex-wrap: wrap; }
+        .badge-inv { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; background: #f0fdf4; color: #16a34a; }
+
+        /* Loading spinner */
+        .spin { display: inline-block; animation: spin 0.9s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .empty-state { text-align: center; padding: 50px 20px; color: #334155; }
+        .empty-state .e-icon { font-size: 36px; margin-bottom: 12px; }
+        .empty-state p { font-size: 14px; }
 
         /* ===== MOBILE ===== */
-        @media (max-width: 640px) {
-            header { padding: 14px 16px; flex-wrap: wrap; gap: 8px; }
-            header h1 { font-size: 16px; }
-            header > div:last-child { gap: 8px; }
-            .container { margin: 14px auto; padding: 0 12px; }
-            .card { padding: 14px; margin-bottom: 14px; }
-            .card h2 { font-size: 13px; margin-bottom: 14px; }
+        @media (max-width: 700px) {
+            header { padding: 0 14px; }
+            .nav-tab { padding: 6px 10px; font-size: 11px; }
+            #secao-dashboard, #secao-detalhe { padding: 12px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .charts-row { grid-template-columns: 1fr; }
+            .plant-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+            .plant-kw { font-size: 28px; }
+            #secao-clientes { padding: 12px; }
+            .lcard { padding: 14px; }
             .grid-2 { grid-template-columns: 1fr; gap: 0; }
-            button.pequeno { padding: 8px 12px; font-size: 12px; }
-
-            .card-monitoramento .stat-number { font-size: 22px; }
-            .card-monitoramento .stat-item { min-width: 58px; }
-            .card-monitoramento .stat-label { font-size: 11px; }
-
-            /* Tabela → Cards */
             table, thead, tbody, th, td, tr { display: block; }
             thead { display: none; }
-            tr {
-                border: 1px solid #e2e8f0;
-                border-radius: 10px;
-                margin-bottom: 10px;
-                padding: 12px 14px;
-                background: white;
-            }
+            tr { border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 10px; padding: 12px; background: white; }
             tr:hover td { background: transparent; }
-            td {
-                border: none;
-                padding: 5px 0;
-                font-size: 13px;
-                border-bottom: 1px solid #f5f5f5;
-            }
+            td { border: none; padding: 5px 0; font-size: 12px; border-bottom: 1px solid #f5f5f5; }
             td:last-child { border-bottom: none; padding-top: 8px; }
-            td::before {
-                content: attr(data-label);
-                font-weight: 700;
-                color: #64748b;
-                font-size: 10px;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-                display: block;
-                margin-bottom: 2px;
-            }
+            td::before { content: attr(data-label); font-weight: 700; color: #64748b; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 2px; }
             td[data-label="Ações"]::before { display: none; }
-
             .modal { padding: 18px; }
             .modal-acoes { flex-direction: column; }
             .modal-acoes button { width: 100%; margin-top: 0; }
-            .dica, .dica-roxo { font-size: 11px; }
+            .kpi-bar { gap: 6px; }
+            .kpi-chip { min-width: 72px; padding: 8px 10px; }
+            .kpi-chip .kv { font-size: 18px; }
         }
     </style>
 </head>
 <body>
 
-<!-- ===== AUTENTICAÇÃO ===== -->
-<div id="tela-auth">
-    <div class="card">
-        <div style="text-align:center; margin-bottom:24px;">
-            <div style="font-size:44px;">☀️</div>
-            <h1 style="font-size:22px; margin-top:8px; color:#1e293b;">Solar Portal</h1>
-            <p style="color:#94a3b8; font-size:13px; margin-top:4px;">Painel do Integrador</p>
-        </div>
-        <div class="auth-tabs">
-            <div class="auth-tab ativa" onclick="trocarAba('login')">Entrar</div>
-            <div class="auth-tab" onclick="trocarAba('registro')">Criar Conta</div>
-        </div>
-        <div class="auth-form ativa" id="form-login">
-            <div class="campo">
-                <label>E-mail</label>
-                <input type="email" id="login-email" placeholder="seu@email.com">
+<!-- ===== AUTH ===== -->
+<div id="tela-auth" style="background:#f0f4f8; min-height:100vh;">
+    <div style="max-width:420px; margin:0 auto; padding:60px 20px 20px;">
+        <div class="card">
+            <div style="text-align:center; margin-bottom:24px;">
+                <div style="font-size:44px;">☀️</div>
+                <h1 style="font-size:22px; margin-top:8px; color:#1e293b;">Solar Portal</h1>
+                <p style="color:#94a3b8; font-size:13px; margin-top:4px;">Painel do Integrador</p>
             </div>
-            <div class="campo">
-                <label>Senha</label>
-                <input type="password" id="login-senha" placeholder="••••••" onkeydown="if(event.key==='Enter') fazerLogin()">
+            <div class="auth-tabs">
+                <div class="auth-tab ativa" onclick="trocarAba('login')">Entrar</div>
+                <div class="auth-tab" onclick="trocarAba('registro')">Criar Conta</div>
             </div>
-            <button onclick="fazerLogin()" style="margin-top:16px;">Entrar no Painel</button>
-            <p class="erro" id="erro-login"></p>
-        </div>
-        <div class="auth-form" id="form-registro">
-            <div class="campo">
-                <label>Nome completo *</label>
-                <input type="text" id="reg-nome" placeholder="Seu nome ou nome da empresa">
+            <div class="auth-form ativa" id="form-login">
+                <div class="campo"><label>E-mail</label><input type="email" id="login-email" placeholder="seu@email.com"></div>
+                <div class="campo"><label>Senha</label><input type="password" id="login-senha" placeholder="••••••" onkeydown="if(event.key==='Enter') fazerLogin()"></div>
+                <button onclick="fazerLogin()" style="margin-top:16px;">Entrar no Painel</button>
+                <p class="erro" id="erro-login"></p>
             </div>
-            <div class="campo">
-                <label>E-mail *</label>
-                <input type="email" id="reg-email" placeholder="seu@email.com">
+            <div class="auth-form" id="form-registro">
+                <div class="campo"><label>Nome completo *</label><input type="text" id="reg-nome" placeholder="Seu nome ou empresa"></div>
+                <div class="campo"><label>E-mail *</label><input type="email" id="reg-email" placeholder="seu@email.com"></div>
+                <div class="campo"><label>Telefone</label><input type="text" id="reg-telefone" placeholder="(35) 99999-9999"></div>
+                <div class="campo"><label>Senha *</label><input type="password" id="reg-senha" placeholder="Mínimo 6 caracteres"></div>
+                <div class="campo"><label>Confirmar senha *</label><input type="password" id="reg-senha2" placeholder="Repita a senha"></div>
+                <button class="verde" onclick="fazerRegistro()" style="margin-top:16px;">✅ Criar Minha Conta</button>
+                <p class="erro" id="erro-registro"></p>
+                <p class="sucesso" id="sucesso-registro"></p>
+                <div class="divisor-auth">ou</div>
+                <p style="font-size:12px; color:#94a3b8; text-align:center;">Já tem conta? <span onclick="trocarAba('login')" style="color:#f59e0b; cursor:pointer; font-weight:600;">Faça login</span></p>
             </div>
-            <div class="campo">
-                <label>Telefone</label>
-                <input type="text" id="reg-telefone" placeholder="(35) 99999-9999">
-            </div>
-            <div class="campo">
-                <label>Senha *</label>
-                <input type="password" id="reg-senha" placeholder="Mínimo 6 caracteres">
-            </div>
-            <div class="campo">
-                <label>Confirmar senha *</label>
-                <input type="password" id="reg-senha2" placeholder="Repita a senha">
-            </div>
-            <button class="verde" onclick="fazerRegistro()" style="margin-top:16px;">✅ Criar Minha Conta</button>
-            <p class="erro" id="erro-registro"></p>
-            <p class="sucesso" id="sucesso-registro"></p>
-            <div class="divisor-auth">ou</div>
-            <p style="font-size:12px; color:#94a3b8; text-align:center;">Já tem conta? <span onclick="trocarAba('login')" style="color:#f59e0b; cursor:pointer; font-weight:600;">Faça login</span></p>
         </div>
     </div>
 </div>
 
-<!-- ===== PAINEL ===== -->
-<div id="tela-painel">
+<!-- ===== PAINEL PRINCIPAL ===== -->
+<div id="tela-painel" style="display:none;">
     <header>
-        <div>
-            <h1>☀️ Solar Portal</h1>
-            <p>Painel do Integrador</p>
+        <div class="header-left">
+            <div class="header-logo">☀️ Solar<span>Portal</span></div>
+            <nav class="nav-tabs">
+                <button class="nav-tab ativa" id="tab-dash" onclick="navegar('dashboard')">📊 Dashboard</button>
+                <button class="nav-tab" id="tab-cli" onclick="navegar('clientes')">👥 Clientes</button>
+            </nav>
         </div>
-        <div style="display:flex; align-items:center; gap:10px;">
-            <span style="font-size:13px; opacity:0.8;" id="nome-usuario"></span>
-            <button class="secundario pequeno" onclick="sair()">Sair</button>
+        <div class="header-right">
+            <span class="header-user" id="nome-usuario"></span>
+            <button class="ghost" onclick="sair()">Sair</button>
         </div>
     </header>
 
-    <div class="container">
+    <!-- ===== DASHBOARD ===== -->
+    <div id="secao-dashboard">
+        <div class="kpi-bar">
+            <div class="kpi-chip"><span class="kv" id="kpi-total">—</span><span class="kl">Usinas</span></div>
+            <div class="kpi-chip c-green"><span class="kv" id="kpi-on">—</span><span class="kl">Gerando</span></div>
+            <div class="kpi-chip c-yellow"><span class="kv" id="kpi-al">—</span><span class="kl">Alerta</span></div>
+            <div class="kpi-chip c-red"><span class="kv" id="kpi-off">—</span><span class="kl">Offline</span></div>
+            <div class="kpi-chip"><span class="kv" id="kpi-cfg">—</span><span class="kl">Sem Config</span></div>
+            <div class="kpi-chip c-blue" style="margin-left:6px;"><span class="kv" id="kpi-kw">—</span><span class="kl">kW Total</span></div>
+            <div class="kpi-sep"></div>
+            <div class="kpi-refresh">
+                <span class="pulse-dot"></span>
+                <span id="countdown-txt" style="font-size:11px; color:#334155;"></span>
+                <button class="ghost" onclick="carregarDashboard()" style="padding:5px 10px; font-size:11px;">🔄</button>
+            </div>
+        </div>
+        <div class="plant-grid" id="plant-grid">
+            <div class="empty-state" style="grid-column:1/-1;">
+                <div class="e-icon"><span class="spin">⟳</span></div>
+                <p style="color:#334155;">Carregando usinas...</p>
+            </div>
+        </div>
+    </div>
 
-        <!-- Monitoramento em Tempo Real -->
-        <div class="card card-monitoramento">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+    <!-- ===== DETALHE DA USINA ===== -->
+    <div id="secao-detalhe" style="display:none;">
+        <div class="det-header">
+            <div class="det-header-left">
+                <button class="btn-back" onclick="voltarDashboard()">← Voltar</button>
                 <div>
-                    <h3>📡 Monitoramento em Tempo Real</h3>
-                    <p style="font-size: 12px; opacity: 0.8;">Atualização automática a cada 1 minuto</p>
+                    <div class="det-title" id="det-nome">—</div>
+                    <div class="det-sub" id="det-sub">—</div>
                 </div>
-                <button class="secundario pequeno" onclick="carregarMonitoramento()" style="background: rgba(255,255,255,0.2); color: white; border-color: rgba(255,255,255,0.3);">🔄 Atualizar agora</button>
+                <span id="det-badge"></span>
             </div>
-            <div class="stats">
-                <div class="stat-item">
-                    <span class="stat-number" id="total-usinas">0</span>
-                    <span class="stat-label">Usinas</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number status-normal" id="usinas-normais">0</span>
-                    <span class="stat-label">🟢 Gerando</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number status-alerta" id="usinas-alerta">0</span>
-                    <span class="stat-label">🟡 Geração Baixa</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number status-problema" id="usinas-problema">0</span>
-                    <span class="stat-label">🔴 Parado/Offline</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number status-offline" id="usinas-sem-config">0</span>
-                    <span class="stat-label">⚙️ Sem Config</span>
-                </div>
+            <button class="ghost" onclick="atualizarDetalhe()">🔄 Atualizar</button>
+        </div>
+
+        <!-- KPI stats -->
+        <div class="stats-grid">
+            <div class="stat-box hi">
+                <div class="sb-icon">☀️</div>
+                <div class="sb-val" id="d-pv">—</div>
+                <div class="sb-unit">kW</div>
+                <div class="sb-lbl">Geração PV</div>
+            </div>
+            <div class="stat-box green">
+                <div class="sb-icon">🏠</div>
+                <div class="sb-val" id="d-casa">—</div>
+                <div class="sb-unit">kW</div>
+                <div class="sb-lbl">Consumo Casa</div>
+            </div>
+            <div class="stat-box blue">
+                <div class="sb-icon">⚡</div>
+                <div class="sb-val" id="d-inj">—</div>
+                <div class="sb-unit">kW</div>
+                <div class="sb-lbl">Injetado na Rede</div>
+            </div>
+            <div class="stat-box">
+                <div class="sb-icon">🔌</div>
+                <div class="sb-val" id="d-rede">—</div>
+                <div class="sb-unit">kW</div>
+                <div class="sb-lbl">Consumo da Rede</div>
             </div>
         </div>
 
-        <!-- Cadastrar Cliente -->
-        <div class="card">
-            <h2>➕ Cadastrar Novo Cliente</h2>
-            <div class="grid-2">
-                <div class="campo"><label>Nome do cliente *</label><input type="text" id="novo-nome" placeholder="Nome completo"></div>
-                <div class="campo"><label>E-mail</label><input type="email" id="novo-email" placeholder="email@exemplo.com"></div>
-                <div class="campo"><label>Telefone</label><input type="text" id="novo-telefone" placeholder="(35) 99999-9999"></div>
-                <div class="campo"><label>Número da UC</label><input type="text" id="novo-uc" placeholder="Ex: 4840248-2026-4-6"></div>
-                <div class="campo"><label>Distribuidora</label><input type="text" id="novo-distribuidora" placeholder="Ex: Energisa Sul-Sudeste"></div>
-                <div class="campo"><label>Tipo GD</label><input type="text" id="novo-tipo-gd" placeholder="Ex: GD_II"></div>
+        <!-- Flow + Monthly -->
+        <div class="charts-row">
+            <div class="cpanel">
+                <div class="cpanel-title">Fluxo de Potência</div>
+                <div class="flow-wrap" id="flow-wrap"></div>
             </div>
-            <button class="verde" style="margin-top:15px;" onclick="cadastrarCliente()">✅ Cadastrar Cliente</button>
-            <p class="erro" id="erro-cadastro"></p>
-            <p class="sucesso" id="sucesso-cadastro"></p>
+            <div class="cpanel">
+                <div class="cpanel-title">Geração Mensal — 12 Meses (kWh)</div>
+                <canvas id="chart-mensal" style="max-height:210px;"></canvas>
+                <div id="chart-mensal-empty" style="display:none; text-align:center; color:#334155; padding:40px 0; font-size:13px;">Sem dados históricos</div>
+            </div>
         </div>
 
-        <!-- Lista de Clientes -->
-        <div class="card">
-            <h2>👥 Minha Carteira de Clientes</h2>
-            <table>
-                <thead>
-                    <tr><th>Nome</th><th>UC</th><th>Distribuidora</th><th>Tipo GD</th><th>📡 Monitoramento</th><th>Ações</th></tr>
-                </thead>
-                <tbody id="tabela-clientes">
-                    <tr><td colspan="6" style="text-align:center; color:#888;">Carregando...</td></tr>
-                </tbody>
-            </table>
+        <!-- Daily chart -->
+        <div class="chart-full">
+            <div class="cpanel-title">Geração Diária — Últimos 30 Dias (kWh)</div>
+            <canvas id="chart-diario" style="max-height:170px;"></canvas>
+            <div id="chart-diario-empty" style="display:none; text-align:center; color:#334155; padding:30px 0; font-size:13px;">Sem dados diários registrados</div>
         </div>
 
+        <!-- Alerts -->
+        <div class="alerts-wrap">
+            <div class="cpanel-title" style="margin-bottom:12px;">Alertas e Anomalias</div>
+            <div id="alerts-content"><p style="color:#334155; font-size:13px;"><span class="spin">⟳</span> Carregando...</p></div>
+        </div>
+    </div>
+
+    <!-- ===== CLIENTES ===== -->
+    <div id="secao-clientes" style="display:none;">
+        <div class="clientes-wrap">
+            <div class="lcard">
+                <h2>➕ Cadastrar Novo Cliente</h2>
+                <div class="grid-2">
+                    <div class="campo"><label>Nome do cliente *</label><input type="text" id="novo-nome" placeholder="Nome completo"></div>
+                    <div class="campo"><label>E-mail</label><input type="email" id="novo-email" placeholder="email@exemplo.com"></div>
+                    <div class="campo"><label>Telefone</label><input type="text" id="novo-telefone" placeholder="(35) 99999-9999"></div>
+                    <div class="campo"><label>Número da UC</label><input type="text" id="novo-uc" placeholder="Ex: 4840248-2026-4-6"></div>
+                    <div class="campo"><label>Distribuidora</label><input type="text" id="novo-distribuidora" placeholder="Ex: Energisa Sul-Sudeste"></div>
+                    <div class="campo"><label>Tipo GD</label><input type="text" id="novo-tipo-gd" placeholder="Ex: GD_II"></div>
+                </div>
+                <button class="verde" style="margin-top:15px; max-width:220px;" onclick="cadastrarCliente()">✅ Cadastrar Cliente</button>
+                <p class="erro" id="erro-cadastro"></p>
+                <p class="sucesso" id="sucesso-cadastro"></p>
+            </div>
+
+            <div class="lcard">
+                <h2>👥 Minha Carteira de Clientes</h2>
+                <table>
+                    <thead>
+                        <tr><th>Nome</th><th>UC</th><th>Distribuidora</th><th>Tipo GD</th><th>Inversor</th><th>Ações</th></tr>
+                    </thead>
+                    <tbody id="tabela-clientes">
+                        <tr><td colspan="6" style="text-align:center; color:#888;">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -436,26 +453,20 @@
         <h3>☀️ Projeto Solar</h3>
         <p class="subtitulo" id="nome-projeto-cliente"></p>
         <div class="grid-2">
-            <div class="campo">
-                <label>Potência do sistema (kWp) *</label>
-                <input type="number" id="proj-potencia" placeholder="Ex: 5.5" step="0.1">
-            </div>
-            <div class="campo">
-                <label>Data de instalação</label>
-                <input type="date" id="proj-data">
-            </div>
+            <div class="campo"><label>Potência do sistema (kWp) *</label><input type="number" id="proj-potencia" placeholder="Ex: 5.5" step="0.1"></div>
+            <div class="campo"><label>Data de instalação</label><input type="date" id="proj-data"></div>
         </div>
         <div class="campo">
             <label>Eficiência do sistema (Performance Ratio)</label>
             <input type="number" id="proj-pr" value="0.80" step="0.01">
-            <p style="font-size:11px; color:#888; margin-top:4px;">Eficiência real considerando perdas por calor, cabeamento e inversor. Entre 0,75 e 0,85 para sistemas residenciais. Se não souber, deixe 0,80.</p>
+            <p style="font-size:11px; color:#888; margin-top:4px;">Entre 0,75 e 0,85 para sistemas residenciais. Se não souber, deixe 0,80.</p>
         </div>
         <hr class="separador">
         <p style="font-weight:600; font-size:14px; margin-bottom:12px;">📍 Localização da instalação</p>
         <div class="dica">
-            💡 Digite o endereço e clique em <strong>Buscar</strong>.<br>
-            Para endereços rurais: abra o <a href="https://maps.google.com" target="_blank" style="color:#d97706; font-weight:600;">Google Maps</a>,
-            clique com o botão direito no local da instalação e copie as coordenadas. Cole abaixo manualmente.
+            💡 Digite o endereço e clique em <strong>Buscar</strong>. Para endereços rurais: abra o
+            <a href="https://maps.google.com" target="_blank" style="color:#d97706; font-weight:600;">Google Maps</a>,
+            clique com o botão direito no local e copie as coordenadas manualmente.
         </div>
         <div class="campo">
             <label>Endereço da instalação</label>
@@ -469,14 +480,8 @@
         <button class="link-manual" onclick="toggleManual()">✏️ Inserir coordenadas manualmente</button>
         <div id="campos-manuais">
             <div class="grid-2">
-                <div class="campo">
-                    <label>Latitude</label>
-                    <input type="number" id="proj-lat" placeholder="-22.876100" step="0.000001">
-                </div>
-                <div class="campo">
-                    <label>Longitude</label>
-                    <input type="number" id="proj-lng" placeholder="-46.316700" step="0.000001">
-                </div>
+                <div class="campo"><label>Latitude</label><input type="number" id="proj-lat" placeholder="-22.876100" step="0.000001"></div>
+                <div class="campo"><label>Longitude</label><input type="number" id="proj-lng" placeholder="-46.316700" step="0.000001"></div>
             </div>
         </div>
         <div class="modal-acoes">
@@ -493,12 +498,9 @@
     <div class="modal">
         <h3>🔌 Cadastro do Inversor</h3>
         <p class="subtitulo" id="nome-inversor-cliente"></p>
-
         <div class="dica-roxo">
             💡 Configure o inversor do cliente para ativar o <strong>monitoramento em tempo real</strong>.
-            Com o inversor configurado, você verá a geração ao vivo no painel e o cliente verá no portal.
         </div>
-
         <div class="campo">
             <label>Marca do Inversor *</label>
             <select id="inv-marca" onchange="atualizarInstrucoes()">
@@ -512,15 +514,12 @@
                 <option value="outro">Outro</option>
             </select>
         </div>
-
-        <!-- Busca automática FoxESS -->
         <div id="foxess-busca" style="display:none;">
             <div class="dica-roxo">
                 ⚡ <strong>Como funciona:</strong><br>
                 1. Acesse <a href="https://www.foxesscloud.com" target="_blank" style="color:#7c3aed;"><strong>foxesscloud.com</strong></a> (versão antiga — não o v2.0)<br>
-                2. Login → clique no seu <strong>perfil</strong> → <strong>User Profile → API Management</strong><br>
-                3. Clique em <strong>Generate API Key</strong> e cole abaixo<br>
-                4. O sistema busca todos os inversores da conta automaticamente ✅
+                2. Login → clique no <strong>perfil</strong> → <strong>User Profile → API Management</strong><br>
+                3. Clique em <strong>Generate API Key</strong> e cole abaixo
             </div>
             <div class="campo">
                 <label>API Key FoxESS *</label>
@@ -538,31 +537,24 @@
             <hr class="separador">
             <p style="font-size:11px; color:#888; margin-bottom:8px;">Ou preencha manualmente:</p>
         </div>
-
         <div class="campo">
             <label>Número de Série do Inversor *</label>
             <input type="text" id="inv-serial" placeholder="Ex: J0MF502043LK010">
             <p style="font-size:11px; color:#888; margin-top:4px;">Encontrado na etiqueta do inversor ou no aplicativo do fabricante.</p>
         </div>
-
         <div class="campo" id="campo-api-key">
             <label>Chave de API *</label>
             <input type="text" id="inv-api-key" placeholder="Cole aqui a chave de API do fabricante">
             <div id="instrucoes-api" style="margin-top:8px;"></div>
         </div>
-
         <div id="campos-deye" style="display:none;">
-            <div class="campo">
-                <label>App ID *</label>
-                <input type="text" id="inv-deye-app-id" placeholder="App ID do portal Solarman">
-            </div>
+            <div class="campo"><label>App ID *</label><input type="text" id="inv-deye-app-id" placeholder="App ID do portal Solarman"></div>
             <div class="campo">
                 <label>App Secret *</label>
                 <input type="text" id="inv-deye-app-secret" placeholder="App Secret do portal Solarman">
                 <div id="instrucoes-api-deye" style="margin-top:8px;"></div>
             </div>
         </div>
-
         <div class="modal-acoes">
             <button class="roxo pequeno" onclick="salvarInversor()">🔌 Salvar Inversor</button>
             <button class="secundario pequeno" onclick="fecharModal('modal-inversor')">Cancelar</button>
@@ -573,539 +565,664 @@
 </div>
 
 <script>
-    const API = "https://solar-portal-api.onrender.com";
-    let token = localStorage.getItem("token");
-    let nomeUsuario = localStorage.getItem("nome");
-    let clienteProjetoId = null;
-    let clienteInversorId = null;
-    let modoManual = false;
-    let intervaloMonitoramento = null;
-    let foxessCredenciais = null;
+const API = "https://solar-portal-api.onrender.com";
+let token = localStorage.getItem("token");
+let nomeUsuario = localStorage.getItem("nome");
+let clienteProjetoId = null;
+let clienteInversorId = null;
+let modoManual = false;
+let foxessCredenciais = null;
+let intervaloDash = null;
+let countdownTimer = null;
+let countdownVal = 60;
+let chartMensal = null;
+let chartDiario = null;
+let clienteDetalheId = null;
 
-    if (token) {
-        mostrarPainel();
-        iniciarMonitoramentoAutomatico();
-    }
+Chart.defaults.color = '#475569';
+Chart.defaults.font.family = "'Segoe UI', sans-serif";
 
-    // ===== ABAS DE AUTENTICAÇÃO =====
-    function trocarAba(aba) {
-        document.querySelectorAll(".auth-tab").forEach(t => t.classList.remove("ativa"));
-        document.querySelectorAll(".auth-form").forEach(f => f.classList.remove("ativa"));
-        document.querySelectorAll(".auth-tab")[aba === "login" ? 0 : 1].classList.add("ativa");
-        document.getElementById(`form-${aba}`).classList.add("ativa");
-        document.getElementById("erro-login").textContent = "";
-        document.getElementById("erro-registro").textContent = "";
-        document.getElementById("sucesso-registro").textContent = "";
-    }
+if (token) { mostrarPainel(); navegar('dashboard'); }
 
-    // ===== LOGIN =====
-    async function fazerLogin() {
-        const email = document.getElementById("login-email").value.trim();
-        const senha = document.getElementById("login-senha").value;
-        if (!email || !senha) { document.getElementById("erro-login").textContent = "Preencha e-mail e senha"; return; }
-        try {
-            const resp = await fetch(`${API}/auth/login`, {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({email, senha})
-            });
-            const data = await resp.json();
-            if (resp.ok) {
-                token = data.token;
-                nomeUsuario = data.nome;
-                localStorage.setItem("token", token);
-                localStorage.setItem("nome", nomeUsuario);
-                mostrarPainel();
-                iniciarMonitoramentoAutomatico();
-            } else {
-                document.getElementById("erro-login").textContent = data.detail || "E-mail ou senha incorretos";
-            }
-        } catch(e) {
-            document.getElementById("erro-login").textContent = "Erro de conexão com o servidor";
-        }
-    }
+// ===== AUTH =====
+function trocarAba(aba) {
+    document.querySelectorAll(".auth-tab").forEach(t => t.classList.remove("ativa"));
+    document.querySelectorAll(".auth-form").forEach(f => f.classList.remove("ativa"));
+    document.querySelectorAll(".auth-tab")[aba === "login" ? 0 : 1].classList.add("ativa");
+    document.getElementById(`form-${aba}`).classList.add("ativa");
+    ["erro-login","erro-registro","sucesso-registro"].forEach(id => document.getElementById(id).textContent = "");
+}
 
-    // ===== REGISTRO =====
-    async function fazerRegistro() {
-        const nome = document.getElementById("reg-nome").value.trim();
-        const email = document.getElementById("reg-email").value.trim();
-        const telefone = document.getElementById("reg-telefone").value.trim();
-        const senha = document.getElementById("reg-senha").value;
-        const senha2 = document.getElementById("reg-senha2").value;
-        document.getElementById("erro-registro").textContent = "";
-        document.getElementById("sucesso-registro").textContent = "";
-        if (!nome || !email || !senha) { document.getElementById("erro-registro").textContent = "Nome, e-mail e senha são obrigatórios"; return; }
-        if (senha.length < 6) { document.getElementById("erro-registro").textContent = "A senha deve ter no mínimo 6 caracteres"; return; }
-        if (senha !== senha2) { document.getElementById("erro-registro").textContent = "As senhas não conferem"; return; }
-        try {
-            const resp = await fetch(`${API}/auth/registro`, {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({nome, email, telefone, senha})
-            });
-            const data = await resp.json();
-            if (resp.ok) {
-                document.getElementById("sucesso-registro").textContent = "✅ Conta criada! Faça login para continuar.";
-                ["reg-nome","reg-email","reg-telefone","reg-senha","reg-senha2"].forEach(id => document.getElementById(id).value = "");
-                setTimeout(() => { trocarAba("login"); document.getElementById("login-email").value = email; }, 2000);
-            } else {
-                document.getElementById("erro-registro").textContent = data.detail || "Erro ao criar conta";
-            }
-        } catch(e) {
-            document.getElementById("erro-registro").textContent = "Erro de conexão com o servidor";
-        }
-    }
-
-    function mostrarPainel() {
-        document.getElementById("tela-auth").style.display = "none";
-        document.getElementById("tela-painel").style.display = "block";
-        document.getElementById("nome-usuario").textContent = nomeUsuario || "";
-    }
-
-    function sair() {
-        if (intervaloMonitoramento) clearInterval(intervaloMonitoramento);
-        localStorage.removeItem("token");
-        localStorage.removeItem("nome");
-        location.reload();
-    }
-
-    // ===== CLIENTES =====
-    async function cadastrarCliente() {
-        const dados = {
-            nome: document.getElementById("novo-nome").value,
-            email: document.getElementById("novo-email").value,
-            telefone: document.getElementById("novo-telefone").value,
-            numero_uc: document.getElementById("novo-uc").value,
-            distribuidora: document.getElementById("novo-distribuidora").value,
-            tipo_gd: document.getElementById("novo-tipo-gd").value
-        };
-        if (!dados.nome) { document.getElementById("erro-cadastro").textContent = "Nome é obrigatório"; return; }
-        try {
-            const resp = await fetch(`${API}/clientes`, {
-                method: "POST",
-                headers: {"Content-Type": "application/json", "Authorization": `Bearer ${token}`},
-                body: JSON.stringify(dados)
-            });
-            if (resp.ok) {
-                document.getElementById("sucesso-cadastro").textContent = "✅ Cliente cadastrado!";
-                ["novo-nome","novo-email","novo-telefone","novo-uc","novo-distribuidora","novo-tipo-gd"].forEach(id => document.getElementById(id).value = "");
-                carregarMonitoramento();
-                setTimeout(() => document.getElementById("sucesso-cadastro").textContent = "", 3000);
-            } else {
-                const data = await resp.json();
-                document.getElementById("erro-cadastro").textContent = data.detail || "Erro ao cadastrar";
-            }
-        } catch(e) { document.getElementById("erro-cadastro").textContent = "Erro de conexão"; }
-    }
-
-    function verContas(clienteId, nomeCliente) {
-        window.open(`portal.html?cliente_id=${clienteId}&nome=${encodeURIComponent(nomeCliente)}`, '_blank');
-    }
-
-    async function obterLink(clienteId, nomeCliente) {
-        try {
-            const resp = await fetch(`${API}/clientes/${clienteId}/obter-token`, { headers: {"Authorization": `Bearer ${token}`} });
-            const data = await resp.json();
-            const base = window.location.href.replace("painel.html", "");
-            document.getElementById("link-cliente").textContent = `${base}portal.html?token_acesso=${data.token_acesso}&nome=${encodeURIComponent(nomeCliente)}`;
-            document.getElementById("modal-link").classList.add("ativo");
-        } catch(e) { alert("Erro ao obter link"); }
-    }
-
-    function copiarLink() {
-        navigator.clipboard.writeText(document.getElementById("link-cliente").textContent);
-        document.getElementById("copiado").style.display = "block";
-        setTimeout(() => document.getElementById("copiado").style.display = "none", 2000);
-    }
-
-    // ===== PROJETO SOLAR =====
-    function cadastrarProjeto(clienteId, nomeCliente) {
-        clienteProjetoId = clienteId;
-        document.getElementById("nome-projeto-cliente").textContent = `Cliente: ${nomeCliente}`;
-        document.getElementById("modal-projeto").classList.add("ativo");
-    }
-
-    function toggleManual() {
-        modoManual = !modoManual;
-        document.getElementById("campos-manuais").style.display = modoManual ? "block" : "none";
-    }
-
-    async function buscarCoordenadas() {
-        const endereco = document.getElementById("proj-endereco").value;
-        if (!endereco) { document.getElementById("erro-endereco").textContent = "Digite o endereço primeiro"; return; }
-        document.getElementById("erro-endereco").textContent = "";
-        document.getElementById("endereco-encontrado").style.display = "none";
-        const variacoes = [endereco, endereco + ", Brasil", endereco.split(",").slice(-2).join(",").trim() + ", Brasil"];
-        for (const v of variacoes) {
-            try {
-                const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(v)}&limit=1&countrycodes=br`;
-                const resp = await fetch(url, { headers: {"Accept-Language": "pt-BR"} });
-                const data = await resp.json();
-                if (data.length > 0) {
-                    modoManual = true;
-                    document.getElementById("campos-manuais").style.display = "block";
-                    document.getElementById("proj-lat").value = parseFloat(data[0].lat).toFixed(6);
-                    document.getElementById("proj-lng").value = parseFloat(data[0].lon).toFixed(6);
-                    document.getElementById("endereco-encontrado").style.display = "block";
-                    document.getElementById("endereco-encontrado").textContent = `✅ Encontrado: ${data[0].display_name.substring(0,70)}...`;
-                    return;
-                }
-            } catch(e) { continue; }
-        }
-        document.getElementById("erro-endereco").textContent = "Endereço não encontrado. Use o Google Maps para copiar as coordenadas manualmente.";
-        modoManual = true;
-        document.getElementById("campos-manuais").style.display = "block";
-    }
-
-    async function salvarProjeto() {
-        const potencia = parseFloat(document.getElementById("proj-potencia").value);
-        const lat = parseFloat(document.getElementById("proj-lat").value);
-        const lng = parseFloat(document.getElementById("proj-lng").value);
-        if (!potencia) { document.getElementById("erro-projeto").textContent = "Potência é obrigatória"; return; }
-        if (!lat || !lng) { document.getElementById("erro-projeto").textContent = "Informe a localização da instalação"; return; }
-        const dados = {
-            potencia_kwp: potencia,
-            data_instalacao: document.getElementById("proj-data").value || null,
-            latitude: lat,
-            longitude: lng,
-            performance_ratio: parseFloat(document.getElementById("proj-pr").value) || 0.80
-        };
-        try {
-            const resp = await fetch(`${API}/clientes/${clienteProjetoId}/projeto`, {
-                method: "PUT",
-                headers: {"Content-Type": "application/json", "Authorization": `Bearer ${token}`},
-                body: JSON.stringify(dados)
-            });
-            if (resp.ok) {
-                document.getElementById("sucesso-projeto").style.display = "block";
-                setTimeout(() => { document.getElementById("sucesso-projeto").style.display = "none"; fecharModal("modal-projeto"); }, 2000);
-            } else {
-                const data = await resp.json();
-                document.getElementById("erro-projeto").textContent = data.detail || "Erro ao salvar";
-            }
-        } catch(e) { document.getElementById("erro-projeto").textContent = "Erro de conexão"; }
-    }
-
-    // ===== INVERSOR =====
-    function cadastrarInversor(clienteId, nomeCliente) {
-        clienteInversorId = clienteId;
-        document.getElementById("nome-inversor-cliente").textContent = `Cliente: ${nomeCliente}`;
-        document.getElementById("inv-marca").value = "";
-        document.getElementById("inv-serial").value = "";
-        document.getElementById("inv-api-key").value = "";
-        document.getElementById("inv-deye-app-id").value = "";
-        document.getElementById("inv-deye-app-secret").value = "";
-        document.getElementById("foxess-apikey-busca").value = "";
-        document.getElementById("foxess-buscando").style.display = "none";
-        document.getElementById("foxess-erro-busca").textContent = "";
-        document.getElementById("foxess-dispositivos").style.display = "none";
-        document.getElementById("foxess-busca").style.display = "none";
-        document.getElementById("instrucoes-api").innerHTML = "";
-        document.getElementById("instrucoes-api-deye").innerHTML = "";
-        foxessCredenciais = null;
-        document.getElementById("campo-api-key").style.display = "block";
-        document.getElementById("campos-deye").style.display = "none";
-        document.getElementById("erro-inversor").textContent = "";
-        document.getElementById("sucesso-inversor").style.display = "none";
-        document.getElementById("modal-inversor").classList.add("ativo");
-    }
-
-    async function foxessBuscar() {
-        const apiKey = document.getElementById("foxess-apikey-busca").value.trim();
-        const erroEl = document.getElementById("foxess-erro-busca");
-        erroEl.textContent = "";
-        document.getElementById("foxess-dispositivos").style.display = "none";
-        if (!apiKey) { erroEl.textContent = "Cole a API Key do FoxESS para buscar"; return; }
-        document.getElementById("foxess-buscando").style.display = "block";
-        document.getElementById("btn-foxess-buscar").disabled = true;
-        try {
-            const resp = await fetch(`${API}/clientes/${clienteInversorId}/foxess/buscar`, {
-                method: "POST",
-                headers: {"Content-Type": "application/json", "Authorization": `Bearer ${token}`},
-                body: JSON.stringify({api_key: apiKey})
-            });
-            const data = await resp.json();
-            if (resp.ok) {
-                foxessCredenciais = null;
-                document.getElementById("inv-api-key").value = apiKey;
-                const sel = document.getElementById("foxess-select-device");
-                sel.innerHTML = '<option value="">Selecione o inversor...</option>';
-                data.dispositivos.forEach(d => {
-                    const opt = document.createElement("option");
-                    opt.value = d.sn;
-                    opt.textContent = `${d.sn} — ${d.modelo || "Inversor"} ${d.status === 1 ? "🟢" : "⚫"}`;
-                    sel.appendChild(opt);
-                });
-                document.getElementById("foxess-dispositivos").style.display = "block";
-                if (data.dispositivos.length === 1) { sel.selectedIndex = 1; foxessSelecionarDispositivo(); }
-            } else {
-                erroEl.textContent = data.detail || "Erro ao buscar inversores";
-            }
-        } catch(e) { erroEl.textContent = "Erro de conexão"; }
-        finally {
-            document.getElementById("foxess-buscando").style.display = "none";
-            document.getElementById("btn-foxess-buscar").disabled = false;
-        }
-    }
-
-    function foxessSelecionarDispositivo() {
-        const sel = document.getElementById("foxess-select-device");
-        const sn = sel.value;
-        if (sn) {
-            document.getElementById("inv-serial").value = sn;
-            document.getElementById("instrucoes-api").innerHTML = `<p class="sucesso" style="margin-top:4px;">✅ Serial preenchido automaticamente!</p>`;
-        }
-    }
-
-    function atualizarInstrucoes() {
-        const marca = document.getElementById("inv-marca").value;
-        const isDeye = marca === "deye";
-        const isFoxess = marca === "foxess";
-        document.getElementById("foxess-busca").style.display = isFoxess ? "block" : "none";
-        document.getElementById("campo-api-key").style.display = isDeye ? "none" : "block";
-        document.getElementById("campos-deye").style.display = isDeye ? "block" : "none";
-
-        const instrucoes = {
-            foxess: `<div class="dica-roxo">
-                📋 <strong>A API Key só aparece na versão antiga do FoxESS Cloud:</strong><br>
-                1. Acesse <a href="https://www.foxesscloud.com" target="_blank" style="color:#7c3aed;">foxesscloud.com</a> (versão antiga — <strong>não</strong> o portal v2.0)<br>
-                2. Faça login com a conta do cliente → clique no <strong>perfil</strong> (canto superior direito)<br>
-                3. Vá em <strong>User Profile → API Management</strong><br>
-                4. Clique em <strong>Generate API Key</strong> e copie a chave gerada<br>
-                <span style="color:#dc2626; font-weight:600;">⚠️ O portal novo (v2.0) não mostra a API Key — use sempre o link acima.</span>
-            </div>`,
-            growatt: `<div class="dica-roxo">
-                📋 <strong>Como obter o token Growatt:</strong><br>
-                1. Acesse <a href="https://openapi.growatt.com" target="_blank" style="color:#7c3aed;">openapi.growatt.com</a><br>
-                2. Faça login com sua conta Growatt<br>
-                3. Vá em <strong>Account → API Token</strong> e copie o token
-            </div>`,
-            weg: `<div class="dica-roxo">
-                📋 <strong>Como obter a chave WEG/SunWEG:</strong><br>
-                1. Acesse <a href="https://solarportal.weg.net" target="_blank" style="color:#7c3aed;">solarportal.weg.net</a><br>
-                2. Faça login → vá em <strong>Gestão de API</strong><br>
-                3. Gere uma nova chave de acesso
-            </div>`,
-            hoymiles: `<div class="dica-roxo">
-                📋 <strong>Como obter a chave Hoymiles:</strong><br>
-                1. Acesse <a href="https://global.hoymiles.com" target="_blank" style="color:#7c3aed;">global.hoymiles.com</a><br>
-                2. Vá em <strong>Account → API Access</strong><br>
-                3. Solicite acesso à API e copie o token
-            </div>`,
-            solis: `<div class="dica-roxo">
-                📋 <strong>Como obter a chave Solis:</strong><br>
-                1. Acesse <a href="https://www.soliscloud.com" target="_blank" style="color:#7c3aed;">soliscloud.com</a><br>
-                2. Vá em <strong>Conta → Gestão de API</strong><br>
-                3. Gere uma nova chave de acesso
-            </div>`,
-        };
-        const instrucaoDeye = `<div class="dica-roxo">
-            📋 <strong>Como obter App ID e App Secret Deye:</strong><br>
-            1. Acesse <a href="https://open.solarmanpv.com" target="_blank" style="color:#7c3aed;">open.solarmanpv.com</a><br>
-            2. Faça login com sua conta SolarmanPV / Deye<br>
-            3. Vá em <strong>Manage Apps → Create App</strong><br>
-            4. Copie o <strong>App ID</strong> e o <strong>App Secret</strong> gerados
-        </div>`;
-        document.getElementById("instrucoes-api").innerHTML = instrucoes[marca] || "";
-        document.getElementById("instrucoes-api-deye").innerHTML = isDeye ? instrucaoDeye : "";
-    }
-
-    async function salvarInversor() {
-        const marca = document.getElementById("inv-marca").value;
-        const serial = document.getElementById("inv-serial").value.trim();
-
-        document.getElementById("erro-inversor").textContent = "";
-
-        if (!marca) { document.getElementById("erro-inversor").textContent = "Selecione a marca do inversor"; return; }
-        if (!serial) { document.getElementById("erro-inversor").textContent = "Número de série é obrigatório"; return; }
-
-        let apiKey = "";
-        if (marca === "deye") {
-            const appId = document.getElementById("inv-deye-app-id").value.trim();
-            const appSecret = document.getElementById("inv-deye-app-secret").value.trim();
-            if (!appId || !appSecret) { document.getElementById("erro-inversor").textContent = "App ID e App Secret são obrigatórios para Deye"; return; }
-            apiKey = JSON.stringify({ app_id: appId, app_secret: appSecret });
+async function fazerLogin() {
+    const email = document.getElementById("login-email").value.trim();
+    const senha = document.getElementById("login-senha").value;
+    if (!email || !senha) { document.getElementById("erro-login").textContent = "Preencha e-mail e senha"; return; }
+    try {
+        const resp = await fetch(`${API}/auth/login`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({email, senha}) });
+        const data = await resp.json();
+        if (resp.ok) {
+            token = data.token; nomeUsuario = data.nome;
+            localStorage.setItem("token", token); localStorage.setItem("nome", nomeUsuario);
+            mostrarPainel(); navegar('dashboard');
         } else {
-            apiKey = document.getElementById("inv-api-key").value.trim();
-            const temCredenciais = marca === "foxess" && foxessCredenciais;
-            if (!apiKey && !temCredenciais) { document.getElementById("erro-inversor").textContent = "Use a busca automática acima ou informe a Chave de API"; return; }
+            document.getElementById("erro-login").textContent = data.detail || "E-mail ou senha incorretos";
+        }
+    } catch(e) { document.getElementById("erro-login").textContent = "Erro de conexão com o servidor"; }
+}
+
+async function fazerRegistro() {
+    const nome = document.getElementById("reg-nome").value.trim();
+    const email = document.getElementById("reg-email").value.trim();
+    const telefone = document.getElementById("reg-telefone").value.trim();
+    const senha = document.getElementById("reg-senha").value;
+    const senha2 = document.getElementById("reg-senha2").value;
+    document.getElementById("erro-registro").textContent = "";
+    document.getElementById("sucesso-registro").textContent = "";
+    if (!nome || !email || !senha) { document.getElementById("erro-registro").textContent = "Nome, e-mail e senha são obrigatórios"; return; }
+    if (senha.length < 6) { document.getElementById("erro-registro").textContent = "A senha deve ter no mínimo 6 caracteres"; return; }
+    if (senha !== senha2) { document.getElementById("erro-registro").textContent = "As senhas não conferem"; return; }
+    try {
+        const resp = await fetch(`${API}/auth/registro`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({nome,email,telefone,senha}) });
+        const data = await resp.json();
+        if (resp.ok) {
+            document.getElementById("sucesso-registro").textContent = "✅ Conta criada! Faça login para continuar.";
+            ["reg-nome","reg-email","reg-telefone","reg-senha","reg-senha2"].forEach(id => document.getElementById(id).value = "");
+            setTimeout(() => { trocarAba("login"); document.getElementById("login-email").value = email; }, 2000);
+        } else {
+            document.getElementById("erro-registro").textContent = data.detail || "Erro ao criar conta";
+        }
+    } catch(e) { document.getElementById("erro-registro").textContent = "Erro de conexão"; }
+}
+
+function mostrarPainel() {
+    document.getElementById("tela-auth").style.display = "none";
+    document.getElementById("tela-painel").style.display = "block";
+    document.getElementById("nome-usuario").textContent = nomeUsuario || "";
+}
+
+function sair() {
+    clearInterval(intervaloDash); clearInterval(countdownTimer);
+    localStorage.removeItem("token"); localStorage.removeItem("nome");
+    location.reload();
+}
+
+// ===== NAVIGATION =====
+function navegar(secao) {
+    ['dashboard','detalhe','clientes'].forEach(s => document.getElementById(`secao-${s}`).style.display = 'none');
+    document.getElementById(`secao-${secao}`).style.display = 'block';
+    document.getElementById('tab-dash').classList.toggle('ativa', secao === 'dashboard' || secao === 'detalhe');
+    document.getElementById('tab-cli').classList.toggle('ativa', secao === 'clientes');
+    if (secao === 'dashboard') iniciarDashboard();
+    if (secao === 'clientes') carregarTabelaClientes();
+}
+
+// ===== DASHBOARD =====
+function iniciarDashboard() {
+    clearInterval(intervaloDash); clearInterval(countdownTimer);
+    carregarDashboard();
+    countdownVal = 60;
+    countdownTimer = setInterval(() => {
+        countdownVal--;
+        document.getElementById('countdown-txt').textContent = `${countdownVal}s`;
+        if (countdownVal <= 0) { countdownVal = 60; carregarDashboard(); }
+    }, 1000);
+    intervaloDash = setInterval(() => carregarDashboard(), 60000);
+}
+
+async function carregarDashboard() {
+    try {
+        const resp = await fetch(`${API}/clientes`, { headers: {"Authorization": `Bearer ${token}`} });
+        const clientes = await resp.json();
+
+        const monitData = await Promise.all(clientes.map(async c => {
+            if (!c.marca_inversor) return { ...c, mon: null };
+            try {
+                const r = await fetch(`${API}/clientes/${c.id}/monitoramento`, { headers: {"Authorization": `Bearer ${token}`} });
+                return { ...c, mon: r.ok ? await r.json() : null };
+            } catch { return { ...c, mon: null }; }
+        }));
+
+        renderKPIBar(monitData);
+        renderPlantGrid(monitData);
+    } catch(e) {
+        document.getElementById('plant-grid').innerHTML = `<div class="empty-state" style="grid-column:1/-1; color:#ef4444;"><p>Erro ao carregar dados. Verifique a conexão.</p></div>`;
+    }
+}
+
+function renderKPIBar(clientes) {
+    const comInversor = clientes.filter(c => c.marca_inversor);
+    const semConfig = clientes.filter(c => !c.marca_inversor).length;
+    let online = 0, alerta = 0, offline = 0, kwTotal = 0;
+    comInversor.forEach(c => {
+        const kw = c.mon?.geracao_atual_kw ?? 0;
+        kwTotal += kw;
+        if (!c.mon) offline++;
+        else if (kw > 0.1) online++;
+        else if (kw > 0) alerta++;
+        else offline++;
+    });
+    document.getElementById('kpi-total').textContent = clientes.length;
+    document.getElementById('kpi-on').textContent = online;
+    document.getElementById('kpi-al').textContent = alerta;
+    document.getElementById('kpi-off').textContent = offline;
+    document.getElementById('kpi-cfg').textContent = semConfig;
+    document.getElementById('kpi-kw').textContent = kwTotal.toFixed(1);
+}
+
+function renderPlantGrid(clientes) {
+    if (!clientes.length) {
+        document.getElementById('plant-grid').innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><div class="e-icon">🌱</div><p>Nenhum cliente cadastrado ainda.<br>Vá em <strong>Clientes</strong> para adicionar.</p></div>`;
+        return;
+    }
+    document.getElementById('plant-grid').innerHTML = clientes.map(c => {
+        const kw = c.mon?.geracao_atual_kw ?? 0;
+        const kwp = c.potencia_kwp || 0;
+        const temInversor = !!c.marca_inversor;
+
+        let status, badgeClass, cardClass;
+        if (!temInversor) {
+            status = '⚙️ Sem Config'; badgeClass = 'badge-config'; cardClass = 'st-config';
+        } else if (!c.mon) {
+            status = '🔴 Offline'; badgeClass = 'badge-offline'; cardClass = 'st-offline';
+        } else if (kw > 0.1) {
+            status = '🟢 Gerando'; badgeClass = 'badge-online'; cardClass = 'st-online';
+        } else if (kw > 0) {
+            status = '🟡 Baixa'; badgeClass = 'badge-alerta'; cardClass = 'st-alerta';
+        } else {
+            status = '🔴 Parado'; badgeClass = 'badge-offline'; cardClass = 'st-offline';
         }
 
-        const dados = {
-            marca_inversor: marca,
-            serial_inversor: serial,
-            api_key_inversor: apiKey,
-            inversor_usuario: foxessCredenciais?.email || null,
-            inversor_senha: foxessCredenciais?.senha || null
-        };
+        const pct = kwp > 0 ? Math.min(100, (kw / kwp) * 100) : 0;
+        const barColor = cardClass === 'st-online' ? '#10b981' : cardClass === 'st-alerta' ? '#f59e0b' : '#334155';
+        const ts = c.mon?.timestamp ? `Atualizado ${new Date(c.mon.timestamp + 'Z').toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})}` : '';
 
-        try {
-            const resp = await fetch(`${API}/clientes/${clienteInversorId}/inversor`, {
-                method: "PUT",
-                headers: {"Content-Type": "application/json", "Authorization": `Bearer ${token}`},
-                body: JSON.stringify(dados)
-            });
-            if (resp.ok) {
-                document.getElementById("sucesso-inversor").style.display = "block";
-                setTimeout(() => {
-                    document.getElementById("sucesso-inversor").style.display = "none";
-                    fecharModal("modal-inversor");
-                    carregarMonitoramento();
-                }, 2000);
-            } else {
-                const data = await resp.json();
-                document.getElementById("erro-inversor").textContent = data.detail || "Erro ao salvar inversor";
+        const detBtn = temInversor ? `<button class="plant-btn primary" onclick="event.stopPropagation(); abrirDetalhe(${c.id},'${c.nome.replace(/'/g,"\\'")}')">📊 Dashboard</button>` : '';
+        const configBtn = `<button class="plant-btn" onclick="event.stopPropagation(); cadastrarInversor(${c.id},'${c.nome.replace(/'/g,"\\'")}')">⚙️ Inversor</button>`;
+        const projetoBtn = `<button class="plant-btn" onclick="event.stopPropagation(); cadastrarProjeto(${c.id},'${c.nome.replace(/'/g,"\\'")}')">☀️ Projeto</button>`;
+        const linkBtn = `<button class="plant-btn" onclick="event.stopPropagation(); obterLink(${c.id},'${c.nome.replace(/'/g,"\\'")}')">🔗</button>`;
+
+        return `
+        <div class="plant-card ${cardClass}" onclick="${temInversor ? `abrirDetalhe(${c.id},'${c.nome.replace(/'/g,"\\'")}')` : `cadastrarInversor(${c.id},'${c.nome.replace(/'/g,"\\'")}')` }">
+            <div class="plant-nome">${c.nome}</div>
+            <div class="plant-badge ${badgeClass}">${status}</div>
+            <div class="plant-kw">${temInversor ? kw.toFixed(2) : '—'}</div>
+            <div class="plant-kw-unit">kW${kwp > 0 ? ` / ${kwp} kWp` : ''}</div>
+            ${kwp > 0 ? `
+            <div class="plant-bar-wrap">
+                <div class="plant-bar-bg"><div class="plant-bar-fill" style="width:${pct}%; background:${barColor};"></div></div>
+                <div class="plant-bar-label"><span>0</span><span>${kwp} kWp</span></div>
+            </div>` : ''}
+            <div class="plant-ts">${ts}</div>
+            <div class="plant-actions">
+                ${detBtn}${projetoBtn}${configBtn}${linkBtn}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ===== PLANT DETAIL =====
+async function abrirDetalhe(clienteId, nomeCliente) {
+    clienteDetalheId = clienteId;
+    document.getElementById('det-nome').textContent = nomeCliente;
+    document.getElementById('det-sub').textContent = 'Carregando dados...';
+    document.getElementById('det-badge').innerHTML = '';
+    document.getElementById('alerts-content').innerHTML = '<p style="color:#334155; font-size:13px;"><span class="spin">⟳</span> Carregando...</p>';
+    clearInterval(intervaloDash); clearInterval(countdownTimer);
+    navegar('detalhe');
+    await atualizarDetalhe();
+}
+
+async function atualizarDetalhe() {
+    if (!clienteDetalheId) return;
+    try {
+        const [monResp, mensalResp, diariaResp, anomaliaResp] = await Promise.all([
+            fetch(`${API}/clientes/${clienteDetalheId}/monitoramento`, {headers:{"Authorization":`Bearer ${token}`}}),
+            fetch(`${API}/clientes/${clienteDetalheId}/monitoramento/mensal`, {headers:{"Authorization":`Bearer ${token}`}}),
+            fetch(`${API}/clientes/${clienteDetalheId}/geracao/diaria?dias=30`, {headers:{"Authorization":`Bearer ${token}`}}),
+            fetch(`${API}/clientes/${clienteDetalheId}/verificar-anomalias`, {headers:{"Authorization":`Bearer ${token}`}})
+        ]);
+
+        // Real-time stats
+        if (monResp.ok) {
+            const d = await monResp.json();
+            document.getElementById('d-pv').textContent = (d.geracao_atual_kw || 0).toFixed(2);
+            document.getElementById('d-casa').textContent = (d.consumo_casa_kw || 0).toFixed(2);
+            document.getElementById('d-inj').textContent = (d.injetado_rede_kw || 0).toFixed(2);
+            document.getElementById('d-rede').textContent = (d.consumo_rede_kw || 0).toFixed(2);
+            document.getElementById('det-sub').textContent = `Última leitura: ${new Date(d.timestamp + 'Z').toLocaleString('pt-BR')}`;
+            const kw = d.geracao_atual_kw || 0;
+            const stClass = kw > 0.1 ? 'badge-online' : kw > 0 ? 'badge-alerta' : 'badge-offline';
+            const stTxt = kw > 0.1 ? '🟢 Online' : kw > 0 ? '🟡 Baixa Geração' : '🔴 Sem Geração';
+            document.getElementById('det-badge').innerHTML = `<span class="plant-badge ${stClass}" style="font-size:11px; padding:3px 10px;">${stTxt}</span>`;
+            renderFluxo(d);
+        } else {
+            document.getElementById('det-sub').textContent = 'Erro ao buscar dados em tempo real';
+            renderFluxo({});
+        }
+
+        // Monthly chart
+        if (mensalResp.ok) {
+            const m = await mensalResp.json();
+            renderChartMensal(m.mensal || []);
+        }
+
+        // Daily chart
+        if (diariaResp.ok) {
+            const di = await diariaResp.json();
+            renderChartDiario(di.dados || []);
+        }
+
+        // Alerts
+        if (anomaliaResp.ok) {
+            const a = await anomaliaResp.json();
+            renderAlertas(a.alertas || []);
+        } else {
+            document.getElementById('alerts-content').innerHTML = '<p style="color:#334155; font-size:13px;">Sem dados suficientes para análise.</p>';
+        }
+
+    } catch(e) {
+        document.getElementById('det-sub').textContent = 'Erro ao carregar dados';
+    }
+}
+
+function renderFluxo(d) {
+    const pv   = d.geracao_atual_kw   || 0;
+    const casa = d.consumo_casa_kw    || 0;
+    const inj  = d.injetado_rede_kw   || 0;
+    const rede = d.consumo_rede_kw    || 0;
+
+    const cPV   = pv   > 0.05 ? '#f59e0b' : '#1f2937';
+    const cCasa = casa > 0.05 ? '#10b981' : '#1f2937';
+    const cRede = (inj > 0.05 || rede > 0.05) ? '#60a5fa' : '#1f2937';
+
+    const aPV   = pv   > 0.05 ? 'sf-active'  : 'sf-idle';
+    const aCasa = casa > 0.05 ? 'sf-active'  : 'sf-idle';
+    const aRede = inj  > 0.05 ? 'sf-active'  : rede > 0.05 ? 'sf-reverse' : 'sf-idle';
+
+    const redeLabel = inj > 0.05 ? `+${inj.toFixed(2)}kW` : rede > 0.05 ? `-${rede.toFixed(2)}kW` : '0 kW';
+
+    document.getElementById('flow-wrap').innerHTML = `
+    <svg viewBox="0 0 300 250" width="100%" style="max-height:210px;" xmlns="http://www.w3.org/2000/svg">
+        <!-- PV → Inversor -->
+        <line x1="150" y1="54" x2="150" y2="86" stroke="${pv>0.05?'#f59e0b':'#1f2937'}" stroke-width="3" stroke-linecap="round" class="${aPV}"/>
+        <!-- Inv → Casa -->
+        <line x1="130" y1="123" x2="72" y2="163" stroke="${casa>0.05?'#10b981':'#1f2937'}" stroke-width="3" stroke-linecap="round" class="${aCasa}"/>
+        <!-- Inv → Rede -->
+        <line x1="170" y1="123" x2="228" y2="163" stroke="${(inj>0.05||rede>0.05)?'#60a5fa':'#1f2937'}" stroke-width="3" stroke-linecap="round" class="${aRede}"/>
+
+        <!-- PV node -->
+        <circle cx="150" cy="32" r="22" fill="#0d1526" stroke="${cPV}" stroke-width="2"/>
+        <text x="150" y="27" text-anchor="middle" fill="${cPV}" font-size="11" font-weight="700" font-family="Segoe UI,sans-serif">PV</text>
+        <text x="150" y="40" text-anchor="middle" fill="#e2e8f0" font-size="10" font-weight="700" font-family="Segoe UI,sans-serif">${pv.toFixed(2)} kW</text>
+
+        <!-- Inversor box -->
+        <rect x="108" y="88" width="84" height="32" rx="8" fill="#0d1526" stroke="#334155" stroke-width="1.5"/>
+        <text x="150" y="108" text-anchor="middle" fill="#475569" font-size="10" font-weight="700" font-family="Segoe UI,sans-serif" letter-spacing="1">INVERSOR</text>
+
+        <!-- Casa node -->
+        <circle cx="56" cy="186" r="24" fill="#0d1526" stroke="${cCasa}" stroke-width="2"/>
+        <text x="56" y="181" text-anchor="middle" fill="${cCasa}" font-size="10" font-weight="700" font-family="Segoe UI,sans-serif">CASA</text>
+        <text x="56" y="196" text-anchor="middle" fill="#e2e8f0" font-size="10" font-weight="700" font-family="Segoe UI,sans-serif">${casa.toFixed(2)} kW</text>
+
+        <!-- Rede node -->
+        <circle cx="244" cy="186" r="24" fill="#0d1526" stroke="${cRede}" stroke-width="2"/>
+        <text x="244" y="181" text-anchor="middle" fill="${cRede}" font-size="10" font-weight="700" font-family="Segoe UI,sans-serif">REDE</text>
+        <text x="244" y="196" text-anchor="middle" fill="#e2e8f0" font-size="10" font-weight="700" font-family="Segoe UI,sans-serif">${redeLabel}</text>
+    </svg>`;
+}
+
+function renderChartMensal(dados) {
+    const canvasEl = document.getElementById('chart-mensal');
+    const emptyEl = document.getElementById('chart-mensal-empty');
+    if (chartMensal) { chartMensal.destroy(); chartMensal = null; }
+
+    if (!dados.length) {
+        canvasEl.style.display = 'none'; emptyEl.style.display = 'block'; return;
+    }
+    canvasEl.style.display = 'block'; emptyEl.style.display = 'none';
+
+    const mesAtual = new Date().getMonth() + 1;
+    chartMensal = new Chart(canvasEl, {
+        type: 'bar',
+        data: {
+            labels: dados.map(d => d.mes),
+            datasets: [{
+                data: dados.map(d => d.geracao_kwh),
+                backgroundColor: dados.map(d => d.mes_num === mesAtual ? '#f59e0b' : 'rgba(96,165,250,0.7)'),
+                borderRadius: 4,
+                borderSkipped: false,
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: true,
+            plugins: { legend: { display: false }, tooltip: {
+                backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1,
+                callbacks: { label: ctx => ` ${ctx.parsed.y.toFixed(1)} kWh` }
+            }},
+            scales: {
+                x: { grid: { color: '#1a2335' }, ticks: { color: '#475569' } },
+                y: { grid: { color: '#1a2335' }, ticks: { color: '#475569', callback: v => v + ' kWh' } }
             }
-        } catch(e) { document.getElementById("erro-inversor").textContent = "Erro de conexão"; }
-    }
-
-    function fecharModal(id) {
-        document.getElementById(id).classList.remove("ativo");
-        if (id === "modal-projeto") {
-            ["proj-endereco","proj-potencia","proj-data","proj-lat","proj-lng"].forEach(i => document.getElementById(i).value = "");
-            document.getElementById("proj-pr").value = "0.80";
-            document.getElementById("sucesso-projeto").style.display = "none";
-            document.getElementById("erro-projeto").textContent = "";
-            document.getElementById("erro-endereco").textContent = "";
-            document.getElementById("endereco-encontrado").style.display = "none";
-            document.getElementById("campos-manuais").style.display = "none";
-            modoManual = false;
         }
-    }
+    });
+}
 
-    // ===== MONITORAMENTO =====
-    async function carregarMonitoramento() {
-        try {
-            const resp = await fetch(`${API}/clientes`, { headers: {"Authorization": `Bearer ${token}`} });
-            const clientes = await resp.json();
-            const clientesComMonitoramento = await Promise.all(
-                clientes.map(async (cliente) => {
-                    try {
-                        const monitorResp = await fetch(`${API}/clientes/${cliente.id}/monitoramento`, {
-                            headers: {"Authorization": `Bearer ${token}`}
-                        });
-                        if (monitorResp.ok) {
-                            const dados = await monitorResp.json();
-                            return { ...cliente, monitoramento: dados, temInversor: true };
-                        } else {
-                            return { ...cliente, monitoramento: null, temInversor: false };
-                        }
-                    } catch(e) {
-                        return { ...cliente, monitoramento: null, temInversor: false };
-                    }
-                })
-            );
-            atualizarTabelaComMonitoramento(clientesComMonitoramento);
-            atualizarCardResumo(clientesComMonitoramento);
-        } catch(e) {
-            console.error("Erro ao carregar monitoramento:", e);
+function renderChartDiario(dados) {
+    const canvasEl = document.getElementById('chart-diario');
+    const emptyEl = document.getElementById('chart-diario-empty');
+    if (chartDiario) { chartDiario.destroy(); chartDiario = null; }
+
+    const dadosFiltrados = dados.filter(d => d.total_kwh > 0);
+    if (!dadosFiltrados.length) {
+        canvasEl.style.display = 'none'; emptyEl.style.display = 'block'; return;
+    }
+    canvasEl.style.display = 'block'; emptyEl.style.display = 'none';
+
+    const labels = dadosFiltrados.map(d => {
+        const [, m, dia] = d.data.split('-');
+        return `${dia}/${m}`;
+    });
+
+    chartDiario = new Chart(canvasEl, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                data: dadosFiltrados.map(d => d.total_kwh),
+                borderColor: '#f59e0b',
+                backgroundColor: 'rgba(245,158,11,0.08)',
+                fill: true,
+                tension: 0.35,
+                pointRadius: 3,
+                pointBackgroundColor: '#f59e0b',
+                borderWidth: 2,
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: true,
+            plugins: { legend: { display: false }, tooltip: {
+                backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1,
+                callbacks: { label: ctx => ` ${ctx.parsed.y.toFixed(1)} kWh` }
+            }},
+            scales: {
+                x: { grid: { color: '#1a2335' }, ticks: { color: '#475569', maxTicksLimit: 10 } },
+                y: { grid: { color: '#1a2335' }, ticks: { color: '#475569', callback: v => v + ' kWh' }, beginAtZero: true }
+            }
         }
-    }
+    });
+}
 
-    function atualizarTabelaComMonitoramento(clientes) {
+function renderAlertas(alertas) {
+    if (!alertas.length) {
+        document.getElementById('alerts-content').innerHTML = '<p style="color:#334155; font-size:13px;">Sem alertas no momento.</p>';
+        return;
+    }
+    document.getElementById('alerts-content').innerHTML = alertas.map(a => `
+        <div class="alert-row ${a.tipo}">
+            <div class="alert-icon">${a.icone}</div>
+            <div>
+                <div class="alert-titulo">${a.titulo}</div>
+                <div class="alert-msg">${a.mensagem}</div>
+                ${a.acao ? `<div class="alert-acao">${a.acao}</div>` : ''}
+            </div>
+        </div>`).join('');
+}
+
+function voltarDashboard() {
+    if (chartMensal) { chartMensal.destroy(); chartMensal = null; }
+    if (chartDiario) { chartDiario.destroy(); chartDiario = null; }
+    clienteDetalheId = null;
+    navegar('dashboard');
+}
+
+// ===== CLIENTS TABLE =====
+async function carregarTabelaClientes() {
+    try {
+        const resp = await fetch(`${API}/clientes`, { headers: {"Authorization": `Bearer ${token}`} });
+        const clientes = await resp.json();
         const tbody = document.getElementById("tabela-clientes");
-        if (clientes.length === 0) {
+        if (!clientes.length) {
             tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#888;">Nenhum cliente cadastrado</td></tr>';
             return;
         }
-        tbody.innerHTML = clientes.map(c => {
-            let statusHtml = '';
-            if (!c.temInversor) {
-                statusHtml = '<span style="color:#9ca3af; font-size:13px;">⚙️ Não configurado</span>';
-            } else if (c.monitoramento && c.monitoramento.status === 'online') {
-                const geracao = c.monitoramento.geracao_atual_kw;
-                if (geracao > 0.1) {
-                    statusHtml = `<span style="color:#16a34a; font-size:13px;">🟢 ${geracao.toFixed(2)} kW</span>`;
-                } else if (geracao > 0) {
-                    statusHtml = `<span style="color:#d97706; font-size:13px;">🟡 ${geracao.toFixed(2)} kW</span>`;
-                } else {
-                    statusHtml = '<span style="color:#dc2626; font-size:13px;">🔴 Sem geração</span>';
-                }
-            } else {
-                statusHtml = '<span style="color:#dc2626; font-size:13px;">🔴 Erro</span>';
-            }
-            return `
-                <tr>
-                    <td data-label="Nome"><strong>${c.nome}</strong></td>
-                    <td data-label="UC">${c.numero_uc || "—"}</td>
-                    <td data-label="Distribuidora">${c.distribuidora || "—"}</td>
-                    <td data-label="Tipo GD">${c.tipo_gd || "—"}</td>
-                    <td data-label="Monitoramento">${statusHtml}</td>
-                    <td data-label="Ações">
-                        <div class="acoes">
-                            <button class="pequeno" onclick="verContas(${c.id}, '${c.nome}')">Ver Contas</button>
-                            <button class="azul pequeno" onclick="obterLink(${c.id}, '${c.nome}')">🔗 Link</button>
-                            <button class="amarelo pequeno" onclick="cadastrarProjeto(${c.id}, '${c.nome}')">☀️ Projeto</button>
-                            <button class="roxo pequeno" onclick="cadastrarInversor(${c.id}, '${c.nome}')">🔌 Inversor</button>
-                            ${c.temInversor ? `<button class="verde pequeno" onclick="verMonitoramentoAoVivo(${c.id}, '${c.nome}')">📡 Ao Vivo</button>` : ''}
-                        </div>
-                    </td>
-                </tr>
-            `;
-        }).join("");
+        tbody.innerHTML = clientes.map(c => `
+            <tr>
+                <td data-label="Nome"><strong>${c.nome}</strong></td>
+                <td data-label="UC">${c.numero_uc || '—'}</td>
+                <td data-label="Distribuidora">${c.distribuidora || '—'}</td>
+                <td data-label="Tipo GD">${c.tipo_gd || '—'}</td>
+                <td data-label="Inversor">${c.marca_inversor ? `<span class="badge-inv">✅ ${c.marca_inversor}</span>` : '<span style="color:#9ca3af; font-size:12px;">Não configurado</span>'}</td>
+                <td data-label="Ações">
+                    <div class="acoes">
+                        <button class="pequeno" onclick="verContas(${c.id},'${c.nome.replace(/'/g,"\\'")}')">Ver Contas</button>
+                        <button class="azul pequeno" onclick="obterLink(${c.id},'${c.nome.replace(/'/g,"\\'")}')">🔗 Link</button>
+                        <button class="amarelo pequeno" onclick="cadastrarProjeto(${c.id},'${c.nome.replace(/'/g,"\\'")}')">☀️ Projeto</button>
+                        <button class="roxo pequeno" onclick="cadastrarInversor(${c.id},'${c.nome.replace(/'/g,"\\'")}')">🔌 Inversor</button>
+                        ${c.marca_inversor ? `<button class="verde pequeno" onclick="abrirDetalhe(${c.id},'${c.nome.replace(/'/g,"\\'")}')">📊 Dashboard</button>` : ''}
+                    </div>
+                </td>
+            </tr>`).join('');
+    } catch(e) {
+        document.getElementById("tabela-clientes").innerHTML = '<tr><td colspan="6" style="color:#dc2626; text-align:center;">Erro ao carregar clientes</td></tr>';
     }
+}
 
-    function atualizarCardResumo(clientes) {
-        const comInversor = clientes.filter(c => c.temInversor);
-        const semInversor = clientes.filter(c => !c.temInversor);
-        const totais = { normal: 0, alerta: 0, problema: 0 };
-        comInversor.forEach(c => {
-            const geracao = c.monitoramento?.geracao_atual_kw || 0;
-            if (geracao > 0.1) totais.normal++;
-            else if (geracao > 0) totais.alerta++;
-            else totais.problema++;
-        });
-        document.getElementById("total-usinas").textContent = comInversor.length;
-        document.getElementById("usinas-normais").textContent = totais.normal;
-        document.getElementById("usinas-alerta").textContent = totais.alerta;
-        document.getElementById("usinas-problema").textContent = totais.problema;
-        document.getElementById("usinas-sem-config").textContent = semInversor.length;
-    }
-
-    async function verMonitoramentoAoVivo(clienteId, nomeCliente) {
-        try {
-            const resp = await fetch(`${API}/clientes/${clienteId}/monitoramento`, {
-                headers: {"Authorization": `Bearer ${token}`}
-            });
-            const dados = await resp.json();
-            let modal = document.getElementById("modal-monitoramento");
-            if (!modal) {
-                modal = document.createElement('div');
-                modal.id = "modal-monitoramento";
-                modal.className = "modal-overlay";
-                modal.innerHTML = `
-                    <div class="modal" style="max-width: 480px;">
-                        <h3 id="mon-titulo">📡 Monitoramento</h3>
-                        <div id="mon-conteudo"></div>
-                        <div class="modal-acoes">
-                            <button class="azul pequeno" id="btn-atualizar-mon">🔄 Atualizar</button>
-                            <button class="secundario pequeno" onclick="document.getElementById('modal-monitoramento').classList.remove('ativo')">Fechar</button>
-                        </div>
-                    </div>`;
-                document.body.appendChild(modal);
-            }
-            document.getElementById("btn-atualizar-mon").onclick = () => verMonitoramentoAoVivo(clienteId, nomeCliente);
-            document.getElementById("mon-titulo").textContent = `📡 ${nomeCliente}`;
-            document.getElementById("mon-conteudo").innerHTML = `
-                <div style="text-align:center; background: linear-gradient(135deg, #f59e0b, #d97706); border-radius:12px; padding:24px; color:white; margin:16px 0;">
-                    <p style="font-size:13px; opacity:0.85;">Geração atual</p>
-                    <p style="font-size:52px; font-weight:800; line-height:1;">${dados.geracao_atual_kw}</p>
-                    <p style="font-size:18px; opacity:0.85;">kW</p>
-                </div>
-                <p style="margin-bottom:8px;"><strong>📟 Status:</strong> ${dados.status === 'online' ? '🟢 Online' : '🔴 Offline'}</p>
-                <p style="margin-bottom:8px;"><strong>🔢 Serial:</strong> ${dados.serial}</p>
-                <p><strong>🕐 Última leitura:</strong> ${new Date(dados.timestamp).toLocaleString('pt-BR')}</p>`;
-            modal.classList.add("ativo");
-        } catch(e) {
-            alert("Erro ao buscar dados de monitoramento");
+async function cadastrarCliente() {
+    const dados = {
+        nome: document.getElementById("novo-nome").value,
+        email: document.getElementById("novo-email").value,
+        telefone: document.getElementById("novo-telefone").value,
+        numero_uc: document.getElementById("novo-uc").value,
+        distribuidora: document.getElementById("novo-distribuidora").value,
+        tipo_gd: document.getElementById("novo-tipo-gd").value
+    };
+    if (!dados.nome) { document.getElementById("erro-cadastro").textContent = "Nome é obrigatório"; return; }
+    try {
+        const resp = await fetch(`${API}/clientes`, { method:"POST", headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`}, body:JSON.stringify(dados) });
+        if (resp.ok) {
+            document.getElementById("sucesso-cadastro").textContent = "✅ Cliente cadastrado!";
+            ["novo-nome","novo-email","novo-telefone","novo-uc","novo-distribuidora","novo-tipo-gd"].forEach(id => document.getElementById(id).value = "");
+            carregarTabelaClientes();
+            setTimeout(() => document.getElementById("sucesso-cadastro").textContent = "", 3000);
+        } else {
+            const d = await resp.json();
+            document.getElementById("erro-cadastro").textContent = d.detail || "Erro ao cadastrar";
         }
-    }
+    } catch(e) { document.getElementById("erro-cadastro").textContent = "Erro de conexão"; }
+}
 
-    function iniciarMonitoramentoAutomatico() {
-        if (intervaloMonitoramento) clearInterval(intervaloMonitoramento);
-        carregarMonitoramento();
-        intervaloMonitoramento = setInterval(carregarMonitoramento, 60000);
+function verContas(clienteId, nomeCliente) {
+    window.open(`portal.html?cliente_id=${clienteId}&nome=${encodeURIComponent(nomeCliente)}`, '_blank');
+}
+
+async function obterLink(clienteId, nomeCliente) {
+    try {
+        const resp = await fetch(`${API}/clientes/${clienteId}/obter-token`, { headers: {"Authorization": `Bearer ${token}`} });
+        const data = await resp.json();
+        const base = window.location.href.replace("painel.html", "");
+        document.getElementById("link-cliente").textContent = `${base}portal.html?token_acesso=${data.token_acesso}&nome=${encodeURIComponent(nomeCliente)}`;
+        document.getElementById("modal-link").classList.add("ativo");
+    } catch(e) { alert("Erro ao obter link"); }
+}
+
+function copiarLink() {
+    navigator.clipboard.writeText(document.getElementById("link-cliente").textContent);
+    document.getElementById("copiado").style.display = "block";
+    setTimeout(() => document.getElementById("copiado").style.display = "none", 2000);
+}
+
+// ===== PROJETO SOLAR =====
+function cadastrarProjeto(clienteId, nomeCliente) {
+    clienteProjetoId = clienteId;
+    document.getElementById("nome-projeto-cliente").textContent = `Cliente: ${nomeCliente}`;
+    document.getElementById("modal-projeto").classList.add("ativo");
+}
+function toggleManual() {
+    modoManual = !modoManual;
+    document.getElementById("campos-manuais").style.display = modoManual ? "block" : "none";
+}
+async function buscarCoordenadas() {
+    const endereco = document.getElementById("proj-endereco").value;
+    if (!endereco) { document.getElementById("erro-endereco").textContent = "Digite o endereço primeiro"; return; }
+    document.getElementById("erro-endereco").textContent = "";
+    document.getElementById("endereco-encontrado").style.display = "none";
+    const variacoes = [endereco, endereco + ", Brasil", endereco.split(",").slice(-2).join(",").trim() + ", Brasil"];
+    for (const v of variacoes) {
+        try {
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(v)}&limit=1&countrycodes=br`;
+            const resp = await fetch(url, { headers: {"Accept-Language": "pt-BR"} });
+            const data = await resp.json();
+            if (data.length > 0) {
+                modoManual = true;
+                document.getElementById("campos-manuais").style.display = "block";
+                document.getElementById("proj-lat").value = parseFloat(data[0].lat).toFixed(6);
+                document.getElementById("proj-lng").value = parseFloat(data[0].lon).toFixed(6);
+                document.getElementById("endereco-encontrado").style.display = "block";
+                document.getElementById("endereco-encontrado").textContent = `✅ Encontrado: ${data[0].display_name.substring(0,70)}...`;
+                return;
+            }
+        } catch(e) { continue; }
     }
+    document.getElementById("erro-endereco").textContent = "Endereço não encontrado. Use o Google Maps para copiar as coordenadas manualmente.";
+    modoManual = true; document.getElementById("campos-manuais").style.display = "block";
+}
+async function salvarProjeto() {
+    const potencia = parseFloat(document.getElementById("proj-potencia").value);
+    const lat = parseFloat(document.getElementById("proj-lat").value);
+    const lng = parseFloat(document.getElementById("proj-lng").value);
+    if (!potencia) { document.getElementById("erro-projeto").textContent = "Potência é obrigatória"; return; }
+    if (!lat || !lng) { document.getElementById("erro-projeto").textContent = "Informe a localização da instalação"; return; }
+    const dados = { potencia_kwp: potencia, data_instalacao: document.getElementById("proj-data").value || null, latitude: lat, longitude: lng, performance_ratio: parseFloat(document.getElementById("proj-pr").value) || 0.80 };
+    try {
+        const resp = await fetch(`${API}/clientes/${clienteProjetoId}/projeto`, { method:"PUT", headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`}, body:JSON.stringify(dados) });
+        if (resp.ok) {
+            document.getElementById("sucesso-projeto").style.display = "block";
+            setTimeout(() => { document.getElementById("sucesso-projeto").style.display = "none"; fecharModal("modal-projeto"); }, 2000);
+        } else {
+            const d = await resp.json();
+            document.getElementById("erro-projeto").textContent = d.detail || "Erro ao salvar";
+        }
+    } catch(e) { document.getElementById("erro-projeto").textContent = "Erro de conexão"; }
+}
+
+// ===== INVERSOR =====
+function cadastrarInversor(clienteId, nomeCliente) {
+    clienteInversorId = clienteId;
+    document.getElementById("nome-inversor-cliente").textContent = `Cliente: ${nomeCliente}`;
+    ["inv-serial","inv-api-key","inv-deye-app-id","inv-deye-app-secret","foxess-apikey-busca"].forEach(id => document.getElementById(id).value = "");
+    document.getElementById("inv-marca").value = "";
+    document.getElementById("foxess-buscando").style.display = "none";
+    document.getElementById("foxess-erro-busca").textContent = "";
+    document.getElementById("foxess-dispositivos").style.display = "none";
+    document.getElementById("foxess-busca").style.display = "none";
+    document.getElementById("instrucoes-api").innerHTML = "";
+    document.getElementById("instrucoes-api-deye").innerHTML = "";
+    foxessCredenciais = null;
+    document.getElementById("campo-api-key").style.display = "block";
+    document.getElementById("campos-deye").style.display = "none";
+    document.getElementById("erro-inversor").textContent = "";
+    document.getElementById("sucesso-inversor").style.display = "none";
+    document.getElementById("modal-inversor").classList.add("ativo");
+}
+async function foxessBuscar() {
+    const apiKey = document.getElementById("foxess-apikey-busca").value.trim();
+    const erroEl = document.getElementById("foxess-erro-busca");
+    erroEl.textContent = "";
+    document.getElementById("foxess-dispositivos").style.display = "none";
+    if (!apiKey) { erroEl.textContent = "Cole a API Key do FoxESS para buscar"; return; }
+    document.getElementById("foxess-buscando").style.display = "block";
+    document.getElementById("btn-foxess-buscar").disabled = true;
+    try {
+        const resp = await fetch(`${API}/clientes/${clienteInversorId}/foxess/buscar`, { method:"POST", headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`}, body:JSON.stringify({api_key: apiKey}) });
+        const data = await resp.json();
+        if (resp.ok) {
+            foxessCredenciais = null;
+            document.getElementById("inv-api-key").value = apiKey;
+            const sel = document.getElementById("foxess-select-device");
+            sel.innerHTML = '<option value="">Selecione o inversor...</option>';
+            data.dispositivos.forEach(d => {
+                const opt = document.createElement("option");
+                opt.value = d.sn;
+                opt.textContent = `${d.sn} — ${d.modelo || "Inversor"} ${d.status === 1 ? "🟢" : "⚫"}`;
+                sel.appendChild(opt);
+            });
+            document.getElementById("foxess-dispositivos").style.display = "block";
+            if (data.dispositivos.length === 1) { sel.selectedIndex = 1; foxessSelecionarDispositivo(); }
+        } else { erroEl.textContent = data.detail || "Erro ao buscar inversores"; }
+    } catch(e) { erroEl.textContent = "Erro de conexão"; }
+    finally { document.getElementById("foxess-buscando").style.display = "none"; document.getElementById("btn-foxess-buscar").disabled = false; }
+}
+function foxessSelecionarDispositivo() {
+    const sn = document.getElementById("foxess-select-device").value;
+    if (sn) {
+        document.getElementById("inv-serial").value = sn;
+        document.getElementById("instrucoes-api").innerHTML = `<p class="sucesso" style="margin-top:4px;">✅ Serial preenchido automaticamente!</p>`;
+    }
+}
+function atualizarInstrucoes() {
+    const marca = document.getElementById("inv-marca").value;
+    const isDeye = marca === "deye"; const isFoxess = marca === "foxess";
+    document.getElementById("foxess-busca").style.display = isFoxess ? "block" : "none";
+    document.getElementById("campo-api-key").style.display = isDeye ? "none" : "block";
+    document.getElementById("campos-deye").style.display = isDeye ? "block" : "none";
+    const instrucoes = {
+        foxess: `<div class="dica-roxo">📋 <strong>API Key FoxESS:</strong><br>1. Acesse <a href="https://www.foxesscloud.com" target="_blank" style="color:#7c3aed;">foxesscloud.com</a> (versão antiga)<br>2. Perfil → User Profile → API Management → Generate API Key<br><span style="color:#dc2626; font-weight:600;">⚠️ O portal novo (v2.0) não mostra a API Key.</span></div>`,
+        growatt: `<div class="dica-roxo">📋 <strong>Token Growatt:</strong><br>1. Acesse <a href="https://openapi.growatt.com" target="_blank" style="color:#7c3aed;">openapi.growatt.com</a><br>2. Account → API Token</div>`,
+        weg: `<div class="dica-roxo">📋 <strong>Chave WEG/SunWEG:</strong><br>1. Acesse <a href="https://solarportal.weg.net" target="_blank" style="color:#7c3aed;">solarportal.weg.net</a><br>2. Gestão de API → nova chave</div>`,
+        hoymiles: `<div class="dica-roxo">📋 <strong>Token Hoymiles:</strong><br>1. Acesse <a href="https://global.hoymiles.com" target="_blank" style="color:#7c3aed;">global.hoymiles.com</a><br>2. Account → API Access</div>`,
+        solis: `<div class="dica-roxo">📋 <strong>Chave Solis:</strong><br>1. Acesse <a href="https://www.soliscloud.com" target="_blank" style="color:#7c3aed;">soliscloud.com</a><br>2. Conta → Gestão de API</div>`,
+    };
+    document.getElementById("instrucoes-api").innerHTML = instrucoes[marca] || "";
+    document.getElementById("instrucoes-api-deye").innerHTML = isDeye ? `<div class="dica-roxo">📋 <strong>App ID e App Secret Deye:</strong><br>1. Acesse <a href="https://open.solarmanpv.com" target="_blank" style="color:#7c3aed;">open.solarmanpv.com</a><br>2. Manage Apps → Create App → copie App ID e App Secret</div>` : "";
+}
+async function salvarInversor() {
+    const marca = document.getElementById("inv-marca").value;
+    const serial = document.getElementById("inv-serial").value.trim();
+    document.getElementById("erro-inversor").textContent = "";
+    if (!marca) { document.getElementById("erro-inversor").textContent = "Selecione a marca do inversor"; return; }
+    if (!serial) { document.getElementById("erro-inversor").textContent = "Número de série é obrigatório"; return; }
+    let apiKey = "";
+    if (marca === "deye") {
+        const appId = document.getElementById("inv-deye-app-id").value.trim();
+        const appSecret = document.getElementById("inv-deye-app-secret").value.trim();
+        if (!appId || !appSecret) { document.getElementById("erro-inversor").textContent = "App ID e App Secret são obrigatórios para Deye"; return; }
+        apiKey = JSON.stringify({ app_id: appId, app_secret: appSecret });
+    } else {
+        apiKey = document.getElementById("inv-api-key").value.trim();
+        const temCredenciais = marca === "foxess" && foxessCredenciais;
+        if (!apiKey && !temCredenciais) { document.getElementById("erro-inversor").textContent = "Use a busca automática ou informe a Chave de API"; return; }
+    }
+    const dados = { marca_inversor: marca, serial_inversor: serial, api_key_inversor: apiKey, inversor_usuario: foxessCredenciais?.email || null, inversor_senha: foxessCredenciais?.senha || null };
+    try {
+        const resp = await fetch(`${API}/clientes/${clienteInversorId}/inversor`, { method:"PUT", headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`}, body:JSON.stringify(dados) });
+        if (resp.ok) {
+            document.getElementById("sucesso-inversor").style.display = "block";
+            setTimeout(() => { document.getElementById("sucesso-inversor").style.display = "none"; fecharModal("modal-inversor"); carregarTabelaClientes(); }, 2000);
+        } else {
+            const d = await resp.json();
+            document.getElementById("erro-inversor").textContent = d.detail || "Erro ao salvar inversor";
+        }
+    } catch(e) { document.getElementById("erro-inversor").textContent = "Erro de conexão"; }
+}
+
+function fecharModal(id) {
+    document.getElementById(id).classList.remove("ativo");
+    if (id === "modal-projeto") {
+        ["proj-endereco","proj-potencia","proj-data","proj-lat","proj-lng"].forEach(i => document.getElementById(i).value = "");
+        document.getElementById("proj-pr").value = "0.80";
+        document.getElementById("sucesso-projeto").style.display = "none";
+        document.getElementById("erro-projeto").textContent = "";
+        document.getElementById("erro-endereco").textContent = "";
+        document.getElementById("endereco-encontrado").style.display = "none";
+        document.getElementById("campos-manuais").style.display = "none";
+        modoManual = false;
+    }
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('ativo'); });
+});
 </script>
 </body>
 </html>

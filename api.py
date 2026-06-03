@@ -650,11 +650,11 @@ def meu_perfil(integrador: dict = Depends(obter_integrador_atual)):
 def listar_clientes(integrador: dict = Depends(obter_integrador_atual)):
     conn = conectar_banco()
     cur = conn.cursor()
-    cur.execute("SELECT id,nome,numero_uc,distribuidora,tipo_gd,marca_inversor,serial_inversor FROM clientes WHERE integrador_id=%s", (integrador["id"],))
+    cur.execute("SELECT id,nome,numero_uc,distribuidora,tipo_gd,marca_inversor,serial_inversor,potencia_kwp FROM clientes WHERE integrador_id=%s", (integrador["id"],))
     clientes = cur.fetchall()
     cur.close()
     conn.close()
-    return [{"id":c[0],"nome":c[1],"numero_uc":c[2],"distribuidora":c[3],"tipo_gd":c[4],"marca_inversor":c[5],"serial_inversor":c[6]} for c in clientes]
+    return [{"id":c[0],"nome":c[1],"numero_uc":c[2],"distribuidora":c[3],"tipo_gd":c[4],"marca_inversor":c[5],"serial_inversor":c[6],"potencia_kwp":float(c[7]) if c[7] else None} for c in clientes]
 
 @app.post("/clientes")
 def cadastrar_cliente(dados: dict, integrador: dict = Depends(obter_integrador_atual)):
@@ -1085,6 +1085,13 @@ def verificar_anomalias(cliente_id: int):
     return {"cliente_id":cliente_id,"cliente_nome":nome,"data_analise":hoje.isoformat(),
             "geracao_ontem_kwh":round(g_ontem,1),"media_7_dias_kwh":round(media7,1),
             "media_diaria_esperada_kwh":round(media_diaria_esperada,1),"alertas":alertas}
+
+@app.get("/clientes/{cliente_id}/geracao/diaria")
+def geracao_diaria(cliente_id: int, dias: int = 30):
+    fim = date.today()
+    inicio = fim - timedelta(days=dias - 1)
+    dados = buscar_geracao_periodo(cliente_id, inicio, fim)
+    return {"cliente_id": cliente_id, "dados": dados}
 
 @app.api_route("/admin/verificar-offline", methods=["GET", "POST"])
 def admin_verificar_offline():
