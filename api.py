@@ -597,11 +597,14 @@ def buscar_geracao_periodo(cliente_id: int, data_inicio, data_fim):
 def salvar_historico_banco(cliente_id: int, dados_mensais: list):
     conn = conectar_banco()
     cur = conn.cursor()
+    hoje_date = date.today()
     for m in dados_mensais:
         dias = monthrange(m["ano"], m["mes_num"])[1]
         val_dia = m["geracao_kwh"] / dias
         for d in range(1, dias + 1):
             dt = datetime(m["ano"], m["mes_num"], d).date()
+            if dt > hoje_date:
+                break  # não armazena dias futuros
             cur.execute("INSERT INTO historico_geracao (cliente_id,data,geracao_kwh) VALUES (%s,%s,%s) ON CONFLICT (cliente_id,data) DO UPDATE SET geracao_kwh=EXCLUDED.geracao_kwh",
                         (cliente_id, dt, round(val_dia, 2)))
     conn.commit()

@@ -348,30 +348,24 @@
         </div>
 
         <!-- KPI stats -->
-        <div class="stats-grid">
+        <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr);">
             <div class="stat-box hi">
                 <div class="sb-icon">☀️</div>
                 <div class="sb-val" id="d-pv">—</div>
                 <div class="sb-unit">kW</div>
-                <div class="sb-lbl">Geração PV</div>
-            </div>
-            <div class="stat-box green">
-                <div class="sb-icon">🏠</div>
-                <div class="sb-val" id="d-casa">—</div>
-                <div class="sb-unit">kW</div>
-                <div class="sb-lbl">Consumo Casa</div>
+                <div class="sb-lbl">Geração Atual</div>
             </div>
             <div class="stat-box blue">
-                <div class="sb-icon">⚡</div>
-                <div class="sb-val" id="d-inj">—</div>
-                <div class="sb-unit">kW</div>
-                <div class="sb-lbl">Injetado na Rede</div>
+                <div class="sb-icon">📆</div>
+                <div class="sb-val" id="d-mes">—</div>
+                <div class="sb-unit">kWh</div>
+                <div class="sb-lbl">Este Mês</div>
             </div>
-            <div class="stat-box">
-                <div class="sb-icon">🔌</div>
-                <div class="sb-val" id="d-rede">—</div>
-                <div class="sb-unit">kW</div>
-                <div class="sb-lbl">Consumo da Rede</div>
+            <div class="stat-box green">
+                <div class="sb-icon">⚡</div>
+                <div class="sb-val" id="d-kwp">—</div>
+                <div class="sb-unit">kWp</div>
+                <div class="sb-lbl">Capacidade</div>
             </div>
         </div>
 
@@ -580,6 +574,7 @@ let countdownVal = 60;
 let chartMensal = null;
 let chartDiario = null;
 let clienteDetalheId = null;
+let clienteDetalheKwp = null;
 
 Chart.defaults.color = '#475569';
 Chart.defaults.font.family = "'Segoe UI', sans-serif";
@@ -738,13 +733,13 @@ function renderPlantGrid(clientes) {
         const barColor = cardClass === 'st-online' ? '#10b981' : cardClass === 'st-alerta' ? '#f59e0b' : '#334155';
         const ts = c.mon?.timestamp ? `Atualizado ${new Date(c.mon.timestamp + 'Z').toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})}` : '';
 
-        const detBtn = temInversor ? `<button class="plant-btn primary" onclick="event.stopPropagation(); abrirDetalhe(${c.id},'${c.nome.replace(/'/g,"\\'")}')">📊 Dashboard</button>` : '';
+        const detBtn = temInversor ? `<button class="plant-btn primary" onclick="event.stopPropagation(); abrirDetalhe(${c.id},'${c.nome.replace(/'/g,"\\'")}',${kwp})">📊 Dashboard</button>` : '';
         const configBtn = `<button class="plant-btn" onclick="event.stopPropagation(); cadastrarInversor(${c.id},'${c.nome.replace(/'/g,"\\'")}')">⚙️ Inversor</button>`;
         const projetoBtn = `<button class="plant-btn" onclick="event.stopPropagation(); cadastrarProjeto(${c.id},'${c.nome.replace(/'/g,"\\'")}')">☀️ Projeto</button>`;
         const linkBtn = `<button class="plant-btn" onclick="event.stopPropagation(); obterLink(${c.id},'${c.nome.replace(/'/g,"\\'")}')">🔗</button>`;
 
         return `
-        <div class="plant-card ${cardClass}" onclick="${temInversor ? `abrirDetalhe(${c.id},'${c.nome.replace(/'/g,"\\'")}')` : `cadastrarInversor(${c.id},'${c.nome.replace(/'/g,"\\'")}')` }">
+        <div class="plant-card ${cardClass}" onclick="${temInversor ? `abrirDetalhe(${c.id},'${c.nome.replace(/'/g,"\\'")}',${kwp})` : `cadastrarInversor(${c.id},'${c.nome.replace(/'/g,"\\'")}')` }">
             <div class="plant-nome">${c.nome}</div>
             <div class="plant-badge ${badgeClass}">${status}</div>
             <div class="plant-kw">${temInversor ? kw.toFixed(2) : '—'}</div>
@@ -763,8 +758,9 @@ function renderPlantGrid(clientes) {
 }
 
 // ===== PLANT DETAIL =====
-async function abrirDetalhe(clienteId, nomeCliente) {
+async function abrirDetalhe(clienteId, nomeCliente, kwp) {
     clienteDetalheId = clienteId;
+    clienteDetalheKwp = kwp || null;
     document.getElementById('det-nome').textContent = nomeCliente;
     document.getElementById('det-sub').textContent = 'Carregando dados...';
     document.getElementById('det-badge').innerHTML = '';
@@ -788,9 +784,6 @@ async function atualizarDetalhe() {
         if (monResp.ok) {
             const d = await monResp.json();
             document.getElementById('d-pv').textContent = (d.geracao_atual_kw || 0).toFixed(2);
-            document.getElementById('d-casa').textContent = (d.consumo_casa_kw || 0).toFixed(2);
-            document.getElementById('d-inj').textContent = (d.injetado_rede_kw || 0).toFixed(2);
-            document.getElementById('d-rede').textContent = (d.consumo_rede_kw || 0).toFixed(2);
             document.getElementById('det-sub').textContent = `Última leitura: ${new Date(d.timestamp + 'Z').toLocaleString('pt-BR')}`;
             const kw = d.geracao_atual_kw || 0;
             const stClass = kw > 0.1 ? 'badge-online' : kw > 0 ? 'badge-alerta' : 'badge-offline';
@@ -802,10 +795,18 @@ async function atualizarDetalhe() {
             renderFluxo({});
         }
 
-        // Monthly chart
+        // Capacidade (kWp) do projeto
+        document.getElementById('d-kwp').textContent = clienteDetalheKwp ? clienteDetalheKwp.toFixed(1) : '—';
+
+        // Monthly chart + stat "Este Mês"
         if (mensalResp.ok) {
             const m = await mensalResp.json();
             renderChartMensal(m.mensal || []);
+            const agora = new Date();
+            const mesAtual = agora.getMonth() + 1;
+            const anoAtual = agora.getFullYear();
+            const mesHoje = (m.mensal || []).find(x => x.mes_num === mesAtual && x.ano === anoAtual);
+            document.getElementById('d-mes').textContent = mesHoje ? mesHoje.geracao_kwh.toFixed(0) : '—';
         }
 
         // Daily chart
@@ -914,7 +915,8 @@ function renderChartDiario(dados) {
     const emptyEl = document.getElementById('chart-diario-empty');
     if (chartDiario) { chartDiario.destroy(); chartDiario = null; }
 
-    const dadosFiltrados = dados.filter(d => d.total_kwh > 0);
+    const hoje = new Date().toISOString().split('T')[0];
+    const dadosFiltrados = dados.filter(d => d.total_kwh > 0 && d.data < hoje);
     if (!dadosFiltrados.length) {
         canvasEl.style.display = 'none'; emptyEl.style.display = 'block'; return;
     }
@@ -1013,7 +1015,7 @@ async function carregarTabelaClientes() {
                         <button class="azul pequeno" onclick="obterLink(${c.id},'${c.nome.replace(/'/g,"\\'")}')">🔗 Link</button>
                         <button class="amarelo pequeno" onclick="cadastrarProjeto(${c.id},'${c.nome.replace(/'/g,"\\'")}')">☀️ Projeto</button>
                         <button class="roxo pequeno" onclick="cadastrarInversor(${c.id},'${c.nome.replace(/'/g,"\\'")}')">🔌 Inversor</button>
-                        ${c.marca_inversor ? `<button class="verde pequeno" onclick="abrirDetalhe(${c.id},'${c.nome.replace(/'/g,"\\'")}')">📊 Dashboard</button>` : ''}
+                        ${c.marca_inversor ? `<button class="verde pequeno" onclick="abrirDetalhe(${c.id},'${c.nome.replace(/'/g,"\\'")}',${c.potencia_kwp||0})">📊 Dashboard</button>` : ''}
                     </div>
                 </td>
             </tr>`).join('');
