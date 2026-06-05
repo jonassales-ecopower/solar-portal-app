@@ -1,0 +1,29 @@
+# Ambiente Python
+.env
+.venv/
+venv/
+env/
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+
+# IDEs
+.vscode/
+.idea/
+*.code-workspace
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Logs e temporários
+*.log
+*.tmp
+*.bak
+
+# Distribuição
+dist/
+build/
+*.egg-info/
