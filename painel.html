@@ -351,7 +351,7 @@
         </div>
 
         <!-- KPI stats -->
-        <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr);">
+        <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
             <div class="stat-box hi">
                 <div class="sb-icon">☀️</div>
                 <div class="sb-val" id="d-pv">—</div>
@@ -363,6 +363,12 @@
                 <div class="sb-val" id="d-mes">—</div>
                 <div class="sb-unit">kWh</div>
                 <div class="sb-lbl">Este Mês</div>
+            </div>
+            <div class="stat-box" id="box-ritmo">
+                <div class="sb-icon">🎯</div>
+                <div class="sb-val" id="d-ritmo">—</div>
+                <div class="sb-unit" id="d-ritmo-sub">do esperado até hoje</div>
+                <div class="sb-lbl">Ritmo do Mês</div>
             </div>
             <div class="stat-box green">
                 <div class="sb-icon">⚡</div>
@@ -809,7 +815,7 @@ async function atualizarDetalhe() {
             dadosEsperados = e.geracao_mensal || [];
         }
 
-        // Monthly chart + stat "Este Mês"
+        // Monthly chart + stat "Este Mês" + Ritmo do Mês
         if (mensalResp.ok) {
             const m = await mensalResp.json();
             renderChartMensal(m.mensal || [], dadosEsperados);
@@ -818,6 +824,27 @@ async function atualizarDetalhe() {
             const anoAtual = agora.getFullYear();
             const mesHoje = (m.mensal || []).find(x => x.mes_num === mesAtual && x.ano === anoAtual);
             document.getElementById('d-mes').textContent = mesHoje ? mesHoje.geracao_kwh.toFixed(0) : '—';
+
+            // Ritmo do mês: geração até agora vs esperado proporcional aos dias passados
+            const boxRitmo = document.getElementById('box-ritmo');
+            const geracaoAtual = mesHoje ? mesHoje.geracao_kwh : null;
+            const esperadoMesObj = dadosEsperados.find(e => e.mes_num === mesAtual);
+            const diaHoje = agora.getDate();
+            const diasNoMes = new Date(anoAtual, mesAtual, 0).getDate();
+
+            boxRitmo.classList.remove('hi', 'green', 'blue', 'red');
+            if (geracaoAtual !== null && esperadoMesObj && esperadoMesObj.kwh_esperado > 0) {
+                const esperadoAteHoje = esperadoMesObj.kwh_esperado * (diaHoje / diasNoMes);
+                const pct = Math.round(geracaoAtual / esperadoAteHoje * 100);
+                document.getElementById('d-ritmo').textContent = pct + '%';
+                document.getElementById('d-ritmo-sub').textContent = `${geracaoAtual.toFixed(0)} de ${Math.round(esperadoAteHoje)} kWh`;
+                if (pct >= 90) boxRitmo.classList.add('green');
+                else if (pct >= 70) boxRitmo.classList.add('hi');
+                else boxRitmo.classList.add('red');
+            } else {
+                document.getElementById('d-ritmo').textContent = '—';
+                document.getElementById('d-ritmo-sub').textContent = 'do esperado até hoje';
+            }
         }
 
         // Daily chart
