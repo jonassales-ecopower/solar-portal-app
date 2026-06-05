@@ -39,6 +39,7 @@ def inicializar_banco():
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS alerta_offline_em TIMESTAMP")
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS inversor_usuario TEXT")
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS inversor_senha TEXT")
+        cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS senha_hash TEXT")
         conn.commit()
     except Exception:
         conn.rollback()
@@ -661,6 +662,57 @@ def salvar_historico_banco(cliente_id: int, dados_mensais: list):
 @app.get("/")
 def inicio():
     return {"status": "Solar Portal API funcionando!"}
+
+@app.post("/portal/login")
+def portal_login(dados: dict):
+    email = (dados.get("email") or "").strip().lower()
+    senha = dados.get("senha") or ""
+    if not email or not senha:
+        raise HTTPException(status_code=400, detail="E-mail e senha são obrigatórios")
+    conn = conectar_banco()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT id, nome, numero_uc, distribuidora, tipo_gd, senha_hash FROM clientes WHERE LOWER(email)=%s",
+        (email,)
+    )
+    c = cur.fetchone()
+    cur.close()
+    conn.close()
+    if not c or not c[5] or not verificar_senha(senha, c[5]):
+        raise HTTPException(status_code=401, detail="E-mail ou senha incorretos")
+    token = criar_token({"cliente_id": c[0], "nome": c[1], "numero_uc": c[2], "distribuidora": c[3], "tipo": "cliente"})
+    return {"token": token, "cliente_id": c[0], "nome": c[1], "numero_uc": c[2], "distribuidora": c[3]}
+
+@app.get("/portal/me")
+def portal_me(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    payload = verificar_token(credentials.credentials)
+    if not payload or payload.get("tipo") != "cliente":
+        raise HTTPException(status_code=401, detail="Token inválido ou expirado")
+    return {"cliente_id": payload["cliente_id"], "nome": payload["nome"],
+            "numero_uc": payload.get("numero_uc"), "distribuidora": payload.get("distribuidora")}
+
+@app.put("/clientes/{cliente_id}/senha")
+def definir_senha_cliente(cliente_id: int, dados: dict, integrador: dict = Depends(obter_integrador_atual)):
+    senha = (dados.get("senha") or "").strip()
+    if len(senha) < 6:
+        raise HTTPException(status_code=400, detail="A senha deve ter no mínimo 6 caracteres")
+    conn = conectar_banco()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "UPDATE clientes SET senha_hash=%s WHERE id=%s AND integrador_id=%s RETURNING id, nome, email",
+            (criptografar_senha(senha), cliente_id, integrador["id"])
+        )
+        c = cur.fetchone()
+        conn.commit()
+        if not c:
+            raise HTTPException(status_code=404, detail="Cliente não encontrado")
+        return {"sucesso": True, "nome": c[1], "email": c[2]}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
 
 @app.post("/auth/registro")
 def registrar_integrador(dados: dict):

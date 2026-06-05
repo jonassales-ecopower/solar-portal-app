@@ -438,6 +438,33 @@
     </div>
 </div>
 
+<!-- ===== MODAL SENHA CLIENTE ===== -->
+<div class="modal-overlay" id="modal-senha">
+    <div class="modal">
+        <h3>🔑 Acesso do Cliente</h3>
+        <p class="subtitulo" id="nome-senha-cliente"></p>
+        <div class="dica">
+            💡 Defina uma senha para o cliente acessar o portal com o e-mail cadastrado.<br>
+            Compartilhe as credenciais via WhatsApp: <strong>e-mail + senha</strong>.<br>
+            O cliente acessa em: <strong>jonassales-ecopower.github.io/solar-portal-app/portal.html</strong>
+        </div>
+        <div class="campo">
+            <label>Nova senha *</label>
+            <input type="password" id="senha-nova" placeholder="Mínimo 6 caracteres">
+        </div>
+        <div class="campo">
+            <label>Confirmar senha *</label>
+            <input type="password" id="senha-confirma" placeholder="Repita a senha">
+        </div>
+        <div class="modal-acoes">
+            <button class="verde pequeno" onclick="salvarSenhaCliente()">🔑 Salvar Senha</button>
+            <button class="secundario pequeno" onclick="fecharModal('modal-senha')">Cancelar</button>
+        </div>
+        <p class="sucesso" id="sucesso-senha" style="display:none; margin-top:8px;">✅ Senha definida! Cliente já pode fazer login.</p>
+        <p class="erro" id="erro-senha"></p>
+    </div>
+</div>
+
 <!-- ===== MODAL LINK ===== -->
 <div class="modal-overlay" id="modal-link">
     <div class="modal">
@@ -1103,6 +1130,7 @@ async function carregarTabelaClientes() {
                     <div class="acoes">
                         <button class="pequeno" onclick="verContas(${c.id},'${c.nome.replace(/'/g,"\\'")}')">Ver Contas</button>
                         <button class="azul pequeno" onclick="obterLink(${c.id},'${c.nome.replace(/'/g,"\\'")}')">🔗 Link</button>
+                        <button class="pequeno" onclick="definirSenha(${c.id},'${c.nome.replace(/'/g,"\\'")}')">🔑 Senha</button>
                         <button class="amarelo pequeno" onclick="cadastrarProjeto(${c.id},'${c.nome.replace(/'/g,"\\'")}')">☀️ Projeto</button>
                         <button class="roxo pequeno" onclick="cadastrarInversor(${c.id},'${c.nome.replace(/'/g,"\\'")}')">🔌 Inversor</button>
                         ${c.marca_inversor ? `<button class="verde pequeno" onclick="abrirDetalhe(${c.id},'${c.nome.replace(/'/g,"\\'")}',${c.potencia_kwp||0})">📊 Dashboard</button>` : ''}
@@ -1310,6 +1338,39 @@ async function salvarInversor() {
             document.getElementById("erro-inversor").textContent = d.detail || "Erro ao salvar inversor";
         }
     } catch(e) { document.getElementById("erro-inversor").textContent = "Erro de conexão"; }
+}
+
+// ===== SENHA CLIENTE =====
+let clienteSenhaId = null;
+function definirSenha(clienteId, nomeCliente) {
+    clienteSenhaId = clienteId;
+    document.getElementById("nome-senha-cliente").textContent = `Cliente: ${nomeCliente}`;
+    document.getElementById("senha-nova").value = "";
+    document.getElementById("senha-confirma").value = "";
+    document.getElementById("erro-senha").textContent = "";
+    document.getElementById("sucesso-senha").style.display = "none";
+    document.getElementById("modal-senha").classList.add("ativo");
+}
+async function salvarSenhaCliente() {
+    const senha = document.getElementById("senha-nova").value;
+    const confirma = document.getElementById("senha-confirma").value;
+    document.getElementById("erro-senha").textContent = "";
+    if (!senha || senha.length < 6) { document.getElementById("erro-senha").textContent = "A senha deve ter no mínimo 6 caracteres"; return; }
+    if (senha !== confirma) { document.getElementById("erro-senha").textContent = "As senhas não conferem"; return; }
+    try {
+        const resp = await fetch(`${API}/clientes/${clienteSenhaId}/senha`, {
+            method: "PUT",
+            headers: {"Content-Type": "application/json", "Authorization": `Bearer ${token}`},
+            body: JSON.stringify({senha})
+        });
+        if (resp.ok) {
+            document.getElementById("sucesso-senha").style.display = "block";
+            setTimeout(() => fecharModal("modal-senha"), 3000);
+        } else {
+            const d = await resp.json();
+            document.getElementById("erro-senha").textContent = d.detail || "Erro ao salvar";
+        }
+    } catch(e) { document.getElementById("erro-senha").textContent = "Erro de conexão"; }
 }
 
 function fecharModal(id) {

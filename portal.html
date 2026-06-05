@@ -231,9 +231,68 @@
             .metrica .val { font-size: 15px; }
             .aba { padding: 10px 10px; font-size: 11px; }
         }
+
+        /* ===== LOGIN ===== */
+        #tela-login {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0f172a 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .login-card {
+            background: white;
+            border-radius: 18px;
+            padding: 40px 32px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+        }
+        .login-logo { text-align: center; margin-bottom: 32px; }
+        .login-logo .sol { font-size: 52px; }
+        .login-logo h1 { font-size: 24px; font-weight: 800; color: #1e293b; margin-top: 10px; }
+        .login-logo p { font-size: 13px; color: #94a3b8; margin-top: 4px; }
+        .login-campo { margin-bottom: 16px; }
+        .login-campo label { display: block; font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.6px; }
+        .login-campo input { width: 100%; padding: 13px 16px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 15px; font-family: 'Segoe UI', sans-serif; transition: border-color 0.2s; box-sizing: border-box; }
+        .login-campo input:focus { outline: none; border-color: #f59e0b; }
+        .btn-login { width: 100%; padding: 14px; background: linear-gradient(135deg, #f59e0b, #d97706); color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 6px; font-family: 'Segoe UI', sans-serif; transition: opacity 0.2s; }
+        .btn-login:hover { opacity: 0.9; }
+        .login-erro { color: #dc2626; font-size: 13px; margin-top: 10px; text-align: center; min-height: 20px; }
+        .login-footer { text-align: center; margin-top: 28px; padding-top: 20px; border-top: 1px solid #f1f5f9; font-size: 12px; color: #94a3b8; }
+        .btn-sair { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.8); padding: 6px 14px; border-radius: 8px; font-size: 12px; cursor: pointer; width: auto; margin: 0; font-family: 'Segoe UI', sans-serif; }
+        .btn-sair:hover { background: rgba(255,255,255,0.18); color: white; }
     </style>
 </head>
 <body>
+
+<!-- ===== TELA DE LOGIN ===== -->
+<div id="tela-login" style="display:none;">
+    <div class="login-card">
+        <div class="login-logo">
+            <div class="sol">☀️</div>
+            <h1>Solar Portal</h1>
+            <p>Portal do Cliente</p>
+        </div>
+        <div class="login-campo">
+            <label>E-mail</label>
+            <input type="email" id="login-email" placeholder="seu@email.com" onkeydown="if(event.key==='Enter') fazerLoginCliente()">
+        </div>
+        <div class="login-campo">
+            <label>Senha</label>
+            <input type="password" id="login-senha" placeholder="••••••" onkeydown="if(event.key==='Enter') fazerLoginCliente()">
+        </div>
+        <button class="btn-login" onclick="fazerLoginCliente()">Entrar</button>
+        <div class="login-erro" id="login-erro"></div>
+        <div class="login-footer">
+            Esqueceu sua senha? Entre em contato com seu integrador solar.
+        </div>
+    </div>
+</div>
+
+<!-- ===== PORTAL ===== -->
+<div id="tela-portal" style="display:none;">
 
 <header>
     <div class="header-top">
@@ -241,9 +300,12 @@
             <div class="sol">☀️</div>
             <div><h1>Solar Portal</h1><p id="subtitulo">Meu Sistema Solar</p></div>
         </div>
-        <div class="header-cliente">
-            <div class="nome" id="hdr-nome">—</div>
-            <div class="sub" id="hdr-sub">—</div>
+        <div style="display:flex; align-items:center; gap:12px;">
+            <div class="header-cliente">
+                <div class="nome" id="hdr-nome">—</div>
+                <div class="sub" id="hdr-sub">—</div>
+            </div>
+            <button class="btn-sair" id="btn-sair" onclick="sairPortal()" style="display:none;">Sair</button>
         </div>
     </div>
     <nav class="nav-abas">
@@ -426,6 +488,8 @@
 
 </div>
 
+</div><!-- /tela-portal -->
+
 <script>
     const API = "https://solar-portal-api.onrender.com";
     const p = new URLSearchParams(window.location.search);
@@ -448,8 +512,55 @@
         document.getElementById(`pag-${aba}`).classList.add("ativa");
     }
 
+    function mostrarPortal() {
+        document.getElementById("tela-login").style.display = "none";
+        document.getElementById("tela-portal").style.display = "block";
+    }
+
+    function mostrarLogin() {
+        document.getElementById("tela-login").style.display = "flex";
+        document.getElementById("tela-portal").style.display = "none";
+    }
+
+    async function carregarDados() {
+        await Promise.all([ligarMonitoramento(), buscarGeracaoEsperada(), buscarGeracaoReal(), buscarAlertas(), buscarHistoricoContas()]);
+        desenharGrafico();
+    }
+
+    async function fazerLoginCliente() {
+        const email = document.getElementById("login-email").value.trim();
+        const senha = document.getElementById("login-senha").value;
+        const erroEl = document.getElementById("login-erro");
+        erroEl.textContent = "";
+        if (!email || !senha) { erroEl.textContent = "Preencha e-mail e senha"; return; }
+        try {
+            const r = await fetch(`${API}/portal/login`, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({email, senha})});
+            const d = await r.json();
+            if (r.ok) {
+                localStorage.setItem("token_cliente", d.token);
+                idCliente = d.cliente_id;
+                document.getElementById("hdr-nome").textContent = d.nome || "—";
+                document.getElementById("hdr-sub").textContent = [d.distribuidora, d.numero_uc].filter(Boolean).join(" • ") || "";
+                document.getElementById("btn-sair").style.display = "block";
+                mostrarPortal();
+                await carregarDados();
+            } else {
+                erroEl.textContent = d.detail || "E-mail ou senha incorretos";
+            }
+        } catch(e) {
+            document.getElementById("login-erro").textContent = "Erro de conexão. Tente novamente.";
+        }
+    }
+
+    function sairPortal() {
+        localStorage.removeItem("token_cliente");
+        clearInterval(intervalo);
+        location.reload();
+    }
+
     async function inicializar() {
-        if (!idCliente && tokenAcesso) {
+        // 1. Link antigo com token_acesso (compatibilidade)
+        if (tokenAcesso) {
             try {
                 const r = await fetch(`${API}/portal/${tokenAcesso}`);
                 if (!r.ok) { erroAcesso(); return; }
@@ -457,17 +568,45 @@
                 idCliente = d.id;
                 document.getElementById("hdr-nome").textContent = d.nome || "—";
                 document.getElementById("hdr-sub").textContent = [d.distribuidora, d.numero_uc].filter(Boolean).join(" • ") || "—";
-            } catch(e) { erroAcesso(); return; }
-        } else if (nomeParam) {
-            document.getElementById("hdr-nome").textContent = decodeURIComponent(nomeParam);
+                mostrarPortal();
+                await carregarDados();
+            } catch(e) { erroAcesso(); }
+            return;
         }
-        if (!idCliente) { erroAcesso(); return; }
-        await Promise.all([ligarMonitoramento(), buscarGeracaoEsperada(), buscarGeracaoReal(), buscarAlertas(), buscarHistoricoContas()]);
-        desenharGrafico();
+        // 2. Prévia do integrador via cliente_id direto
+        if (clienteIdParam) {
+            idCliente = clienteIdParam;
+            if (nomeParam) document.getElementById("hdr-nome").textContent = decodeURIComponent(nomeParam);
+            mostrarPortal();
+            await carregarDados();
+            return;
+        }
+        // 3. Sessão salva
+        const tokenSalvo = localStorage.getItem("token_cliente");
+        if (tokenSalvo) {
+            try {
+                const r = await fetch(`${API}/portal/me`, {headers: {"Authorization": `Bearer ${tokenSalvo}`}});
+                if (r.ok) {
+                    const d = await r.json();
+                    idCliente = d.cliente_id;
+                    document.getElementById("hdr-nome").textContent = d.nome || "—";
+                    document.getElementById("hdr-sub").textContent = [d.distribuidora, d.numero_uc].filter(Boolean).join(" • ") || "";
+                    document.getElementById("btn-sair").style.display = "block";
+                    mostrarPortal();
+                    await carregarDados();
+                } else {
+                    localStorage.removeItem("token_cliente");
+                    mostrarLogin();
+                }
+            } catch(e) { mostrarLogin(); }
+            return;
+        }
+        // 4. Sem sessão — mostrar login
+        mostrarLogin();
     }
 
     function erroAcesso() {
-        document.body.innerHTML = `<div style="text-align:center;padding:80px 20px;font-family:sans-serif;"><div style="font-size:60px;margin-bottom:20px;">🔒</div><h2 style="color:#334155;margin-bottom:10px;">Link inválido ou expirado</h2><p style="color:#64748b;">Solicite um novo link ao seu integrador solar.</p></div>`;
+        document.getElementById("tela-portal").innerHTML = `<div style="text-align:center;padding:80px 20px;font-family:sans-serif;"><div style="font-size:60px;margin-bottom:20px;">🔒</div><h2 style="color:#334155;margin-bottom:10px;">Link inválido ou expirado</h2><p style="color:#64748b;">Solicite um novo link ao seu integrador solar.</p></div>`;
     }
 
     async function ligarMonitoramento() {
