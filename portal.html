@@ -232,6 +232,43 @@
             .aba { padding: 10px 10px; font-size: 11px; }
         }
 
+        /* ===== PREVISÃO ===== */
+        .prev-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-top:12px; }
+        .prev-card { background:#f8fafc; border-radius:10px; padding:12px 6px; text-align:center; border-top:3px solid #e2e8f0; }
+        .prev-card.hoje { border-top-color:#f59e0b; background:#fffbeb; }
+        .prev-card .p-dia { font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; }
+        .prev-card .p-ico { font-size:22px; margin:5px 0; }
+        .prev-card .p-kwh { font-size:15px; font-weight:800; color:#1e293b; }
+        .prev-card .p-sub { font-size:10px; color:#94a3b8; margin-top:2px; }
+
+        /* ===== ECONOMIA ===== */
+        .eco-row { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px; }
+        .eco-box { border-radius:12px; padding:16px 10px; text-align:center; }
+        .eco-box.verde { background:linear-gradient(135deg,#dcfce7,#bbf7d0); }
+        .eco-box.azul { background:linear-gradient(135deg,#dbeafe,#bfdbfe); }
+        .eco-box.am { background:linear-gradient(135deg,#fef9c3,#fde68a); }
+        .eco-box.roxo { background:linear-gradient(135deg,#f5f3ff,#ede9fe); }
+        .eco-box .eb-val { font-size:20px; font-weight:800; color:#1e293b; line-height:1; }
+        .eco-box .eb-unit { font-size:11px; color:#64748b; }
+        .eco-box .eb-lbl { font-size:10px; color:#94a3b8; margin-top:5px; font-weight:600; text-transform:uppercase; letter-spacing:0.4px; }
+
+        /* ===== SALDO CHART ===== */
+        .saldo-destaque { background:linear-gradient(135deg,#1e293b,#334155); border-radius:14px; padding:20px; text-align:center; margin-bottom:16px; color:white; }
+        .saldo-destaque .sd-val { font-size:48px; font-weight:800; color:#10b981; line-height:1; }
+        .saldo-destaque .sd-lbl { font-size:13px; color:#94a3b8; margin-top:6px; }
+        .saldo-destaque .sd-sub { font-size:11px; color:#64748b; margin-top:4px; }
+
+        @media (max-width:640px) {
+            .prev-grid { gap:4px; }
+            .prev-card { padding:8px 3px; }
+            .prev-card .p-ico { font-size:18px; }
+            .prev-card .p-kwh { font-size:12px; }
+            .eco-row { gap:6px; }
+            .eco-box .eb-val { font-size:16px; }
+            .eco-box { padding:12px 6px; }
+            .saldo-destaque .sd-val { font-size:36px; }
+        }
+
         /* ===== LOGIN ===== */
         #tela-login {
             min-height: 100vh;
@@ -348,7 +385,8 @@
     <nav class="nav-abas">
         <div class="aba ativa" onclick="irPara('inicio')">🏠 Início</div>
         <div class="aba" onclick="irPara('geracao')">📈 Geração</div>
-        <div class="aba" onclick="irPara('conta')">📄 Conta de Energia</div>
+        <div class="aba" onclick="irPara('economia')">💰 Economia</div>
+        <div class="aba" onclick="irPara('conta')">📄 Conta</div>
         <div class="aba" onclick="irPara('alertas')">🔔 Alertas</div>
     </nav>
 </header>
@@ -366,6 +404,31 @@
             </div>
         </div>
         <p class="txt-atu" id="txt-atu">Atualizando a cada 30 segundos</p>
+
+        <!-- Métricas rápidas -->
+        <div class="eco-row" id="eco-metrics" style="display:none;">
+            <div class="eco-box verde">
+                <div class="eb-val" id="eco-mes">—</div>
+                <div class="eb-unit">R$</div>
+                <div class="eb-lbl">Economia este mês</div>
+            </div>
+            <div class="eco-box azul">
+                <div class="eb-val" id="eco-co2">—</div>
+                <div class="eb-unit">kg CO₂</div>
+                <div class="eb-lbl">Evitados este ano</div>
+            </div>
+            <div class="eco-box am">
+                <div class="eb-val" id="eco-saldo">—</div>
+                <div class="eb-unit">kWh</div>
+                <div class="eb-lbl">Saldo de créditos</div>
+            </div>
+        </div>
+
+        <!-- Previsão 5 dias -->
+        <div class="card" id="card-previsao" style="display:none;">
+            <div class="card-titulo">🌤️ Previsão de Geração — Próximos 5 Dias</div>
+            <div class="prev-grid" id="prev-grid"></div>
+        </div>
 
         <div class="card" id="card-resumo" style="display:none;">
             <div class="card-titulo">📊 Última Conta Analisada</div>
@@ -405,8 +468,85 @@
         </div>
     </div>
 
+    <!-- ECONOMIA -->
+    <div class="pagina" id="pag-economia">
+        <div class="card" id="card-eco-resumo" style="display:none;">
+            <div class="card-titulo">💰 Economia em R$</div>
+            <div class="eco-row" style="margin-bottom:0;">
+                <div class="eco-box verde">
+                    <div class="eb-val" id="eco-total-rs">—</div>
+                    <div class="eb-unit">R$</div>
+                    <div class="eb-lbl">Economia total</div>
+                </div>
+                <div class="eco-box am">
+                    <div class="eb-val" id="eco-mes-rs">—</div>
+                    <div class="eb-unit">R$</div>
+                    <div class="eb-lbl">Este mês</div>
+                </div>
+                <div class="eco-box azul">
+                    <div class="eb-val" id="eco-media-rs">—</div>
+                    <div class="eb-unit">R$/mês</div>
+                    <div class="eb-lbl">Média mensal</div>
+                </div>
+            </div>
+            <div style="margin-top:14px;font-size:12px;color:#94a3b8;text-align:center;" id="eco-tarifa-info"></div>
+        </div>
+
+        <div class="card" id="card-co2" style="display:none;">
+            <div class="card-titulo">🌱 Impacto Ambiental</div>
+            <div class="eco-row" style="margin-bottom:0;">
+                <div class="eco-box verde">
+                    <div class="eb-val" id="eco-co2-total">—</div>
+                    <div class="eb-unit">kg CO₂</div>
+                    <div class="eb-lbl">Total evitado</div>
+                </div>
+                <div class="eco-box roxo">
+                    <div class="eb-val" id="eco-arvores">—</div>
+                    <div class="eb-unit">árvores</div>
+                    <div class="eb-lbl">Equivalente plantado</div>
+                </div>
+                <div class="eco-box azul">
+                    <div class="eb-val" id="eco-kwh-total">—</div>
+                    <div class="eb-unit">kWh</div>
+                    <div class="eb-lbl">Total gerado</div>
+                </div>
+            </div>
+            <p style="font-size:11px;color:#94a3b8;text-align:center;margin-top:12px;">
+                Fator de emissão: 0,0817 kg CO₂/kWh (rede elétrica brasileira — MCTIC)
+            </p>
+        </div>
+
+        <div class="card" id="card-antes-depois" style="display:none;">
+            <div class="card-titulo">📊 Comparativo — Antes × Depois do Solar</div>
+            <canvas id="grafico-antes-depois" height="110"></canvas>
+            <div style="display:flex;gap:16px;justify-content:center;margin-top:12px;flex-wrap:wrap;font-size:12px;color:#64748b;">
+                <span>🔴 Consumo antes (média)</span>
+                <span>🟢 Consumo da rede após solar</span>
+                <span>☀️ Geração solar</span>
+            </div>
+        </div>
+
+        <div class="card" id="card-eco-vazio" style="display:none;">
+            <div class="empty"><div class="icone">⚙️</div><p>Configure a <strong>tarifa de energia</strong> no seu cadastro para ver a economia em R$.<br>Fale com seu integrador.</p></div>
+        </div>
+    </div>
+
     <!-- CONTA DE ENERGIA -->
     <div class="pagina" id="pag-conta">
+
+        <!-- Saldo de Créditos -->
+        <div class="card" id="card-saldo-creditos" style="display:none;">
+            <div class="card-titulo">🏦 Saldo de Créditos na Concessionária</div>
+            <div class="saldo-destaque">
+                <div class="sd-val" id="saldo-atual-val">— kWh</div>
+                <div class="sd-lbl">Saldo atual de créditos</div>
+                <div class="sd-sub" id="saldo-atual-ref"></div>
+            </div>
+            <canvas id="grafico-saldo" height="110"></canvas>
+            <p style="font-size:11px;color:#94a3b8;text-align:center;margin-top:10px;">
+                Baseado nas contas de energia enviadas ao portal
+            </p>
+        </div>
 
         <!-- Card orientação leitura pela média -->
         <div class="card" style="border-left: 4px solid #8b5cf6; background: linear-gradient(135deg, #faf5ff, #f5f3ff);">
@@ -538,6 +678,9 @@
     let idCliente = clienteIdParam;
     let dadosGeracao = [];
     let dadosGeracaoReal = [];
+    let dadosSaldo = [];
+    let dadosTarifa = 0;
+    let dadosConsumoAntes = 0;
     let grafico = null;
     let intervalo = null;
     let contaAberta = null;
@@ -545,7 +688,7 @@
     function irPara(aba) {
         document.querySelectorAll(".aba").forEach(a => a.classList.remove("ativa"));
         document.querySelectorAll(".pagina").forEach(pg => pg.classList.remove("ativa"));
-        const idx = {inicio:0,geracao:1,conta:2,alertas:3};
+        const idx = {inicio:0,geracao:1,economia:2,conta:3,alertas:4};
         document.querySelectorAll(".aba")[idx[aba]].classList.add("ativa");
         document.getElementById(`pag-${aba}`).classList.add("ativa");
     }
@@ -610,7 +753,8 @@
     }
 
     async function carregarDados() {
-        await Promise.all([ligarMonitoramento(), buscarGeracaoEsperada(), buscarGeracaoReal(), buscarAlertas(), buscarHistoricoContas()]);
+        await Promise.all([ligarMonitoramento(), buscarGeracaoEsperada(), buscarGeracaoReal(),
+            buscarAlertas(), buscarHistoricoContas(), buscarSaldoCreditos(), buscarPrevisao()]);
         desenharGrafico();
     }
 
@@ -743,8 +887,138 @@
             if (!r.ok) return;
             const d = await r.json();
             dadosGeracao = d.geracao_mensal || [];
+            dadosTarifa = d.tarifa_kwh || 0;
+            dadosConsumoAntes = d.consumo_medio_antes_kwh || 0;
             document.getElementById("card-sem-projeto").style.display = "none";
         } catch(e) {}
+    }
+
+    async function buscarSaldoCreditos() {
+        try {
+            const r = await fetch(`${API}/clientes/${idCliente}/saldo-creditos`);
+            if (!r.ok) return;
+            const d = await r.json();
+            dadosSaldo = d.dados || [];
+            renderSaldoCreditos(dadosSaldo, d.saldo_atual);
+        } catch(e) {}
+    }
+
+    async function buscarPrevisao() {
+        try {
+            const r = await fetch(`${API}/clientes/${idCliente}/previsao`);
+            if (!r.ok) return;
+            const d = await r.json();
+            renderPrevisao(d.dias || []);
+        } catch(e) {}
+    }
+
+    function renderPrevisao(dias) {
+        if (!dias.length) return;
+        document.getElementById("card-previsao").style.display = "block";
+        document.getElementById("prev-grid").innerHTML = dias.map(d => `
+            <div class="prev-card${d.hoje ? ' hoje' : ''}">
+                <div class="p-dia">${d.dia_semana}</div>
+                <div class="p-ico">${d.icone}</div>
+                <div class="p-kwh">${d.geracao_kwh} kWh</div>
+                <div class="p-sub">${d.cloudcover}% nuvens</div>
+            </div>`).join('');
+    }
+
+    function renderSaldoCreditos(dados, saldoAtual) {
+        if (!dados.length) return;
+        document.getElementById("card-saldo-creditos").style.display = "block";
+        document.getElementById("saldo-atual-val").textContent = `${saldoAtual.toFixed(0)} kWh`;
+        const ultima = dados[dados.length - 1];
+        document.getElementById("saldo-atual-ref").textContent = `Referência: ${ultima.mes}`;
+        // Update home metric
+        document.getElementById("eco-saldo").textContent = saldoAtual.toFixed(0);
+        document.getElementById("eco-metrics").style.display = "grid";
+
+        const labels = dados.map(d => d.mes);
+        const valores = dados.map(d => d.saldo_kwh);
+        const cores = valores.map(v => v >= 0 ? 'rgba(16,185,129,0.7)' : 'rgba(239,68,68,0.7)');
+        const canvas = document.getElementById("grafico-saldo");
+        if (canvas._chart) canvas._chart.destroy();
+        canvas._chart = new Chart(canvas.getContext("2d"), {
+            type: "bar",
+            data: { labels, datasets: [{ label: "Saldo kWh", data: valores, backgroundColor: cores, borderRadius: 4 }] },
+            options: { responsive: true, plugins: { legend: { display: false },
+                tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y.toFixed(0)} kWh` } } },
+                scales: { y: { beginAtZero: false, ticks: { callback: v => v + ' kWh' } } } }
+        });
+    }
+
+    function renderEconomia() {
+        if (!dadosGeracaoReal.length) return;
+        const agora = new Date();
+        const mesAtual = agora.getMonth() + 1;
+        const anoAtual = agora.getFullYear();
+
+        // Total gerado histórico
+        const totalKwh = dadosGeracaoReal.reduce((s, m) => s + m.geracao_kwh, 0);
+        // CO2
+        const co2kg = totalKwh * 0.0817;
+        const arvores = co2kg / 21.77;
+        // Este ano
+        const anoAtualKwh = dadosGeracaoReal.filter(m => m.ano === anoAtual).reduce((s, m) => s + m.geracao_kwh, 0);
+        const co2Ano = anoAtualKwh * 0.0817;
+
+        // Update home
+        document.getElementById("eco-co2").textContent = co2Ano.toFixed(0);
+        document.getElementById("eco-metrics").style.display = "grid";
+
+        // Economia tab
+        document.getElementById("card-co2").style.display = "block";
+        document.getElementById("eco-co2-total").textContent = co2kg.toFixed(0);
+        document.getElementById("eco-arvores").textContent = arvores.toFixed(0);
+        document.getElementById("eco-kwh-total").textContent = totalKwh.toFixed(0);
+
+        if (dadosTarifa > 0) {
+            const totalRs = totalKwh * dadosTarifa;
+            const mesHoje = dadosGeracaoReal.find(m => m.mes_num === mesAtual && m.ano === anoAtual);
+            const mesRs = mesHoje ? mesHoje.geracao_kwh * dadosTarifa : 0;
+            const mediaRs = totalRs / dadosGeracaoReal.length;
+
+            document.getElementById("eco-mes").textContent = `R$ ${mesRs.toFixed(2)}`;
+            document.getElementById("eco-metrics").style.display = "grid";
+            document.getElementById("card-eco-resumo").style.display = "block";
+            document.getElementById("eco-total-rs").textContent = totalRs.toFixed(2);
+            document.getElementById("eco-mes-rs").textContent = mesRs.toFixed(2);
+            document.getElementById("eco-media-rs").textContent = mediaRs.toFixed(2);
+            document.getElementById("eco-tarifa-info").textContent = `Tarifa configurada: R$ ${dadosTarifa.toFixed(4)}/kWh`;
+        } else {
+            document.getElementById("eco-mes").textContent = "—";
+            document.getElementById("card-eco-vazio").style.display = "block";
+        }
+
+        // Antes × Depois
+        if (dadosConsumoAntes > 0 && dadosGeracaoReal.length > 0) {
+            renderAntesDEpois();
+        }
+    }
+
+    function renderAntesDEpois() {
+        document.getElementById("card-antes-depois").style.display = "block";
+        const ultimos = [...dadosGeracaoReal].slice(-6);
+        const labels = ultimos.map(m => m.mes + (m.ano ? `/${String(m.ano).slice(2)}` : ''));
+        const consumoAntes = ultimos.map(() => dadosConsumoAntes);
+        // Consumo da rede após solar = geração esperada - geração real + consumo médio
+        // Simplified: use contas if available, else estimate
+        const geracao = ultimos.map(m => m.geracao_kwh);
+        const consumoRede = ultimos.map(m => Math.max(0, dadosConsumoAntes - m.geracao_kwh));
+
+        const canvas = document.getElementById("grafico-antes-depois");
+        if (canvas._chart) canvas._chart.destroy();
+        canvas._chart = new Chart(canvas.getContext("2d"), {
+            type: "bar",
+            data: { labels, datasets: [
+                { label: "Antes do solar", data: consumoAntes, backgroundColor: "rgba(239,68,68,0.3)", borderColor: "#ef4444", borderWidth: 2, borderRadius: 4, type: "line", fill: false, pointRadius: 0 },
+                { label: "Consumo da rede", data: consumoRede, backgroundColor: "rgba(59,130,246,0.6)", borderRadius: 4 },
+                { label: "Gerado solar", data: geracao, backgroundColor: "rgba(245,158,11,0.7)", borderRadius: 4 }
+            ]},
+            options: { responsive: true, plugins: { legend: { display: false } },
+                scales: { x: { stacked: false }, y: { beginAtZero: true, ticks: { callback: v => v + ' kWh' } } } }
+        });
     }
 
     async function buscarGeracaoReal() {
@@ -752,7 +1026,10 @@
             const r = await fetch(`${API}/clientes/${idCliente}/monitoramento/mensal`);
             if (!r.ok) return;
             const d = await r.json();
-            if (d.mensal && d.mensal.length > 0) dadosGeracaoReal = d.mensal;
+            if (d.mensal && d.mensal.length > 0) {
+                dadosGeracaoReal = d.mensal;
+                renderEconomia();
+            }
         } catch(e) {}
     }
 

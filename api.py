@@ -42,6 +42,8 @@ def inicializar_banco():
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS senha_hash TEXT")
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS reset_token TEXT")
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS reset_token_exp TIMESTAMP")
+        cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS tarifa_kwh DECIMAL(6,4)")
+        cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS consumo_medio_antes_kwh DECIMAL(8,2)")
         conn.commit()
     except Exception:
         conn.rollback()
@@ -700,7 +702,8 @@ def detalhes_cliente(cliente_id: int, integrador: dict = Depends(obter_integrado
     cur.execute("""
         SELECT id, nome, email, telefone, numero_uc, distribuidora, tipo_gd,
                marca_inversor, serial_inversor, api_key_inversor,
-               potencia_kwp, latitude, longitude, data_instalacao, performance_ratio, token_acesso
+               potencia_kwp, latitude, longitude, data_instalacao, performance_ratio, token_acesso,
+               tarifa_kwh, consumo_medio_antes_kwh
         FROM clientes WHERE id=%s AND integrador_id=%s
     """, (cliente_id, integrador["id"]))
     c = cur.fetchone()
@@ -717,7 +720,9 @@ def detalhes_cliente(cliente_id: int, integrador: dict = Depends(obter_integrado
         "longitude": float(c[12]) if c[12] else None,
         "data_instalacao": str(c[13]) if c[13] else None,
         "performance_ratio": float(c[14]) if c[14] else 0.80,
-        "token_acesso": c[15]
+        "token_acesso": c[15],
+        "tarifa_kwh": float(c[16]) if c[16] else None,
+        "consumo_medio_antes_kwh": float(c[17]) if c[17] else None
     }
 
 @app.put("/clientes/{cliente_id}")
@@ -1003,8 +1008,12 @@ def atualizar_projeto(cliente_id: int, dados: dict, integrador: dict = Depends(o
     conn = conectar_banco()
     cur = conn.cursor()
     try:
-        cur.execute("UPDATE clientes SET potencia_kwp=%s,latitude=%s,longitude=%s,data_instalacao=%s,performance_ratio=%s WHERE id=%s AND integrador_id=%s RETURNING id,nome",
-                    (dados.get("potencia_kwp"),dados.get("latitude"),dados.get("longitude"),dados.get("data_instalacao"),dados.get("performance_ratio",0.80),cliente_id,integrador["id"]))
+        cur.execute("""UPDATE clientes SET potencia_kwp=%s,latitude=%s,longitude=%s,data_instalacao=%s,
+                    performance_ratio=%s,tarifa_kwh=%s,consumo_medio_antes_kwh=%s
+                    WHERE id=%s AND integrador_id=%s RETURNING id,nome""",
+                    (dados.get("potencia_kwp"),dados.get("latitude"),dados.get("longitude"),dados.get("data_instalacao"),
+                     dados.get("performance_ratio",0.80),dados.get("tarifa_kwh"),dados.get("consumo_medio_antes_kwh"),
+                     cliente_id,integrador["id"]))
         c = cur.fetchone()
         conn.commit()
         if not c:
@@ -1149,7 +1158,7 @@ async def upload_conta(cliente_id: int, arquivo: UploadFile = File(...)):
 def geracao_esperada(cliente_id: int):
     conn = conectar_banco()
     cur = conn.cursor()
-    cur.execute("SELECT potencia_kwp,latitude,longitude,performance_ratio FROM clientes WHERE id=%s", (cliente_id,))
+    cur.execute("SELECT potencia_kwp,latitude,longitude,performance_ratio,tarifa_kwh,consumo_medio_antes_kwh FROM clientes WHERE id=%s", (cliente_id,))
     c = cur.fetchone()
     cur.close()
     conn.close()
@@ -1157,11 +1166,79 @@ def geracao_esperada(cliente_id: int):
         raise HTTPException(status_code=404, detail="Projeto solar não cadastrado")
     kwp = float(c[0])
     pr = float(c[3]) if c[3] else 0.80
+    tarifa = float(c[4]) if c[4] else None
+    consumo_antes = float(c[5]) if c[5] else None
     hsp = {1:5.2,2:5.4,3:5.1,4:4.8,5:4.5,6:4.3,7:4.5,8:5.0,9:4.9,10:4.8,11:4.9,12:5.0}
     meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]
     dias = [31,28,31,30,31,30,31,31,30,31,30,31]
     geracao = [{"mes":meses[i],"mes_num":i+1,"hsp":hsp[i+1],"kwh_esperado":round(kwp*hsp[i+1]*dias[i]*pr,2)} for i in range(12)]
-    return {"potencia_kwp":kwp,"performance_ratio":pr,"geracao_mensal":geracao,"total_anual":round(sum(g["kwh_esperado"] for g in geracao),2)}
+    return {"potencia_kwp":kwp,"performance_ratio":pr,"tarifa_kwh":tarifa,"consumo_medio_antes_kwh":consumo_antes,
+            "geracao_mensal":geracao,"total_anual":round(sum(g["kwh_esperado"] for g in geracao),2)}
+
+@app.get("/clientes/{cliente_id}/saldo-creditos")
+def saldo_creditos(cliente_id: int):
+    conn = conectar_banco()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT mes_referencia, saldo_acumulado_kwh, energia_injetada_kwh, consumo_kwh, criado_em
+        FROM contas WHERE cliente_id=%s
+        ORDER BY criado_em ASC
+    """, (cliente_id,))
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    dados = [{"mes": r[0], "saldo_kwh": float(r[1] or 0),
+              "injetado_kwh": float(r[2] or 0), "consumo_kwh": float(r[3] or 0),
+              "data": str(r[4])} for r in rows]
+    saldo_atual = dados[-1]["saldo_kwh"] if dados else 0
+    return {"dados": dados, "saldo_atual": saldo_atual}
+
+@app.get("/clientes/{cliente_id}/previsao")
+def previsao_geracao(cliente_id: int):
+    conn = conectar_banco()
+    cur = conn.cursor()
+    cur.execute("SELECT latitude, longitude, potencia_kwp, performance_ratio FROM clientes WHERE id=%s", (cliente_id,))
+    c = cur.fetchone()
+    cur.close()
+    conn.close()
+    if not c or not c[0] or not c[2]:
+        raise HTTPException(status_code=404, detail="Projeto não configurado")
+    lat, lng, kwp, pr = float(c[0]), float(c[1]), float(c[2]), float(c[3] or 0.80)
+    try:
+        hoje = date.today()
+        fim = hoje + timedelta(days=4)
+        url = (f"https://api.open-meteo.com/v1/forecast"
+               f"?latitude={lat}&longitude={lng}"
+               f"&daily=shortwave_radiation_sum,cloudcover_mean,weathercode"
+               f"&timezone=America%2FSao_Paulo"
+               f"&start_date={hoje}&end_date={fim}")
+        resp = requests.get(url, timeout=10)
+        data = resp.json()
+        daily = data.get("daily", {})
+        datas = daily.get("time", [])
+        radiacao = daily.get("shortwave_radiation_sum", [])
+        nuvens = daily.get("cloudcover_mean", [])
+        wcodes = daily.get("weathercode", [])
+        semana = ["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"]
+        dias = []
+        for i, d in enumerate(datas):
+            hsp = round((radiacao[i] or 0) * 0.2778, 2) if i < len(radiacao) and radiacao[i] else 0
+            kwh = round(kwp * hsp * pr, 2)
+            wc = wcodes[i] if i < len(wcodes) else 0
+            if wc == 0: icone = "☀️"
+            elif wc in [1, 2]: icone = "🌤️"
+            elif wc == 3: icone = "☁️"
+            elif 51 <= wc <= 69: icone = "🌧️"
+            elif 80 <= wc <= 99: icone = "⛈️"
+            else: icone = "⛅"
+            dt = date.fromisoformat(d)
+            dias.append({"data": d, "hoje": d == str(hoje),
+                         "dia_semana": "Hoje" if d == str(hoje) else semana[dt.weekday()],
+                         "icone": icone, "geracao_kwh": kwh,
+                         "cloudcover": round(nuvens[i] or 0) if i < len(nuvens) else 0})
+        return {"dias": dias}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/clientes/{cliente_id}/monitoramento")
 def monitoramento(cliente_id: int):

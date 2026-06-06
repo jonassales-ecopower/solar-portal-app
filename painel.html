@@ -462,6 +462,16 @@
             <div class="grid-2">
                 <div class="campo"><label>Potência do sistema (kWp) *</label><input type="number" id="mc-potencia" placeholder="Ex: 5.5" step="0.1"></div>
                 <div class="campo"><label>Data de instalação</label><input type="date" id="mc-data-inst"></div>
+                <div class="campo">
+                    <label>Tarifa de energia (R$/kWh)</label>
+                    <input type="number" id="mc-tarifa" placeholder="Ex: 0.89" step="0.01">
+                    <p style="font-size:11px;color:#888;margin-top:2px;">Usado para calcular economia em R$. Veja na conta de energia.</p>
+                </div>
+                <div class="campo">
+                    <label>Consumo médio antes do solar (kWh/mês)</label>
+                    <input type="number" id="mc-consumo-antes" placeholder="Ex: 450" step="1">
+                    <p style="font-size:11px;color:#888;margin-top:2px;">Para comparativo antes × depois.</p>
+                </div>
             </div>
             <div class="campo">
                 <label>Eficiência (Performance Ratio)</label>
@@ -1467,7 +1477,7 @@ function mcTab(aba) {
 
 function mcLimpar() {
     ['mc-nome','mc-email','mc-telefone','mc-uc','mc-distribuidora','mc-tipo-gd',
-     'mc-potencia','mc-data-inst','mc-endereco','mc-lat','mc-lng',
+     'mc-potencia','mc-data-inst','mc-tarifa','mc-consumo-antes','mc-endereco','mc-lat','mc-lng',
      'mc-serial','mc-apikey','mc-foxess-apikey','mc-deye-app-id','mc-deye-app-secret',
      'mc-senha','mc-senha2'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
     document.getElementById('mc-pr').value = '0.80';
@@ -1515,6 +1525,8 @@ async function editarCliente(clienteId) {
         if (d.potencia_kwp) document.getElementById('mc-potencia').value = d.potencia_kwp;
         if (d.data_instalacao) document.getElementById('mc-data-inst').value = d.data_instalacao;
         if (d.performance_ratio) document.getElementById('mc-pr').value = d.performance_ratio;
+        if (d.tarifa_kwh) document.getElementById('mc-tarifa').value = d.tarifa_kwh;
+        if (d.consumo_medio_antes_kwh) document.getElementById('mc-consumo-antes').value = d.consumo_medio_antes_kwh;
         if (d.latitude) document.getElementById('mc-lat').value = d.latitude;
         if (d.longitude) document.getElementById('mc-lng').value = d.longitude;
         if (d.marca_inversor) {
@@ -1565,9 +1577,14 @@ async function salvarModalCliente() {
         const lat = parseFloat(document.getElementById('mc-lat').value);
         const lng = parseFloat(document.getElementById('mc-lng').value);
         if (potencia && lat && lng) {
+            const tarifa = parseFloat(document.getElementById('mc-tarifa').value) || null;
+            const consumoAntes = parseFloat(document.getElementById('mc-consumo-antes').value) || null;
             await fetch(`${API}/clientes/${clienteId}/projeto`, {
                 method:'PUT', headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},
-                body: JSON.stringify({potencia_kwp: potencia, latitude: lat, longitude: lng, data_instalacao: document.getElementById('mc-data-inst').value||null, performance_ratio: parseFloat(document.getElementById('mc-pr').value)||0.80})
+                body: JSON.stringify({potencia_kwp: potencia, latitude: lat, longitude: lng,
+                    data_instalacao: document.getElementById('mc-data-inst').value||null,
+                    performance_ratio: parseFloat(document.getElementById('mc-pr').value)||0.80,
+                    tarifa_kwh: tarifa, consumo_medio_antes_kwh: consumoAntes})
             });
         }
 
