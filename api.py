@@ -1180,18 +1180,53 @@ def saldo_creditos(cliente_id: int):
     conn = conectar_banco()
     cur = conn.cursor()
     cur.execute("""
-        SELECT mes_referencia, saldo_acumulado_kwh, energia_injetada_kwh, consumo_kwh, criado_em
+        SELECT mes_referencia, saldo_acumulado_kwh, energia_injetada_kwh,
+               consumo_bruto_kwh, consumo_kwh, criado_em
         FROM contas WHERE cliente_id=%s
         ORDER BY criado_em ASC
     """, (cliente_id,))
     rows = cur.fetchall()
     cur.close()
     conn.close()
-    dados = [{"mes": r[0], "saldo_kwh": float(r[1] or 0),
-              "injetado_kwh": float(r[2] or 0), "consumo_kwh": float(r[3] or 0),
-              "data": str(r[4])} for r in rows]
+    if not rows:
+        return {"dados": [], "saldo_atual": 0, "metodo": "sem_dados"}
+
+    # Verificar se as contas têm saldo_acumulado_kwh extraído direto do PDF
+    tem_saldo_direto = any(float(r[1] or 0) > 0 for r in rows)
+
+    dados = []
+    saldo_cumulativo = 0.0
+
+    for r in rows:
+        mes       = r[0]
+        saldo_pdf = float(r[1] or 0)
+        injetado  = float(r[2] or 0)
+        consumo_bruto = float(r[3] or 0)   # leitura real do medidor
+        consumo_fat   = float(r[4] or 0)   # consumo faturado (após créditos)
+        data      = str(r[5])
+
+        if tem_saldo_direto and saldo_pdf > 0:
+            # Estratégia 1: usar o saldo que a IA extraiu diretamente do PDF
+            saldo_mes = saldo_pdf
+        else:
+            # Estratégia 2: recalcular acumulando (injetado - consumo_bruto)
+            # consumo_bruto = leitura do medidor de entrada (o que veio da rede)
+            # injetado = leitura do medidor de saída (o que foi para a rede)
+            saldo_cumulativo = max(0.0, round(saldo_cumulativo + injetado - consumo_bruto, 2))
+            saldo_mes = saldo_cumulativo
+
+        dados.append({
+            "mes": mes,
+            "saldo_kwh": saldo_mes,
+            "injetado_kwh": injetado,
+            "consumo_bruto_kwh": consumo_bruto,
+            "delta_kwh": round(injetado - consumo_bruto, 2),
+            "data": data
+        })
+
     saldo_atual = dados[-1]["saldo_kwh"] if dados else 0
-    return {"dados": dados, "saldo_atual": saldo_atual}
+    metodo = "extraido_pdf" if tem_saldo_direto else "calculado_acumulado"
+    return {"dados": dados, "saldo_atual": saldo_atual, "metodo": metodo}
 
 @app.get("/clientes/{cliente_id}/previsao")
 def previsao_geracao(cliente_id: int):

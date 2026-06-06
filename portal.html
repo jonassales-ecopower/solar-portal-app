@@ -930,21 +930,31 @@
         document.getElementById("saldo-atual-val").textContent = `${saldoAtual.toFixed(0)} kWh`;
         const ultima = dados[dados.length - 1];
         document.getElementById("saldo-atual-ref").textContent = `Referência: ${ultima.mes}`;
-        // Update home metric
         document.getElementById("eco-saldo").textContent = saldoAtual.toFixed(0);
         document.getElementById("eco-metrics").style.display = "grid";
 
         const labels = dados.map(d => d.mes);
         const valores = dados.map(d => d.saldo_kwh);
-        const cores = valores.map(v => v >= 0 ? 'rgba(16,185,129,0.7)' : 'rgba(239,68,68,0.7)');
+        const deltas = dados.map(d => d.delta_kwh || 0);
+        const cores = valores.map(v => v > 0 ? 'rgba(16,185,129,0.75)' : 'rgba(239,68,68,0.75)');
         const canvas = document.getElementById("grafico-saldo");
         if (canvas._chart) canvas._chart.destroy();
         canvas._chart = new Chart(canvas.getContext("2d"), {
             type: "bar",
-            data: { labels, datasets: [{ label: "Saldo kWh", data: valores, backgroundColor: cores, borderRadius: 4 }] },
-            options: { responsive: true, plugins: { legend: { display: false },
-                tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y.toFixed(0)} kWh` } } },
-                scales: { y: { beginAtZero: false, ticks: { callback: v => v + ' kWh' } } } }
+            data: { labels, datasets: [{ label: "Saldo acumulado", data: valores, backgroundColor: cores, borderRadius: 4 }] },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false },
+                    tooltip: { backgroundColor: '#1e293b', callbacks: {
+                        label: (ctx) => {
+                            const delta = deltas[ctx.dataIndex];
+                            const sinal = delta >= 0 ? '+' : '';
+                            return [` Saldo: ${ctx.parsed.y.toFixed(0)} kWh`, ` Este mês: ${sinal}${delta.toFixed(0)} kWh`];
+                        }
+                    }}
+                },
+                scales: { y: { beginAtZero: false, ticks: { callback: v => v + ' kWh' } } }
+            }
         });
     }
 
