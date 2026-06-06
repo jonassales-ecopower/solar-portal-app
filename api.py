@@ -40,6 +40,8 @@ def inicializar_banco():
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS inversor_usuario TEXT")
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS inversor_senha TEXT")
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS senha_hash TEXT")
+        cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS reset_token TEXT")
+        cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS reset_token_exp TIMESTAMP")
         conn.commit()
     except Exception:
         conn.rollback()
@@ -690,6 +692,140 @@ def portal_me(credentials: HTTPAuthorizationCredentials = Depends(security)):
         raise HTTPException(status_code=401, detail="Token inválido ou expirado")
     return {"cliente_id": payload["cliente_id"], "nome": payload["nome"],
             "numero_uc": payload.get("numero_uc"), "distribuidora": payload.get("distribuidora")}
+
+@app.get("/clientes/{cliente_id}/detalhes")
+def detalhes_cliente(cliente_id: int, integrador: dict = Depends(obter_integrador_atual)):
+    conn = conectar_banco()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, nome, email, telefone, numero_uc, distribuidora, tipo_gd,
+               marca_inversor, serial_inversor, api_key_inversor,
+               potencia_kwp, latitude, longitude, data_instalacao, performance_ratio, token_acesso
+        FROM clientes WHERE id=%s AND integrador_id=%s
+    """, (cliente_id, integrador["id"]))
+    c = cur.fetchone()
+    cur.close()
+    conn.close()
+    if not c:
+        raise HTTPException(status_code=404, detail="Cliente não encontrado")
+    return {
+        "id": c[0], "nome": c[1], "email": c[2], "telefone": c[3],
+        "numero_uc": c[4], "distribuidora": c[5], "tipo_gd": c[6],
+        "marca_inversor": c[7], "serial_inversor": c[8], "api_key_inversor": c[9],
+        "potencia_kwp": float(c[10]) if c[10] else None,
+        "latitude": float(c[11]) if c[11] else None,
+        "longitude": float(c[12]) if c[12] else None,
+        "data_instalacao": str(c[13]) if c[13] else None,
+        "performance_ratio": float(c[14]) if c[14] else 0.80,
+        "token_acesso": c[15]
+    }
+
+@app.put("/clientes/{cliente_id}")
+def atualizar_cliente(cliente_id: int, dados: dict, integrador: dict = Depends(obter_integrador_atual)):
+    conn = conectar_banco()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            UPDATE clientes SET nome=%s, email=%s, telefone=%s, numero_uc=%s, distribuidora=%s, tipo_gd=%s
+            WHERE id=%s AND integrador_id=%s RETURNING id, nome
+        """, (dados.get("nome"), dados.get("email"), dados.get("telefone"),
+              dados.get("numero_uc"), dados.get("distribuidora"), dados.get("tipo_gd"),
+              cliente_id, integrador["id"]))
+        c = cur.fetchone()
+        conn.commit()
+        if not c:
+            raise HTTPException(status_code=404, detail="Cliente não encontrado")
+        return {"sucesso": True, "id": c[0], "nome": c[1]}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+@app.delete("/clientes/{cliente_id}")
+def excluir_cliente(cliente_id: int, integrador: dict = Depends(obter_integrador_atual)):
+    conn = conectar_banco()
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM clientes WHERE id=%s AND integrador_id=%s RETURNING id, nome",
+                    (cliente_id, integrador["id"]))
+        c = cur.fetchone()
+        conn.commit()
+        if not c:
+            raise HTTPException(status_code=404, detail="Cliente não encontrado")
+        return {"sucesso": True, "id": c[0], "nome": c[1]}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+@app.post("/portal/esqueci-senha")
+def esqueci_senha(dados: dict):
+    email = (dados.get("email") or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="E-mail obrigatório")
+    conn = conectar_banco()
+    cur = conn.cursor()
+    cur.execute("SELECT id, nome, email FROM clientes WHERE LOWER(email)=%s", (email,))
+    c = cur.fetchone()
+    if not c:
+        cur.close()
+        conn.close()
+        return {"mensagem": "Se o e-mail estiver cadastrado, você receberá um link em breve."}
+    reset_tok = secrets.token_urlsafe(32)
+    exp = datetime.utcnow() + timedelta(hours=2)
+    cur.execute("UPDATE clientes SET reset_token=%s, reset_token_exp=%s WHERE id=%s", (reset_tok, exp, c[0]))
+    conn.commit()
+    cur.close()
+    conn.close()
+    link = f"https://jonassales-ecopower.github.io/solar-portal-app/portal.html?reset_token={reset_tok}"
+    html_email = f"""<div style="font-family:sans-serif;max-width:540px;margin:0 auto;">
+        <h2 style="color:#d97706;">☀️ Redefinição de Senha — Solar Portal</h2>
+        <p>Olá, <strong>{c[1]}</strong>!</p>
+        <p>Clique no botão abaixo para criar uma nova senha:</p>
+        <p style="margin:24px 0;">
+            <a href="{link}" style="background:#d97706;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">
+               🔑 Criar Nova Senha
+            </a>
+        </p>
+        <p style="color:#888;font-size:12px;">Este link expira em 2 horas.</p>
+        </div>"""
+    if SENDGRID_API_KEY:
+        try:
+            requests.post(
+                "https://api.sendgrid.com/v3/mail/send",
+                json={"personalizations":[{"to":[{"email":c[2]}]}],
+                      "from":{"email":ALERT_EMAIL_FROM,"name":"Solar Portal"},
+                      "subject":"🔑 Redefinição de Senha — Solar Portal",
+                      "content":[{"type":"text/html","value":html_email}]},
+                headers={"Authorization":f"Bearer {SENDGRID_API_KEY}","Content-Type":"application/json"},
+                timeout=10
+            )
+        except Exception:
+            pass
+    return {"mensagem": "Se o e-mail estiver cadastrado, você receberá um link em breve."}
+
+@app.post("/portal/redefinir-senha")
+def redefinir_senha(dados: dict):
+    reset_tok = (dados.get("token") or "").strip()
+    senha = (dados.get("senha") or "").strip()
+    if not reset_tok or len(senha) < 6:
+        raise HTTPException(status_code=400, detail="Token e senha (mínimo 6 caracteres) são obrigatórios")
+    conn = conectar_banco()
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM clientes WHERE reset_token=%s AND reset_token_exp > NOW()", (reset_tok,))
+    c = cur.fetchone()
+    if not c:
+        cur.close()
+        conn.close()
+        raise HTTPException(status_code=400, detail="Link expirado ou inválido. Solicite um novo link.")
+    cur.execute("UPDATE clientes SET senha_hash=%s, reset_token=NULL, reset_token_exp=NULL WHERE id=%s",
+                (criptografar_senha(senha), c[0]))
+    conn.commit()
+    cur.close()
+    conn.close()
+    return {"sucesso": True, "mensagem": "Senha redefinida! Faça login."}
 
 @app.put("/clientes/{cliente_id}/senha")
 def definir_senha_cliente(cliente_id: int, dados: dict, integrador: dict = Depends(obter_integrador_atual)):

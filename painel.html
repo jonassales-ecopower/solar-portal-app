@@ -222,6 +222,12 @@
         tr:hover td { background: #fafafa; }
         .acoes { display: flex; gap: 6px; flex-wrap: wrap; }
         .badge-inv { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; background: #f0fdf4; color: #16a34a; }
+        .mc-tabs { display: flex; gap: 2px; border-bottom: 2px solid #e2e8f0; margin-bottom: 20px; }
+        .mc-tab { padding: 8px 14px; border: none; background: none; font-size: 13px; font-weight: 600; color: #94a3b8; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; font-family: 'Segoe UI', sans-serif; transition: color 0.15s; }
+        .mc-tab:hover { color: #334155; }
+        .mc-tab.ativa { color: #f59e0b; border-bottom-color: #f59e0b; }
+        .mc-panel { display: none; }
+        .mc-panel.ativa { display: block; }
 
         /* Loading spinner */
         .spin { display: inline-block; animation: spin 0.9s linear infinite; }
@@ -409,22 +415,10 @@
     <div id="secao-clientes" style="display:none;">
         <div class="clientes-wrap">
             <div class="lcard">
-                <h2>➕ Cadastrar Novo Cliente</h2>
-                <div class="grid-2">
-                    <div class="campo"><label>Nome do cliente *</label><input type="text" id="novo-nome" placeholder="Nome completo"></div>
-                    <div class="campo"><label>E-mail</label><input type="email" id="novo-email" placeholder="email@exemplo.com"></div>
-                    <div class="campo"><label>Telefone</label><input type="text" id="novo-telefone" placeholder="(35) 99999-9999"></div>
-                    <div class="campo"><label>Número da UC</label><input type="text" id="novo-uc" placeholder="Ex: 4840248-2026-4-6"></div>
-                    <div class="campo"><label>Distribuidora</label><input type="text" id="novo-distribuidora" placeholder="Ex: Energisa Sul-Sudeste"></div>
-                    <div class="campo"><label>Tipo GD</label><input type="text" id="novo-tipo-gd" placeholder="Ex: GD_II"></div>
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
+                    <h2 style="margin-bottom:0;">👥 Minha Carteira de Clientes</h2>
+                    <button class="verde pequeno" onclick="novoCliente()">➕ Novo Cliente</button>
                 </div>
-                <button class="verde" style="margin-top:15px; max-width:220px;" onclick="cadastrarCliente()">✅ Cadastrar Cliente</button>
-                <p class="erro" id="erro-cadastro"></p>
-                <p class="sucesso" id="sucesso-cadastro"></p>
-            </div>
-
-            <div class="lcard">
-                <h2>👥 Minha Carteira de Clientes</h2>
                 <table>
                     <thead>
                         <tr><th>Nome</th><th>UC</th><th>Distribuidora</th><th>Tipo GD</th><th>Inversor</th><th>Ações</th></tr>
@@ -435,6 +429,130 @@
                 </table>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- ===== MODAL NOVO / EDITAR CLIENTE ===== -->
+<div class="modal-overlay" id="modal-cliente">
+    <div class="modal" style="max-width:640px;">
+        <h3 id="mc-titulo">➕ Novo Cliente</h3>
+        <p class="subtitulo" id="mc-sub">Preencha as informações abaixo</p>
+
+        <div class="mc-tabs">
+            <button class="mc-tab ativa" id="mctab-info"     onclick="mcTab('info')">👤 Cliente</button>
+            <button class="mc-tab"        id="mctab-projeto"  onclick="mcTab('projeto')">☀️ Projeto</button>
+            <button class="mc-tab"        id="mctab-inversor" onclick="mcTab('inversor')">🔌 Inversor</button>
+            <button class="mc-tab"        id="mctab-acesso"   onclick="mcTab('acesso')">🔑 Acesso</button>
+        </div>
+
+        <!-- Tab: Cliente -->
+        <div class="mc-panel ativa" id="mcpanel-info">
+            <div class="grid-2">
+                <div class="campo"><label>Nome do cliente *</label><input type="text" id="mc-nome" placeholder="Nome completo"></div>
+                <div class="campo"><label>E-mail</label><input type="email" id="mc-email" placeholder="email@exemplo.com"></div>
+                <div class="campo"><label>Telefone</label><input type="text" id="mc-telefone" placeholder="(35) 99999-9999"></div>
+                <div class="campo"><label>Número da UC</label><input type="text" id="mc-uc" placeholder="Ex: 4840248-2026-4-6"></div>
+                <div class="campo"><label>Distribuidora</label><input type="text" id="mc-distribuidora" placeholder="Ex: Energisa Sul-Sudeste"></div>
+                <div class="campo"><label>Tipo GD</label><input type="text" id="mc-tipo-gd" placeholder="Ex: GD_II"></div>
+            </div>
+        </div>
+
+        <!-- Tab: Projeto -->
+        <div class="mc-panel" id="mcpanel-projeto">
+            <div class="grid-2">
+                <div class="campo"><label>Potência do sistema (kWp) *</label><input type="number" id="mc-potencia" placeholder="Ex: 5.5" step="0.1"></div>
+                <div class="campo"><label>Data de instalação</label><input type="date" id="mc-data-inst"></div>
+            </div>
+            <div class="campo">
+                <label>Eficiência (Performance Ratio)</label>
+                <input type="number" id="mc-pr" value="0.80" step="0.01">
+                <p style="font-size:11px;color:#888;margin-top:4px;">Entre 0,75 e 0,85 para sistemas residenciais.</p>
+            </div>
+            <div class="campo">
+                <label>Endereço da instalação</label>
+                <div style="display:flex;gap:8px;">
+                    <input type="text" id="mc-endereco" placeholder="Ex: Rua das Flores, 123, Extrema, MG" style="flex:1;">
+                    <button class="amarelo pequeno" onclick="mcBuscarCoordenadas()">🔍 Buscar</button>
+                </div>
+                <p class="info" id="mc-endereco-ok" style="display:none;"></p>
+                <p class="erro" id="mc-endereco-erro"></p>
+            </div>
+            <div class="grid-2">
+                <div class="campo"><label>Latitude</label><input type="number" id="mc-lat" placeholder="-22.876100" step="0.000001"></div>
+                <div class="campo"><label>Longitude</label><input type="number" id="mc-lng" placeholder="-46.316700" step="0.000001"></div>
+            </div>
+        </div>
+
+        <!-- Tab: Inversor -->
+        <div class="mc-panel" id="mcpanel-inversor">
+            <div class="campo">
+                <label>Marca do Inversor *</label>
+                <select id="mc-marca" onchange="mcAtualizarInstrucoes()">
+                    <option value="">Selecione a marca...</option>
+                    <option value="foxess">FoxESS</option>
+                    <option value="growatt">Growatt</option>
+                    <option value="deye">Deye</option>
+                    <option value="weg">WEG / SunWEG</option>
+                    <option value="hoymiles">Hoymiles</option>
+                    <option value="solis">Solis</option>
+                    <option value="outro">Outro</option>
+                </select>
+            </div>
+            <div id="mc-foxess-busca" style="display:none;">
+                <div class="dica-roxo">⚡ <strong>FoxESS:</strong> Acesse <a href="https://www.foxesscloud.com" target="_blank" style="color:#7c3aed;">foxesscloud.com</a> → Perfil → API Management → Generate API Key</div>
+                <div class="campo">
+                    <label>API Key FoxESS *</label>
+                    <input type="text" id="mc-foxess-apikey" placeholder="Cole aqui a API Key do portal FoxESS">
+                </div>
+                <button class="azul pequeno" id="mc-btn-foxess" onclick="mcFoxessBuscar()">🔍 Buscar Inversores</button>
+                <p class="info" id="mc-foxess-buscando" style="display:none;">🔄 Buscando...</p>
+                <p class="erro" id="mc-foxess-erro"></p>
+                <div id="mc-foxess-dispositivos" style="display:none;" class="campo">
+                    <label>Inversor encontrado</label>
+                    <select id="mc-foxess-select" onchange="mcFoxessSelecionar()">
+                        <option value="">Selecione o inversor...</option>
+                    </select>
+                </div>
+                <hr class="separador">
+                <p style="font-size:11px;color:#888;margin-bottom:8px;">Ou preencha manualmente:</p>
+            </div>
+            <div class="campo">
+                <label>Número de Série do Inversor *</label>
+                <input type="text" id="mc-serial" placeholder="Ex: J0MF502043LK010">
+            </div>
+            <div class="campo" id="mc-campo-apikey">
+                <label>Chave de API *</label>
+                <input type="text" id="mc-apikey" placeholder="Cole aqui a chave de API">
+            </div>
+            <div id="mc-campos-deye" style="display:none;">
+                <div class="campo"><label>App ID *</label><input type="text" id="mc-deye-app-id" placeholder="App ID do portal Solarman"></div>
+                <div class="campo"><label>App Secret *</label><input type="text" id="mc-deye-app-secret" placeholder="App Secret do portal Solarman"></div>
+            </div>
+            <div id="mc-instrucoes-api"></div>
+        </div>
+
+        <!-- Tab: Acesso -->
+        <div class="mc-panel" id="mcpanel-acesso">
+            <div class="dica">
+                💡 Defina uma senha para o cliente acessar o portal com o e-mail cadastrado. Compartilhe via WhatsApp: <strong>e-mail + senha</strong>.<br>
+                URL do portal: <strong>jonassales-ecopower.github.io/solar-portal-app/portal.html</strong>
+            </div>
+            <div class="campo"><label>Nova senha (mín. 6 caracteres)</label><input type="password" id="mc-senha" placeholder="Deixe em branco para não alterar"></div>
+            <div class="campo"><label>Confirmar senha</label><input type="password" id="mc-senha2" placeholder="Repita a senha"></div>
+            <div id="mc-link-box" style="display:none;">
+                <label style="display:block;font-size:12px;color:#666;font-weight:600;margin-bottom:4px;">🔗 Link do Portal</label>
+                <div class="link-box" id="mc-link-txt" style="cursor:pointer;" onclick="mcCopiarLink()" title="Clique para copiar"></div>
+                <p class="sucesso" id="mc-link-copiado" style="display:none;margin-top:4px;">✅ Link copiado!</p>
+            </div>
+        </div>
+
+        <div class="modal-acoes" style="margin-top:20px;">
+            <button class="verde pequeno" onclick="salvarModalCliente()">✅ Salvar</button>
+            <button class="secundario pequeno" onclick="fecharModal('modal-cliente')">Cancelar</button>
+            <button class="vermelho pequeno" id="mc-btn-excluir" onclick="excluirClienteModal()" style="display:none; margin-left:auto;">🗑️ Excluir Cliente</button>
+        </div>
+        <p class="sucesso" id="mc-sucesso" style="display:none;margin-top:10px;"></p>
+        <p class="erro" id="mc-erro" style="margin-top:6px;"></p>
     </div>
 </div>
 
@@ -1128,11 +1246,8 @@ async function carregarTabelaClientes() {
                 <td data-label="Inversor">${c.marca_inversor ? `<span class="badge-inv">✅ ${c.marca_inversor}</span>` : '<span style="color:#9ca3af; font-size:12px;">Não configurado</span>'}</td>
                 <td data-label="Ações">
                     <div class="acoes">
-                        <button class="pequeno" onclick="verContas(${c.id},'${c.nome.replace(/'/g,"\\'")}')">Ver Contas</button>
-                        <button class="azul pequeno" onclick="obterLink(${c.id},'${c.nome.replace(/'/g,"\\'")}')">🔗 Link</button>
-                        <button class="pequeno" onclick="definirSenha(${c.id},'${c.nome.replace(/'/g,"\\'")}')">🔑 Senha</button>
-                        <button class="amarelo pequeno" onclick="cadastrarProjeto(${c.id},'${c.nome.replace(/'/g,"\\'")}')">☀️ Projeto</button>
-                        <button class="roxo pequeno" onclick="cadastrarInversor(${c.id},'${c.nome.replace(/'/g,"\\'")}')">🔌 Inversor</button>
+                        <button class="pequeno" onclick="verContas(${c.id},'${c.nome.replace(/'/g,"\\'")}')">📄 Ver Contas</button>
+                        <button class="azul pequeno" onclick="editarCliente(${c.id})">✏️ Editar</button>
                         ${c.marca_inversor ? `<button class="verde pequeno" onclick="abrirDetalhe(${c.id},'${c.nome.replace(/'/g,"\\'")}',${c.potencia_kwp||0})">📊 Dashboard</button>` : ''}
                     </div>
                 </td>
@@ -1338,6 +1453,248 @@ async function salvarInversor() {
             document.getElementById("erro-inversor").textContent = d.detail || "Erro ao salvar inversor";
         }
     } catch(e) { document.getElementById("erro-inversor").textContent = "Erro de conexão"; }
+}
+
+// ===== MODAL NOVO/EDITAR CLIENTE =====
+let mcClienteId = null;
+
+function mcTab(aba) {
+    ['info','projeto','inversor','acesso'].forEach(a => {
+        document.getElementById(`mctab-${a}`).classList.toggle('ativa', a === aba);
+        document.getElementById(`mcpanel-${a}`).classList.toggle('ativa', a === aba);
+    });
+}
+
+function mcLimpar() {
+    ['mc-nome','mc-email','mc-telefone','mc-uc','mc-distribuidora','mc-tipo-gd',
+     'mc-potencia','mc-data-inst','mc-endereco','mc-lat','mc-lng',
+     'mc-serial','mc-apikey','mc-foxess-apikey','mc-deye-app-id','mc-deye-app-secret',
+     'mc-senha','mc-senha2'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+    document.getElementById('mc-pr').value = '0.80';
+    document.getElementById('mc-marca').value = '';
+    document.getElementById('mc-foxess-busca').style.display = 'none';
+    document.getElementById('mc-campo-apikey').style.display = 'block';
+    document.getElementById('mc-campos-deye').style.display = 'none';
+    document.getElementById('mc-foxess-dispositivos').style.display = 'none';
+    document.getElementById('mc-instrucoes-api').innerHTML = '';
+    document.getElementById('mc-endereco-ok').style.display = 'none';
+    document.getElementById('mc-endereco-erro').textContent = '';
+    document.getElementById('mc-foxess-erro').textContent = '';
+    document.getElementById('mc-link-box').style.display = 'none';
+    document.getElementById('mc-sucesso').style.display = 'none';
+    document.getElementById('mc-erro').textContent = '';
+    mcTab('info');
+}
+
+function novoCliente() {
+    mcClienteId = null;
+    mcLimpar();
+    document.getElementById('mc-titulo').textContent = '➕ Novo Cliente';
+    document.getElementById('mc-sub').textContent = 'Preencha as informações abaixo';
+    document.getElementById('mc-btn-excluir').style.display = 'none';
+    document.getElementById('modal-cliente').classList.add('ativo');
+}
+
+async function editarCliente(clienteId) {
+    mcClienteId = clienteId;
+    mcLimpar();
+    document.getElementById('mc-titulo').textContent = '✏️ Editar Cliente';
+    document.getElementById('mc-sub').textContent = 'Atualize as informações do cliente';
+    document.getElementById('mc-btn-excluir').style.display = 'block';
+    document.getElementById('modal-cliente').classList.add('ativo');
+    try {
+        const r = await fetch(`${API}/clientes/${clienteId}/detalhes`, {headers:{"Authorization":`Bearer ${token}`}});
+        if (!r.ok) { document.getElementById('mc-erro').textContent = 'Erro ao carregar dados do cliente'; return; }
+        const d = await r.json();
+        document.getElementById('mc-nome').value = d.nome || '';
+        document.getElementById('mc-email').value = d.email || '';
+        document.getElementById('mc-telefone').value = d.telefone || '';
+        document.getElementById('mc-uc').value = d.numero_uc || '';
+        document.getElementById('mc-distribuidora').value = d.distribuidora || '';
+        document.getElementById('mc-tipo-gd').value = d.tipo_gd || '';
+        if (d.potencia_kwp) document.getElementById('mc-potencia').value = d.potencia_kwp;
+        if (d.data_instalacao) document.getElementById('mc-data-inst').value = d.data_instalacao;
+        if (d.performance_ratio) document.getElementById('mc-pr').value = d.performance_ratio;
+        if (d.latitude) document.getElementById('mc-lat').value = d.latitude;
+        if (d.longitude) document.getElementById('mc-lng').value = d.longitude;
+        if (d.marca_inversor) {
+            document.getElementById('mc-marca').value = d.marca_inversor;
+            mcAtualizarInstrucoes();
+        }
+        if (d.serial_inversor) document.getElementById('mc-serial').value = d.serial_inversor;
+        if (d.api_key_inversor && d.marca_inversor !== 'deye') document.getElementById('mc-apikey').value = d.api_key_inversor;
+        if (d.marca_inversor === 'deye' && d.api_key_inversor) {
+            try { const cr = JSON.parse(d.api_key_inversor); document.getElementById('mc-deye-app-id').value = cr.app_id||''; document.getElementById('mc-deye-app-secret').value = cr.app_secret||''; } catch(e) {}
+        }
+        if (d.token_acesso) {
+            const base = window.location.href.replace('painel.html','');
+            const email = document.getElementById('mc-email').value;
+            const nomeEnc = encodeURIComponent(d.nome);
+            document.getElementById('mc-link-box').style.display = 'block';
+            document.getElementById('mc-link-txt').textContent = `${base}portal.html?token_acesso=${d.token_acesso}&nome=${nomeEnc}`;
+        }
+    } catch(e) { document.getElementById('mc-erro').textContent = 'Erro de conexão'; }
+}
+
+async function salvarModalCliente() {
+    const nome = document.getElementById('mc-nome').value.trim();
+    if (!nome) { mcTab('info'); document.getElementById('mc-erro').textContent = 'Nome do cliente é obrigatório'; return; }
+    document.getElementById('mc-erro').textContent = '';
+    document.getElementById('mc-sucesso').style.display = 'none';
+
+    try {
+        // 1. Criar ou atualizar dados básicos
+        let clienteId = mcClienteId;
+        if (!clienteId) {
+            const resp = await fetch(`${API}/clientes`, {
+                method:'POST', headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},
+                body: JSON.stringify({nome, email: document.getElementById('mc-email').value, telefone: document.getElementById('mc-telefone').value, numero_uc: document.getElementById('mc-uc').value, distribuidora: document.getElementById('mc-distribuidora').value, tipo_gd: document.getElementById('mc-tipo-gd').value})
+            });
+            if (!resp.ok) { const d = await resp.json(); document.getElementById('mc-erro').textContent = d.detail||'Erro ao criar cliente'; return; }
+            const d = await resp.json(); clienteId = d.id;
+        } else {
+            const resp = await fetch(`${API}/clientes/${clienteId}`, {
+                method:'PUT', headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},
+                body: JSON.stringify({nome, email: document.getElementById('mc-email').value, telefone: document.getElementById('mc-telefone').value, numero_uc: document.getElementById('mc-uc').value, distribuidora: document.getElementById('mc-distribuidora').value, tipo_gd: document.getElementById('mc-tipo-gd').value})
+            });
+            if (!resp.ok) { const d = await resp.json(); document.getElementById('mc-erro').textContent = d.detail||'Erro ao atualizar cliente'; return; }
+        }
+
+        // 2. Projeto (se preenchido)
+        const potencia = parseFloat(document.getElementById('mc-potencia').value);
+        const lat = parseFloat(document.getElementById('mc-lat').value);
+        const lng = parseFloat(document.getElementById('mc-lng').value);
+        if (potencia && lat && lng) {
+            await fetch(`${API}/clientes/${clienteId}/projeto`, {
+                method:'PUT', headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},
+                body: JSON.stringify({potencia_kwp: potencia, latitude: lat, longitude: lng, data_instalacao: document.getElementById('mc-data-inst').value||null, performance_ratio: parseFloat(document.getElementById('mc-pr').value)||0.80})
+            });
+        }
+
+        // 3. Inversor (se preenchido)
+        const marca = document.getElementById('mc-marca').value;
+        const serial = document.getElementById('mc-serial').value.trim();
+        if (marca && serial) {
+            let apiKey = '';
+            if (marca === 'deye') {
+                const appId = document.getElementById('mc-deye-app-id').value.trim();
+                const appSecret = document.getElementById('mc-deye-app-secret').value.trim();
+                if (appId && appSecret) apiKey = JSON.stringify({app_id: appId, app_secret: appSecret});
+            } else {
+                apiKey = document.getElementById('mc-apikey').value.trim();
+            }
+            if (apiKey || marca === 'foxess') {
+                await fetch(`${API}/clientes/${clienteId}/inversor`, {
+                    method:'PUT', headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},
+                    body: JSON.stringify({marca_inversor: marca, serial_inversor: serial, api_key_inversor: apiKey})
+                });
+            }
+        }
+
+        // 4. Senha (se preenchida)
+        const senha = document.getElementById('mc-senha').value;
+        const senha2 = document.getElementById('mc-senha2').value;
+        if (senha) {
+            if (senha !== senha2) { document.getElementById('mc-erro').textContent = 'As senhas não conferem'; mcTab('acesso'); return; }
+            if (senha.length < 6) { document.getElementById('mc-erro').textContent = 'A senha deve ter no mínimo 6 caracteres'; mcTab('acesso'); return; }
+            await fetch(`${API}/clientes/${clienteId}/senha`, {
+                method:'PUT', headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},
+                body: JSON.stringify({senha})
+            });
+        }
+
+        document.getElementById('mc-sucesso').style.display = 'block';
+        document.getElementById('mc-sucesso').textContent = mcClienteId ? '✅ Cliente atualizado com sucesso!' : '✅ Cliente cadastrado com sucesso!';
+        carregarTabelaClientes();
+        setTimeout(() => fecharModal('modal-cliente'), 2000);
+    } catch(e) { document.getElementById('mc-erro').textContent = 'Erro de conexão'; }
+}
+
+async function excluirClienteModal() {
+    if (!mcClienteId) return;
+    const nome = document.getElementById('mc-nome').value;
+    if (!confirm(`Excluir o cliente "${nome}"? Todas as contas e dados serão removidos permanentemente.`)) return;
+    try {
+        const resp = await fetch(`${API}/clientes/${mcClienteId}`, {method:'DELETE', headers:{"Authorization":`Bearer ${token}`}});
+        if (resp.ok) {
+            fecharModal('modal-cliente');
+            carregarTabelaClientes();
+        } else {
+            const d = await resp.json();
+            document.getElementById('mc-erro').textContent = d.detail || 'Erro ao excluir';
+        }
+    } catch(e) { document.getElementById('mc-erro').textContent = 'Erro de conexão'; }
+}
+
+function mcCopiarLink() {
+    navigator.clipboard.writeText(document.getElementById('mc-link-txt').textContent);
+    document.getElementById('mc-link-copiado').style.display = 'block';
+    setTimeout(() => document.getElementById('mc-link-copiado').style.display = 'none', 2000);
+}
+
+async function mcBuscarCoordenadas() {
+    const endereco = document.getElementById('mc-endereco').value;
+    if (!endereco) { document.getElementById('mc-endereco-erro').textContent = 'Digite o endereço primeiro'; return; }
+    document.getElementById('mc-endereco-erro').textContent = '';
+    document.getElementById('mc-endereco-ok').style.display = 'none';
+    const variacoes = [endereco, endereco + ', Brasil', endereco.split(',').slice(-2).join(',').trim() + ', Brasil'];
+    for (const v of variacoes) {
+        try {
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(v)}&limit=1&countrycodes=br`;
+            const resp = await fetch(url, {headers:{"Accept-Language":"pt-BR"}});
+            const data = await resp.json();
+            if (data.length > 0) {
+                document.getElementById('mc-lat').value = parseFloat(data[0].lat).toFixed(6);
+                document.getElementById('mc-lng').value = parseFloat(data[0].lon).toFixed(6);
+                document.getElementById('mc-endereco-ok').style.display = 'block';
+                document.getElementById('mc-endereco-ok').textContent = `✅ ${data[0].display_name.substring(0,70)}...`;
+                return;
+            }
+        } catch(e) { continue; }
+    }
+    document.getElementById('mc-endereco-erro').textContent = 'Endereço não encontrado. Insira as coordenadas manualmente.';
+}
+
+function mcAtualizarInstrucoes() {
+    const marca = document.getElementById('mc-marca').value;
+    document.getElementById('mc-foxess-busca').style.display = marca === 'foxess' ? 'block' : 'none';
+    document.getElementById('mc-campo-apikey').style.display = marca === 'deye' ? 'none' : 'block';
+    document.getElementById('mc-campos-deye').style.display = marca === 'deye' ? 'block' : 'none';
+    const instrucoes = {
+        growatt: `<div class="dica-roxo">📋 <a href="https://openapi.growatt.com" target="_blank" style="color:#7c3aed;">openapi.growatt.com</a> → Account → API Token</div>`,
+        weg: `<div class="dica-roxo">📋 <a href="https://solarportal.weg.net" target="_blank" style="color:#7c3aed;">solarportal.weg.net</a> → Gestão de API</div>`,
+        hoymiles: `<div class="dica-roxo">📋 <a href="https://global.hoymiles.com" target="_blank" style="color:#7c3aed;">global.hoymiles.com</a> → Account → API Access</div>`,
+        solis: `<div class="dica-roxo">📋 <a href="https://www.soliscloud.com" target="_blank" style="color:#7c3aed;">soliscloud.com</a> → Conta → Gestão de API</div>`,
+    };
+    document.getElementById('mc-instrucoes-api').innerHTML = instrucoes[marca] || '';
+}
+
+async function mcFoxessBuscar() {
+    const apiKey = document.getElementById('mc-foxess-apikey').value.trim();
+    if (!apiKey) { document.getElementById('mc-foxess-erro').textContent = 'Cole a API Key'; return; }
+    document.getElementById('mc-foxess-buscando').style.display = 'block';
+    document.getElementById('mc-btn-foxess').disabled = true;
+    document.getElementById('mc-foxess-erro').textContent = '';
+    document.getElementById('mc-foxess-dispositivos').style.display = 'none';
+    try {
+        const tmpId = mcClienteId || 0;
+        const resp = await fetch(`${API}/clientes/${tmpId}/foxess/buscar`, {method:'POST', headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`}, body: JSON.stringify({api_key: apiKey})});
+        const data = await resp.json();
+        if (resp.ok) {
+            document.getElementById('mc-apikey').value = apiKey;
+            const sel = document.getElementById('mc-foxess-select');
+            sel.innerHTML = '<option value="">Selecione o inversor...</option>';
+            data.dispositivos.forEach(d => { const opt = document.createElement('option'); opt.value = d.sn; opt.textContent = `${d.sn} — ${d.modelo||'Inversor'} ${d.status===1?'🟢':'⚫'}`; sel.appendChild(opt); });
+            document.getElementById('mc-foxess-dispositivos').style.display = 'block';
+            if (data.dispositivos.length === 1) { sel.selectedIndex = 1; mcFoxessSelecionar(); }
+        } else { document.getElementById('mc-foxess-erro').textContent = data.detail || 'Erro ao buscar inversores'; }
+    } catch(e) { document.getElementById('mc-foxess-erro').textContent = 'Erro de conexão'; }
+    finally { document.getElementById('mc-foxess-buscando').style.display = 'none'; document.getElementById('mc-btn-foxess').disabled = false; }
+}
+
+function mcFoxessSelecionar() {
+    const sn = document.getElementById('mc-foxess-select').value;
+    if (sn) document.getElementById('mc-serial').value = sn;
 }
 
 // ===== SENHA CLIENTE =====

@@ -269,7 +269,7 @@
 
 <!-- ===== TELA DE LOGIN ===== -->
 <div id="tela-login" style="display:none;">
-    <div class="login-card">
+    <div class="login-card" id="card-login">
         <div class="login-logo">
             <div class="sol">☀️</div>
             <h1>Solar Portal</h1>
@@ -286,8 +286,45 @@
         <button class="btn-login" onclick="fazerLoginCliente()">Entrar</button>
         <div class="login-erro" id="login-erro"></div>
         <div class="login-footer">
-            Esqueceu sua senha? Entre em contato com seu integrador solar.
+            <span onclick="mostrarEsqueci()" style="color:#f59e0b;cursor:pointer;font-weight:600;">Esqueci minha senha</span>
         </div>
+    </div>
+
+    <!-- Esqueci a Senha -->
+    <div class="login-card" id="card-esqueci" style="display:none;">
+        <div class="login-logo">
+            <div class="sol">🔑</div>
+            <h1 style="font-size:20px;">Redefinir Senha</h1>
+            <p>Informe o e-mail cadastrado pelo seu integrador</p>
+        </div>
+        <div class="login-campo">
+            <label>E-mail</label>
+            <input type="email" id="esqueci-email" placeholder="seu@email.com" onkeydown="if(event.key==='Enter') enviarEsqueci()">
+        </div>
+        <button class="btn-login" onclick="enviarEsqueci()">Enviar link de redefinição</button>
+        <div class="login-erro" id="esqueci-erro"></div>
+        <div class="login-footer">
+            <span onclick="mostrarLogin()" style="color:#f59e0b;cursor:pointer;font-weight:600;">← Voltar ao login</span>
+        </div>
+    </div>
+
+    <!-- Nova Senha (via link de reset) -->
+    <div class="login-card" id="card-nova-senha" style="display:none;">
+        <div class="login-logo">
+            <div class="sol">🔒</div>
+            <h1 style="font-size:20px;">Nova Senha</h1>
+            <p>Escolha uma nova senha para acessar o portal</p>
+        </div>
+        <div class="login-campo">
+            <label>Nova senha</label>
+            <input type="password" id="nova-senha" placeholder="Mínimo 6 caracteres">
+        </div>
+        <div class="login-campo">
+            <label>Confirmar senha</label>
+            <input type="password" id="nova-senha2" placeholder="Repita a senha" onkeydown="if(event.key==='Enter') confirmarNovaSenha()">
+        </div>
+        <button class="btn-login" onclick="confirmarNovaSenha()">Salvar Nova Senha</button>
+        <div class="login-erro" id="nova-senha-erro"></div>
     </div>
 </div>
 
@@ -496,6 +533,7 @@
     const tokenAcesso = p.get("token_acesso");
     const clienteIdParam = p.get("cliente_id");
     const nomeParam = p.get("nome");
+    const resetToken = p.get("reset_token");
 
     let idCliente = clienteIdParam;
     let dadosGeracao = [];
@@ -520,6 +558,55 @@
     function mostrarLogin() {
         document.getElementById("tela-login").style.display = "flex";
         document.getElementById("tela-portal").style.display = "none";
+        document.getElementById("card-login").style.display = "block";
+        document.getElementById("card-esqueci").style.display = "none";
+        document.getElementById("card-nova-senha").style.display = "none";
+    }
+
+    function mostrarEsqueci() {
+        document.getElementById("card-login").style.display = "none";
+        document.getElementById("card-esqueci").style.display = "block";
+        document.getElementById("card-nova-senha").style.display = "none";
+    }
+
+    async function enviarEsqueci() {
+        const email = document.getElementById("esqueci-email").value.trim();
+        const erroEl = document.getElementById("esqueci-erro");
+        erroEl.textContent = "";
+        if (!email) { erroEl.textContent = "Informe o e-mail"; return; }
+        try {
+            const r = await fetch(`${API}/portal/esqueci-senha`, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({email})});
+            const d = await r.json();
+            erroEl.style.color = "#16a34a";
+            erroEl.textContent = d.mensagem || "Link enviado! Verifique seu e-mail.";
+        } catch(e) {
+            erroEl.style.color = "#dc2626";
+            erroEl.textContent = "Erro de conexão. Tente novamente.";
+        }
+    }
+
+    async function confirmarNovaSenha() {
+        const senha = document.getElementById("nova-senha").value;
+        const senha2 = document.getElementById("nova-senha2").value;
+        const erroEl = document.getElementById("nova-senha-erro");
+        erroEl.textContent = "";
+        if (senha.length < 6) { erroEl.textContent = "A senha deve ter no mínimo 6 caracteres"; return; }
+        if (senha !== senha2) { erroEl.textContent = "As senhas não conferem"; return; }
+        try {
+            const r = await fetch(`${API}/portal/redefinir-senha`, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({token: resetToken, senha})});
+            const d = await r.json();
+            if (r.ok) {
+                erroEl.style.color = "#16a34a";
+                erroEl.textContent = "✅ Senha redefinida! Redirecionando...";
+                setTimeout(() => { window.location.href = "portal.html"; }, 2000);
+            } else {
+                erroEl.style.color = "#dc2626";
+                erroEl.textContent = d.detail || "Erro ao redefinir senha";
+            }
+        } catch(e) {
+            erroEl.style.color = "#dc2626";
+            erroEl.textContent = "Erro de conexão. Tente novamente.";
+        }
     }
 
     async function carregarDados() {
@@ -601,7 +688,13 @@
             } catch(e) { mostrarLogin(); }
             return;
         }
-        // 4. Sem sessão — mostrar login
+        // 4. Link de reset de senha
+        if (resetToken) {
+            document.getElementById('tela-login').style.display = 'flex';
+            document.getElementById('card-nova-senha').style.display = 'block';
+            return;
+        }
+        // 5. Sem sessão — mostrar login
         mostrarLogin();
     }
 
