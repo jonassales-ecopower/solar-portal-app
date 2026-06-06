@@ -691,6 +691,8 @@
         // 4. Link de reset de senha
         if (resetToken) {
             document.getElementById('tela-login').style.display = 'flex';
+            document.getElementById('card-login').style.display = 'none';
+            document.getElementById('card-esqueci').style.display = 'none';
             document.getElementById('card-nova-senha').style.display = 'block';
             return;
         }
