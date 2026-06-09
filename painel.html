@@ -236,6 +236,34 @@
         .empty-state .e-icon { font-size: 36px; margin-bottom: 12px; }
         .empty-state p { font-size: 14px; }
 
+        /* ===== RELATÓRIOS ===== */
+        #secao-relatorios { background: #f0f4f8; min-height: calc(100vh - 54px); padding: 24px; }
+        .rel-kpi-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+        .rel-kpi { background: white; border-radius: 10px; padding: 16px 20px; border: 1px solid #e2e8f0; flex: 1; min-width: 120px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,.05); }
+        .rel-kpi .rkv { font-size: 26px; font-weight: 800; color: #1e293b; line-height: 1; }
+        .rel-kpi .rkl { font-size: 11px; color: #64748b; margin-top: 4px; text-transform: uppercase; letter-spacing: .5px; }
+        .rel-kpi.c-green .rkv { color: #16a34a; }
+        .rel-kpi.c-yellow .rkv { color: #d97706; }
+        .rel-kpi.c-blue .rkv { color: #2563eb; }
+        .rel-kpi.c-red .rkv { color: #dc2626; }
+        .rel-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .rel-table th { background: #f8fafc; padding: 10px 12px; text-align: left; font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid #e2e8f0; }
+        .rel-table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        .rel-table tr:hover td { background: #fafafa; }
+        .ritmo-badge { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+        .ritmo-ok { background: #dcfce7; color: #16a34a; }
+        .ritmo-alerta { background: #fef9c3; color: #a16207; }
+        .ritmo-baixo { background: #fee2e2; color: #dc2626; }
+        .ritmo-nd { background: #f1f5f9; color: #94a3b8; }
+        .rel-chart-wrap { background: white; border-radius: 10px; padding: 20px; border: 1px solid #e2e8f0; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.05); }
+        .rel-chart-title { font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 14px; }
+        .email-preview-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; font-size: 13px; line-height: 1.6; }
+        .cron-card { background: #fffbeb; border: 1px solid #fbbf24; border-radius: 10px; padding: 16px 20px; font-size: 13px; line-height: 1.8; color: #92400e; }
+        .cron-url { font-family: monospace; background: #1e293b; color: #f59e0b; padding: 8px 12px; border-radius: 6px; font-size: 12px; word-break: break-all; display: block; margin: 8px 0; }
+        .sel-campo { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+        .sel-campo label { font-size: 13px; font-weight: 600; color: #475569; min-width: 80px; }
+        .sel-campo select { width: auto; min-width: 200px; padding: 8px 12px; font-size: 13px; }
+
         /* ===== MOBILE ===== */
         @media (max-width: 700px) {
             header { padding: 0 14px; }
@@ -310,6 +338,7 @@
             <nav class="nav-tabs">
                 <button class="nav-tab ativa" id="tab-dash" onclick="navegar('dashboard')">📊 Dashboard</button>
                 <button class="nav-tab" id="tab-cli" onclick="navegar('clientes')">👥 Clientes</button>
+                <button class="nav-tab" id="tab-rel" onclick="navegar('relatorios')">📈 Relatórios</button>
             </nav>
         </div>
         <div class="header-right">
@@ -427,6 +456,87 @@
                         <tr><td colspan="6" style="text-align:center; color:#888;">Carregando...</td></tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== RELATÓRIOS ===== -->
+<div id="secao-relatorios" style="display:none;">
+    <div class="clientes-wrap">
+        <div class="lcard">
+            <h2 style="margin-bottom:18px;">📈 Relatórios</h2>
+
+            <!-- Sub-tabs -->
+            <div class="mc-tabs">
+                <button class="mc-tab ativa" id="rtab-carteira" onclick="rTab('carteira')">🏭 Carteira</button>
+                <button class="mc-tab" id="rtab-cliente"    onclick="rTab('cliente')">👤 Por Cliente</button>
+                <button class="mc-tab" id="rtab-desempenho" onclick="rTab('desempenho')">📈 Desempenho</button>
+                <button class="mc-tab" id="rtab-email"      onclick="rTab('email')">✉️ E-mail Diário</button>
+            </div>
+
+            <!-- ===== CARTEIRA ===== -->
+            <div class="mc-panel ativa" id="rpanel-carteira">
+                <div id="rel-carteira-kpis" class="rel-kpi-row"></div>
+                <div id="rel-carteira-tabela">
+                    <div class="empty-state"><div class="e-icon"><span class="spin">⟳</span></div><p>Carregando...</p></div>
+                </div>
+                <div style="margin-top:12px; display:flex; gap:10px;">
+                    <button class="secundario pequeno" onclick="exportarCarteiraCSV()">⬇️ Exportar CSV</button>
+                </div>
+            </div>
+
+            <!-- ===== POR CLIENTE ===== -->
+            <div class="mc-panel" id="rpanel-cliente">
+                <div class="sel-campo">
+                    <label>Cliente</label>
+                    <select id="rel-sel-cliente" onchange="carregarRelatorioCliente()">
+                        <option value="">— Selecione um cliente —</option>
+                    </select>
+                    <label style="margin-left:10px;">Período</label>
+                    <select id="rel-periodo" onchange="carregarRelatorioCliente()">
+                        <option value="6">Últimos 6 meses</option>
+                        <option value="12" selected>Últimos 12 meses</option>
+                    </select>
+                    <button class="verde pequeno" onclick="imprimirRelatorioCliente()">🖨️ Exportar PDF</button>
+                </div>
+                <div id="rel-cliente-kpis" class="rel-kpi-row"></div>
+                <div id="rel-cliente-charts">
+                    <div class="empty-state"><div class="e-icon">👤</div><p>Selecione um cliente acima</p></div>
+                </div>
+            </div>
+
+            <!-- ===== DESEMPENHO ===== -->
+            <div class="mc-panel" id="rpanel-desempenho">
+                <div class="sel-campo">
+                    <label>Usina</label>
+                    <select id="rel-sel-usina" onchange="filtrarDesempenho()">
+                        <option value="">Todas as usinas</option>
+                    </select>
+                </div>
+                <div id="rel-desempenho-content">
+                    <div class="empty-state"><div class="e-icon"><span class="spin">⟳</span></div><p>Carregando...</p></div>
+                </div>
+            </div>
+
+            <!-- ===== E-MAIL DIÁRIO ===== -->
+            <div class="mc-panel" id="rpanel-email">
+                <div id="rel-email-preview">
+                    <div class="empty-state"><div class="e-icon"><span class="spin">⟳</span></div><p>Carregando prévia...</p></div>
+                </div>
+                <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
+                    <button class="azul pequeno" onclick="enviarEmailTeste()">📧 Enviar Teste Agora</button>
+                    <button class="secundario pequeno" onclick="carregarEmailPreview()">🔄 Atualizar Prévia</button>
+                </div>
+                <div class="cron-card" style="margin-top:20px;">
+                    <strong>⏰ Agendamento Automático (cron-job.org)</strong><br>
+                    Para receber este relatório todos os dias às 7h, configure um cron gratuito em <strong>cron-job.org</strong>:<br>
+                    1. Crie uma conta em cron-job.org<br>
+                    2. Adicione um novo job com a URL abaixo<br>
+                    3. Configure para executar <strong>diariamente às 07:00</strong><br>
+                    <span class="cron-url" id="cron-url-display">https://solar-portal-api.onrender.com/relatorio-diario/enviar</span>
+                    Método: <strong>GET</strong> &nbsp;|&nbsp; Sem autenticação necessária
+                </div>
             </div>
         </div>
     </div>
@@ -809,12 +919,14 @@ function sair() {
 
 // ===== NAVIGATION =====
 function navegar(secao) {
-    ['dashboard','detalhe','clientes'].forEach(s => document.getElementById(`secao-${s}`).style.display = 'none');
+    ['dashboard','detalhe','clientes','relatorios'].forEach(s => document.getElementById(`secao-${s}`).style.display = 'none');
     document.getElementById(`secao-${secao}`).style.display = 'block';
     document.getElementById('tab-dash').classList.toggle('ativa', secao === 'dashboard' || secao === 'detalhe');
     document.getElementById('tab-cli').classList.toggle('ativa', secao === 'clientes');
+    document.getElementById('tab-rel').classList.toggle('ativa', secao === 'relatorios');
     if (secao === 'dashboard') iniciarDashboard();
     if (secao === 'clientes') carregarTabelaClientes();
+    if (secao === 'relatorios') { carregarRelatorioCarteira(); preencherSelectClientes(); carregarRelatorioDesempenho(); carregarEmailPreview(); }
 }
 
 // ===== DASHBOARD =====
@@ -1765,6 +1877,390 @@ function fecharModal(id) {
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('ativo'); });
 });
+
+// ===== RELATÓRIOS =====
+
+let dadosDesempenho = null;
+let chartDesempenho = null;
+let chartRelCliente = null;
+let dadosCarteira = null;
+
+function rTab(aba) {
+    ['carteira','cliente','desempenho','email'].forEach(a => {
+        document.getElementById(`rtab-${a}`).classList.toggle('ativa', a === aba);
+        document.getElementById(`rpanel-${a}`).classList.toggle('ativa', a === aba);
+    });
+}
+
+// ---- CARTEIRA ----
+async function carregarRelatorioCarteira() {
+    const kpisEl = document.getElementById('rel-carteira-kpis');
+    const tabEl  = document.getElementById('rel-carteira-tabela');
+    kpisEl.innerHTML = '';
+    tabEl.innerHTML  = '<div class="empty-state"><div class="e-icon"><span class="spin">⟳</span></div><p>Carregando...</p></div>';
+    try {
+        const resp = await fetch(`${API}/relatorio/carteira`, { headers: { "Authorization": `Bearer ${token}` } });
+        const data = await resp.json();
+        dadosCarteira = data;
+        renderCarteira(data);
+    } catch(e) {
+        tabEl.innerHTML = `<p class="erro">Erro ao carregar: ${e.message}</p>`;
+    }
+}
+
+function renderCarteira(data) {
+    const { plantas, resumo } = data;
+    document.getElementById('rel-carteira-kpis').innerHTML = `
+        <div class="rel-kpi c-blue"><div class="rkv">${resumo.total_plantas}</div><div class="rkl">Usinas</div></div>
+        <div class="rel-kpi"><div class="rkv">${resumo.total_kwp}</div><div class="rkl">kWp Total</div></div>
+        <div class="rel-kpi c-green"><div class="rkv">${resumo.total_geracao_mes_kwh}</div><div class="rkl">kWh — ${resumo.mes_referencia}</div></div>
+        <div class="rel-kpi c-yellow"><div class="rkv">${plantas.filter(p => p.ritmo_pct !== null && p.ritmo_pct < 70).length}</div><div class="rkl">Abaixo do Ritmo</div></div>`;
+
+    const rows = plantas.map(p => {
+        let ritmoBadge = '<span class="ritmo-badge ritmo-nd">N/D</span>';
+        if (p.ritmo_pct !== null) {
+            const cls = p.ritmo_pct >= 90 ? 'ritmo-ok' : p.ritmo_pct >= 70 ? 'ritmo-alerta' : 'ritmo-baixo';
+            ritmoBadge = `<span class="ritmo-badge ${cls}">${p.ritmo_pct}%</span>`;
+        }
+        const offline = p.offline ? '🔴 ' : '';
+        return `<tr>
+            <td>${offline}<strong>${p.nome}</strong></td>
+            <td>${p.potencia_kwp ? p.potencia_kwp + ' kWp' : '—'}</td>
+            <td>${p.marca_inversor || '—'}</td>
+            <td>${p.geracao_mes_kwh} kWh</td>
+            <td>${p.esperado_mes_kwh ? p.esperado_mes_kwh + ' kWh' : '—'}</td>
+            <td>${ritmoBadge}</td>
+            <td>${p.geracao_ano_kwh} kWh</td>
+            <td>${p.data_instalacao ? p.data_instalacao.substring(0,7) : '—'}</td>
+        </tr>`;
+    }).join('');
+    document.getElementById('rel-carteira-tabela').innerHTML = `
+        <table class="rel-table">
+            <thead><tr>
+                <th>Nome</th><th>Potência</th><th>Inversor</th>
+                <th>Geração Mês</th><th>Esperado Mês</th><th>Ritmo</th>
+                <th>Geração 12M</th><th>Instalação</th>
+            </tr></thead>
+            <tbody>${rows || '<tr><td colspan="8" style="text-align:center;color:#888;">Nenhuma usina cadastrada</td></tr>'}</tbody>
+        </table>`;
+}
+
+function exportarCarteiraCSV() {
+    if (!dadosCarteira) return;
+    const { plantas } = dadosCarteira;
+    const header = ['Nome','kWp','Inversor','Geração Mês kWh','Esperado Mês kWh','Ritmo %','Geração 12M kWh','Instalação'];
+    const rows = plantas.map(p => [
+        p.nome, p.potencia_kwp || '', p.marca_inversor || '',
+        p.geracao_mes_kwh, p.esperado_mes_kwh || '',
+        p.ritmo_pct !== null ? p.ritmo_pct : '',
+        p.geracao_ano_kwh, p.data_instalacao || ''
+    ]);
+    const csv = [header, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `carteira_${new Date().toISOString().substring(0,10)}.csv`;
+    a.click();
+}
+
+// ---- POR CLIENTE ----
+async function preencherSelectClientes() {
+    const sel = document.getElementById('rel-sel-cliente');
+    if (sel.options.length > 1) return; // já preenchido
+    try {
+        const resp = await fetch(`${API}/clientes`, { headers: { "Authorization": `Bearer ${token}` } });
+        const clientes = await resp.json();
+        clientes.forEach(c => {
+            const o = document.createElement('option');
+            o.value = c.id; o.textContent = c.nome;
+            sel.appendChild(o);
+        });
+        // Preenche também o select de desempenho
+        const selD = document.getElementById('rel-sel-usina');
+        clientes.forEach(c => {
+            const o = document.createElement('option');
+            o.value = c.id; o.textContent = c.nome;
+            selD.appendChild(o);
+        });
+    } catch(e) {}
+}
+
+async function carregarRelatorioCliente() {
+    const clienteId = document.getElementById('rel-sel-cliente').value;
+    const periodo   = parseInt(document.getElementById('rel-periodo').value);
+    const kpisEl    = document.getElementById('rel-cliente-kpis');
+    const chartsEl  = document.getElementById('rel-cliente-charts');
+    if (!clienteId) {
+        kpisEl.innerHTML = '';
+        chartsEl.innerHTML = '<div class="empty-state"><div class="e-icon">👤</div><p>Selecione um cliente acima</p></div>';
+        return;
+    }
+    chartsEl.innerHTML = '<div class="empty-state"><div class="e-icon"><span class="spin">⟳</span></div><p>Carregando...</p></div>';
+    try {
+        const [rMensal, rContas, rEsperado] = await Promise.all([
+            fetch(`${API}/clientes/${clienteId}/monitoramento/mensal`, { headers: { "Authorization": `Bearer ${token}` } }).then(r => r.json()),
+            fetch(`${API}/clientes/${clienteId}/contas-publico`).then(r => r.json()),
+            fetch(`${API}/clientes/${clienteId}/geracao-esperada`).then(r => r.json())
+        ]);
+        renderRelatorioCliente(clienteId, rMensal, rContas, rEsperado, periodo);
+    } catch(e) {
+        chartsEl.innerHTML = `<p class="erro">Erro: ${e.message}</p>`;
+    }
+}
+
+function renderRelatorioCliente(clienteId, rMensal, rContas, rEsperado, periodo) {
+    const tarifa = rEsperado.tarifa_kwh || 0;
+    const consumoAntes = rEsperado.consumo_medio_antes_kwh || 0;
+
+    // Pega os últimos N meses de geração
+    const mensal = (rMensal.mensal || []).slice(-periodo);
+    const totalGerado = mensal.reduce((s, m) => s + m.geracao_kwh, 0);
+    const totalEconomia = tarifa ? (totalGerado * tarifa) : 0;
+    const totalCO2 = totalGerado * 0.0817;
+    const totalContas = rContas.length;
+    const valorMedioFatura = totalContas > 0 ? (rContas.reduce((s, c) => s + c.valor_fatura, 0) / totalContas) : 0;
+
+    document.getElementById('rel-cliente-kpis').innerHTML = `
+        <div class="rel-kpi c-green"><div class="rkv">${totalGerado.toFixed(0)}</div><div class="rkl">kWh Gerado (${periodo}m)</div></div>
+        ${tarifa ? `<div class="rel-kpi c-yellow"><div class="rkv">R$ ${totalEconomia.toFixed(0)}</div><div class="rkl">Economia (${periodo}m)</div></div>` : ''}
+        <div class="rel-kpi"><div class="rkv">${totalCO2.toFixed(0)} kg</div><div class="rkl">CO₂ Evitado</div></div>
+        ${valorMedioFatura > 0 ? `<div class="rel-kpi c-blue"><div class="rkv">R$ ${valorMedioFatura.toFixed(0)}</div><div class="rkl">Fatura Média</div></div>` : ''}`;
+
+    if (chartRelCliente) { chartRelCliente.destroy(); chartRelCliente = null; }
+
+    const labels = mensal.map(m => `${['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][m.mes_num-1]}/${m.ano.toString().slice(-2)}`);
+    const geracoes = mensal.map(m => m.geracao_kwh);
+    const esperados = mensal.map(m => {
+        const ge = (rEsperado.geracao_mensal || []).find(g => g.mes_num === m.mes_num);
+        return ge ? ge.kwh_esperado : 0;
+    });
+
+    document.getElementById('rel-cliente-charts').innerHTML = `
+        <div id="print-area-cliente">
+            <div class="rel-chart-wrap">
+                <div class="rel-chart-title">Geração Mensal — Realizado vs Esperado (kWh)</div>
+                <canvas id="chart-rel-cli" style="max-height:220px;"></canvas>
+            </div>
+            ${tarifa ? `<div class="rel-chart-wrap">
+                <div class="rel-chart-title">Economia Estimada (R$)</div>
+                <canvas id="chart-rel-eco" style="max-height:160px;"></canvas>
+            </div>` : ''}
+            ${rContas.length > 0 ? `<div class="rel-chart-wrap">
+                <div class="rel-chart-title">Histórico de Faturas (R$)</div>
+                <canvas id="chart-rel-fat" style="max-height:160px;"></canvas>
+            </div>` : ''}
+        </div>`;
+
+    requestAnimationFrame(() => {
+        const ctx = document.getElementById('chart-rel-cli').getContext('2d');
+        chartRelCliente = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [
+                    { label: 'Realizado', data: geracoes, backgroundColor: 'rgba(16,185,129,.7)', borderRadius: 4 },
+                    { label: 'Esperado',  data: esperados, backgroundColor: 'rgba(245,158,11,.25)', borderColor: '#f59e0b', borderWidth: 1.5, borderRadius: 4, type: 'bar' }
+                ]
+            },
+            options: { responsive: true, plugins: { legend: { labels: { color: '#475569' } } }, scales: { x: { ticks: { color: '#64748b' } }, y: { ticks: { color: '#64748b' } } } }
+        });
+
+        if (tarifa) {
+            const econEl = document.getElementById('chart-rel-eco');
+            if (econEl) {
+                new Chart(econEl.getContext('2d'), {
+                    type: 'bar',
+                    data: { labels, datasets: [{ label: 'Economia R$', data: geracoes.map(g => +(g * tarifa).toFixed(2)), backgroundColor: 'rgba(245,158,11,.6)', borderRadius: 4 }] },
+                    options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b' } }, y: { ticks: { color: '#64748b', callback: v => 'R$ ' + v } } } }
+                });
+            }
+        }
+
+        if (rContas.length > 0) {
+            const fatEl = document.getElementById('chart-rel-fat');
+            if (fatEl) {
+                const contsRev = [...rContas].reverse().slice(-periodo);
+                new Chart(fatEl.getContext('2d'), {
+                    type: 'line',
+                    data: { labels: contsRev.map(c => c.mes_referencia || ''), datasets: [{ label: 'Fatura R$', data: contsRev.map(c => c.valor_fatura), borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.1)', tension: .35, fill: true, pointRadius: 4 }] },
+                    options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b' } }, y: { ticks: { color: '#64748b', callback: v => 'R$ ' + v } } } }
+                });
+            }
+        }
+    });
+}
+
+function imprimirRelatorioCliente() {
+    const area = document.getElementById('print-area-cliente');
+    if (!area) { alert('Selecione um cliente primeiro'); return; }
+    const conteudo = area.innerHTML;
+    const nome = document.getElementById('rel-sel-cliente').options[document.getElementById('rel-sel-cliente').selectedIndex]?.text || 'Cliente';
+    const janela = window.open('', '_blank');
+    janela.document.write(`<!DOCTYPE html><html><head><title>Relatório — ${nome}</title>
+        <style>body{font-family:'Segoe UI',sans-serif;padding:24px;color:#1e293b;}h1{font-size:20px;margin-bottom:4px;}p{color:#64748b;font-size:13px;margin-bottom:20px;}
+        canvas{max-width:100%;margin-bottom:20px;}</style></head>
+        <body><h1>☀️ Relatório Solar — ${nome}</h1><p>Gerado em ${new Date().toLocaleDateString('pt-BR')}</p>${conteudo}</body></html>`);
+    janela.document.close();
+    setTimeout(() => { janela.print(); }, 600);
+}
+
+// ---- DESEMPENHO ----
+async function carregarRelatorioDesempenho() {
+    const el = document.getElementById('rel-desempenho-content');
+    el.innerHTML = '<div class="empty-state"><div class="e-icon"><span class="spin">⟳</span></div><p>Carregando...</p></div>';
+    try {
+        const resp = await fetch(`${API}/relatorio/desempenho`, { headers: { "Authorization": `Bearer ${token}` } });
+        dadosDesempenho = await resp.json();
+        filtrarDesempenho();
+    } catch(e) {
+        el.innerHTML = `<p class="erro">Erro: ${e.message}</p>`;
+    }
+}
+
+function filtrarDesempenho() {
+    if (!dadosDesempenho) return;
+    const usinaId = document.getElementById('rel-sel-usina').value;
+    const plantas = usinaId
+        ? dadosDesempenho.plantas.filter(p => String(p.id) === usinaId)
+        : dadosDesempenho.plantas;
+    renderDesempenho(plantas, dadosDesempenho.labels);
+}
+
+function renderDesempenho(plantas, labels) {
+    const el = document.getElementById('rel-desempenho-content');
+    if (!plantas.length) {
+        el.innerHTML = '<div class="empty-state"><div class="e-icon">📊</div><p>Nenhuma usina com projeto configurado</p></div>';
+        return;
+    }
+    if (chartDesempenho) { chartDesempenho.destroy(); chartDesempenho = null; }
+
+    // Agrega se múltiplas plantas
+    const esperado = labels.map((_, i) => plantas.reduce((s, p) => s + p.meses[i].esperado, 0));
+    const realizado = labels.map((_, i) => plantas.reduce((s, p) => s + p.meses[i].realizado, 0));
+    const totalEsp = esperado.reduce((s, v) => s + v, 0);
+    const totalReal = realizado.reduce((s, v) => s + v, 0);
+    const pctGeral = totalEsp > 0 ? Math.round(totalReal / totalEsp * 100) : 0;
+
+    // Tabela de desempenho por mês
+    const linhasTabela = labels.map((lbl, i) => {
+        const esp = esperado[i], real = realizado[i];
+        const pct = esp > 0 ? Math.round(real / esp * 100) : null;
+        const cls = pct === null ? 'ritmo-nd' : pct >= 90 ? 'ritmo-ok' : pct >= 70 ? 'ritmo-alerta' : 'ritmo-baixo';
+        return `<tr>
+            <td>${lbl}</td>
+            <td>${esp.toFixed(1)} kWh</td>
+            <td>${real.toFixed(1)} kWh</td>
+            <td><span class="ritmo-badge ${cls}">${pct !== null ? pct + '%' : 'N/D'}</span></td>
+        </tr>`;
+    }).join('');
+
+    el.innerHTML = `
+        <div class="rel-kpi-row" style="margin-bottom:16px;">
+            <div class="rel-kpi c-blue"><div class="rkv">${totalEsp.toFixed(0)}</div><div class="rkl">kWh Esperado (12m)</div></div>
+            <div class="rel-kpi c-green"><div class="rkv">${totalReal.toFixed(0)}</div><div class="rkl">kWh Realizado (12m)</div></div>
+            <div class="rel-kpi ${pctGeral >= 90 ? 'c-green' : pctGeral >= 70 ? 'c-yellow' : 'c-red'}">
+                <div class="rkv">${pctGeral}%</div><div class="rkl">Performance Geral</div>
+            </div>
+        </div>
+        <div class="rel-chart-wrap">
+            <div class="rel-chart-title">Esperado vs Realizado — 12 Meses (kWh)</div>
+            <canvas id="chart-desemp" style="max-height:250px;"></canvas>
+        </div>
+        <div class="rel-chart-wrap" style="margin-top:12px;">
+            <div class="rel-chart-title">Detalhamento Mensal</div>
+            <table class="rel-table">
+                <thead><tr><th>Mês</th><th>Esperado</th><th>Realizado</th><th>Performance</th></tr></thead>
+                <tbody>${linhasTabela}</tbody>
+            </table>
+        </div>`;
+
+    requestAnimationFrame(() => {
+        const ctx = document.getElementById('chart-desemp');
+        if (!ctx) return;
+        chartDesempenho = new Chart(ctx.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [
+                    { label: 'Esperado',  data: esperado,  backgroundColor: 'rgba(245,158,11,.3)', borderColor: '#f59e0b', borderWidth: 1.5, borderRadius: 4 },
+                    { label: 'Realizado', data: realizado, backgroundColor: 'rgba(16,185,129,.6)', borderRadius: 4 }
+                ]
+            },
+            options: { responsive: true, plugins: { legend: { labels: { color: '#475569' } } }, scales: { x: { ticks: { color: '#64748b' } }, y: { ticks: { color: '#64748b' } } } }
+        });
+    });
+}
+
+// ---- E-MAIL DIÁRIO ----
+async function carregarEmailPreview() {
+    const el = document.getElementById('rel-email-preview');
+    el.innerHTML = '<div class="empty-state"><div class="e-icon"><span class="spin">⟳</span></div><p>Carregando prévia...</p></div>';
+    try {
+        const resp = await fetch(`${API}/relatorio-diario/preview`, { headers: { "Authorization": `Bearer ${token}` } });
+        const data = await resp.json();
+        renderEmailPreview(data);
+    } catch(e) {
+        el.innerHTML = `<p class="erro">Erro: ${e.message}</p>`;
+    }
+}
+
+function renderEmailPreview(data) {
+    const { plantas, resumo, data_ref } = data;
+    const ordem = { offline: 0, sem_config: 1, alerta: 2, normal: 3 };
+    const plantasOrd = [...plantas].sort((a, b) => (ordem[a.status]||9) - (ordem[b.status]||9));
+
+    const statusMap = {
+        normal:     { cor: '#16a34a', icone: '✅', txt: p => `${p.pct_performance ?? '?'}% do esperado` },
+        alerta:     { cor: '#d97706', icone: '⚠️', txt: p => `${p.pct_performance ?? '?'}% do esperado` },
+        offline:    { cor: '#dc2626', icone: '🔴', txt: () => 'Sem geração' },
+        sem_config: { cor: '#94a3b8', icone: '⚙️', txt: () => 'Sem configuração' }
+    };
+
+    const linhas = plantasOrd.map(p => {
+        const s = statusMap[p.status] || statusMap.sem_config;
+        return `<tr>
+            <td style="padding:9px 12px;font-size:13px;border-bottom:1px solid #f1f5f9;">${p.nome}</td>
+            <td style="padding:9px 12px;text-align:center;font-size:13px;border-bottom:1px solid #f1f5f9;">${p.geracao_ontem_kwh} kWh</td>
+            <td style="padding:9px 12px;text-align:center;font-size:13px;color:#64748b;border-bottom:1px solid #f1f5f9;">${p.esperado_dia_kwh} kWh</td>
+            <td style="padding:9px 12px;text-align:center;font-size:13px;color:${s.cor};font-weight:600;border-bottom:1px solid #f1f5f9;">${s.icone} ${s.txt(p)}</td>
+        </tr>`;
+    }).join('');
+
+    document.getElementById('rel-email-preview').innerHTML = `
+        <div style="margin-bottom:14px;">
+            <strong>Prévia do e-mail — referência: ${data_ref}</strong>
+            <span style="font-size:12px;color:#64748b;margin-left:10px;">(dados de ontem)</span>
+        </div>
+        <div class="rel-kpi-row">
+            <div class="rel-kpi c-green"><div class="rkv">${resumo.normais}</div><div class="rkl">✅ Normais</div></div>
+            <div class="rel-kpi c-yellow"><div class="rkv">${resumo.alertas}</div><div class="rkl">⚠️ Alertas</div></div>
+            <div class="rel-kpi c-red"><div class="rkv">${resumo.offline}</div><div class="rkl">🔴 Offline</div></div>
+            <div class="rel-kpi c-blue"><div class="rkv">${resumo.total_kwh}</div><div class="rkl">kWh Total</div></div>
+        </div>
+        <div class="email-preview-box">
+            <table style="width:100%;border-collapse:collapse;">
+                <thead><tr style="background:#f8fafc;">
+                    <th style="padding:9px 12px;text-align:left;font-size:11px;color:#64748b;text-transform:uppercase;">Usina</th>
+                    <th style="padding:9px 12px;text-align:center;font-size:11px;color:#64748b;text-transform:uppercase;">Gerado</th>
+                    <th style="padding:9px 12px;text-align:center;font-size:11px;color:#64748b;text-transform:uppercase;">Esperado</th>
+                    <th style="padding:9px 12px;text-align:center;font-size:11px;color:#64748b;text-transform:uppercase;">Status</th>
+                </tr></thead>
+                <tbody>${linhas}</tbody>
+            </table>
+        </div>`;
+}
+
+async function enviarEmailTeste() {
+    if (!confirm('Enviar o relatório diário para seu e-mail agora?')) return;
+    try {
+        const resp = await fetch(`${API}/relatorio-diario/enviar`, { method: 'POST' });
+        const data = await resp.json();
+        alert(data.enviados > 0
+            ? `✅ E-mail enviado para ${data.enviados} integrador(es)!`
+            : `⚠️ Nenhum e-mail enviado. Verifique se o SendGrid está configurado no servidor.`);
+    } catch(e) {
+        alert('Erro ao enviar: ' + e.message);
+    }
+}
 </script>
 </body>
 </html>

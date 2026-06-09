@@ -44,6 +44,7 @@ def inicializar_banco():
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS reset_token_exp TIMESTAMP")
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS tarifa_kwh DECIMAL(6,4)")
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS consumo_medio_antes_kwh DECIMAL(8,2)")
+        cur.execute("ALTER TABLE integradores ADD COLUMN IF NOT EXISTS alertas_diario_ativo BOOLEAN DEFAULT TRUE")
         conn.commit()
     except Exception:
         conn.rollback()
@@ -1531,6 +1532,299 @@ def geracao_diaria(cliente_id: int, dias: int = 30):
     # Fallback: banco (Growatt, Deye, etc.)
     dados = buscar_geracao_periodo(cliente_id, inicio, fim)
     return {"cliente_id": cliente_id, "dados": dados}
+
+# ==================== RELATÓRIOS ====================
+
+HSP_MENSAIS = {1:5.2,2:5.4,3:5.1,4:4.8,5:4.5,6:4.3,7:4.5,8:5.0,9:4.9,10:4.8,11:4.9,12:5.0}
+MESES_NOMES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]
+
+def obter_performance_plantas(integrador_id: int, data_ref: date) -> list:
+    conn = conectar_banco()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT c.id, c.nome, c.potencia_kwp, c.performance_ratio,
+               c.marca_inversor, c.serial_inversor, c.api_key_inversor,
+               c.ultima_leitura_em,
+               COALESCE((SELECT SUM(geracao_kwh) FROM historico_geracao
+                         WHERE cliente_id=c.id AND data=%s), 0) AS geracao_ontem,
+               COALESCE((SELECT SUM(geracao_kwh) FROM historico_geracao
+                         WHERE cliente_id=c.id
+                           AND EXTRACT(YEAR FROM data)=%s
+                           AND EXTRACT(MONTH FROM data)=%s), 0) AS geracao_mes
+        FROM clientes c WHERE c.integrador_id=%s ORDER BY c.nome
+    """, (data_ref, data_ref.year, data_ref.month, integrador_id))
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    plantas = []
+    for r in rows:
+        cid, nome, kwp, pr, marca, serial, api_key, ultima_leitura, g_ontem, g_mes = r
+        g_ontem = float(g_ontem or 0)
+        g_mes = float(g_mes or 0)
+
+        # FoxESS sem dados no banco: busca direto na API
+        if g_ontem == 0 and marca and marca.lower() == "foxess" and api_key:
+            try:
+                for item in foxess_get_diario(api_key, serial, data_ref.year, data_ref.month):
+                    if item["data"] == str(data_ref):
+                        g_ontem = item["total_kwh"]
+                        break
+            except Exception:
+                pass
+
+        kwp_f = float(kwp) if kwp else 0.0
+        pr_f = float(pr) if pr else 0.80
+        esperado_dia = round(kwp_f * HSP_MENSAIS.get(data_ref.month, 5.0) * pr_f, 2) if kwp_f else 0.0
+
+        pct = round(g_ontem / esperado_dia * 100) if esperado_dia > 0 else None
+
+        if not kwp_f:
+            status = "sem_config"
+        elif g_ontem < 0.5:
+            status = "offline"
+        elif pct is not None and pct < 70:
+            status = "alerta"
+        else:
+            status = "normal"
+
+        plantas.append({
+            "id": cid, "nome": nome, "potencia_kwp": kwp_f,
+            "geracao_ontem_kwh": round(g_ontem, 1),
+            "geracao_mes_kwh": round(g_mes, 1),
+            "esperado_dia_kwh": esperado_dia,
+            "pct_performance": pct,
+            "status": status
+        })
+    return plantas
+
+
+def gerar_html_email_diario(integrador_nome: str, plantas: list, data_ref: date) -> str:
+    data_str = data_ref.strftime("%d/%m/%Y")
+    normais = sum(1 for p in plantas if p["status"] == "normal")
+    alertas_ct = sum(1 for p in plantas if p["status"] == "alerta")
+    offline_ct = sum(1 for p in plantas if p["status"] in ["offline", "sem_config"])
+    total_kwh = sum(p["geracao_ontem_kwh"] for p in plantas)
+
+    ordem = {"offline": 0, "sem_config": 1, "alerta": 2, "normal": 3}
+    plantas_ord = sorted(plantas, key=lambda p: ordem.get(p["status"], 9))
+
+    linhas = ""
+    for p in plantas_ord:
+        pct = p["pct_performance"]
+        if p["status"] == "normal":
+            cor, txt = "#16a34a", f"✅ {pct}% do esperado" if pct else "✅ OK"
+        elif p["status"] == "alerta":
+            cor, txt = "#d97706", f"⚠️ {pct}% do esperado" if pct else "⚠️ Baixo"
+        elif p["status"] == "offline":
+            cor, txt = "#dc2626", "🔴 Sem geração"
+        else:
+            cor, txt = "#94a3b8", "⚙️ Sem config"
+        linhas += f"""<tr style="border-bottom:1px solid #f1f5f9;">
+            <td style="padding:10px 12px;font-size:13px;font-weight:600;">{p['nome']}</td>
+            <td style="padding:10px 12px;text-align:center;font-size:13px;">{p['geracao_ontem_kwh']:.1f} kWh</td>
+            <td style="padding:10px 12px;text-align:center;font-size:13px;color:#64748b;">{p['esperado_dia_kwh']:.1f} kWh</td>
+            <td style="padding:10px 12px;text-align:center;font-size:13px;color:{cor};font-weight:600;">{txt}</td>
+        </tr>"""
+
+    return f"""<div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#f8fafc;border-radius:12px;overflow:hidden;">
+  <div style="background:linear-gradient(135deg,#0f172a,#1e293b);padding:24px 28px;">
+    <h1 style="color:#f1f5f9;font-size:20px;margin:0;">☀️ Relatório Diário — Solar Portal</h1>
+    <p style="color:#94a3b8;font-size:13px;margin:6px 0 0;">Desempenho de ontem — {data_str}</p>
+  </div>
+  <div style="padding:24px 28px;">
+    <p style="font-size:15px;color:#1e293b;margin:0 0 20px;">Olá, <strong>{integrador_nome}</strong>! Aqui está o resumo de ontem:</p>
+    <div style="display:flex;gap:10px;margin-bottom:24px;">
+      <div style="background:white;border-radius:10px;padding:14px 18px;border:1px solid #e2e8f0;flex:1;text-align:center;">
+        <div style="font-size:26px;font-weight:800;color:#16a34a;">{normais}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:2px;">✅ Normais</div>
+      </div>
+      <div style="background:white;border-radius:10px;padding:14px 18px;border:1px solid #e2e8f0;flex:1;text-align:center;">
+        <div style="font-size:26px;font-weight:800;color:#d97706;">{alertas_ct}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:2px;">⚠️ Alertas</div>
+      </div>
+      <div style="background:white;border-radius:10px;padding:14px 18px;border:1px solid #e2e8f0;flex:1;text-align:center;">
+        <div style="font-size:26px;font-weight:800;color:#dc2626;">{offline_ct}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:2px;">🔴 Offline</div>
+      </div>
+      <div style="background:white;border-radius:10px;padding:14px 18px;border:1px solid #e2e8f0;flex:1;text-align:center;">
+        <div style="font-size:26px;font-weight:800;color:#3b82f6;">{total_kwh:.0f}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:2px;">kWh Total</div>
+      </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;background:white;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0;">
+      <thead><tr style="background:#f8fafc;">
+        <th style="padding:10px 12px;text-align:left;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Usina</th>
+        <th style="padding:10px 12px;text-align:center;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Gerado</th>
+        <th style="padding:10px 12px;text-align:center;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Esperado</th>
+        <th style="padding:10px 12px;text-align:center;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">Status</th>
+      </tr></thead>
+      <tbody>{linhas}</tbody>
+    </table>
+    <div style="margin-top:24px;text-align:center;">
+      <a href="https://jonassales-ecopower.github.io/solar-portal-app/painel.html"
+         style="background:#f59e0b;color:white;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;">
+         Abrir Painel ☀️
+      </a>
+    </div>
+  </div>
+  <div style="padding:14px 28px;text-align:center;background:#f1f5f9;border-top:1px solid #e2e8f0;">
+    <p style="font-size:11px;color:#94a3b8;margin:0;">Solar Portal — Monitoramento de Usinas Solares</p>
+  </div>
+</div>"""
+
+
+@app.get("/relatorio-diario/preview")
+def preview_relatorio_diario(integrador: dict = Depends(obter_integrador_atual)):
+    ontem = date.today() - timedelta(days=1)
+    plantas = obter_performance_plantas(integrador["id"], ontem)
+    normais = sum(1 for p in plantas if p["status"] == "normal")
+    alertas = sum(1 for p in plantas if p["status"] == "alerta")
+    offline = sum(1 for p in plantas if p["status"] in ["offline", "sem_config"])
+    return {
+        "data_ref": str(ontem),
+        "plantas": plantas,
+        "resumo": {
+            "total": len(plantas),
+            "normais": normais,
+            "alertas": alertas,
+            "offline": offline,
+            "total_kwh": round(sum(p["geracao_ontem_kwh"] for p in plantas), 1)
+        }
+    }
+
+
+@app.api_route("/relatorio-diario/enviar", methods=["GET", "POST"])
+def enviar_relatorio_diario():
+    """Chamado por cron externo (sem auth). Envia email para todos os integradores ativos."""
+    if not SENDGRID_API_KEY:
+        return {"status": "erro", "detalhe": "SENDGRID_API_KEY não configurada", "enviados": 0}
+    ontem = date.today() - timedelta(days=1)
+    conn = conectar_banco()
+    cur = conn.cursor()
+    cur.execute("SELECT id, nome, email FROM integradores WHERE ativo=TRUE")
+    integradores = cur.fetchall()
+    cur.close()
+    conn.close()
+    enviados = 0
+    erros = []
+    for int_id, int_nome, int_email in integradores:
+        try:
+            plantas = obter_performance_plantas(int_id, ontem)
+            if not plantas:
+                continue
+            html = gerar_html_email_diario(int_nome, plantas, ontem)
+            n_alertas = sum(1 for p in plantas if p["status"] in ["alerta", "offline"])
+            assunto = (f"☀️ Relatório {ontem.strftime('%d/%m')} — {n_alertas} alerta(s) ⚠️"
+                       if n_alertas else
+                       f"☀️ Relatório {ontem.strftime('%d/%m')} — Tudo operando ✅")
+            requests.post(
+                "https://api.sendgrid.com/v3/mail/send",
+                json={"personalizations": [{"to": [{"email": int_email}]}],
+                      "from": {"email": ALERT_EMAIL_FROM, "name": "Solar Portal"},
+                      "subject": assunto,
+                      "content": [{"type": "text/html", "value": html}]},
+                headers={"Authorization": f"Bearer {SENDGRID_API_KEY}", "Content-Type": "application/json"},
+                timeout=15
+            )
+            enviados += 1
+        except Exception as e:
+            erros.append({"integrador": int_nome, "erro": str(e)})
+    return {"status": "ok", "enviados": enviados, "data_ref": str(ontem), "erros": erros}
+
+
+@app.get("/relatorio/carteira")
+def relatorio_carteira(integrador: dict = Depends(obter_integrador_atual)):
+    hoje = datetime.now()
+    conn = conectar_banco()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT c.id, c.nome, c.potencia_kwp, c.performance_ratio, c.data_instalacao,
+               c.marca_inversor, c.ultima_leitura_em,
+               COALESCE((SELECT SUM(geracao_kwh) FROM historico_geracao
+                         WHERE cliente_id=c.id
+                           AND EXTRACT(YEAR FROM data)=%s AND EXTRACT(MONTH FROM data)=%s), 0) AS g_mes,
+               COALESCE((SELECT SUM(geracao_kwh) FROM historico_geracao
+                         WHERE cliente_id=c.id AND data >= CURRENT_DATE - INTERVAL '365 days'), 0) AS g_ano
+        FROM clientes c WHERE c.integrador_id=%s ORDER BY c.nome
+    """, (hoje.year, hoje.month, integrador["id"]))
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    dias_mes = monthrange(hoje.year, hoje.month)[1]
+    hsp = HSP_MENSAIS[hoje.month]
+    total_kwp = 0.0
+    total_g_mes = 0.0
+    plantas = []
+    for r in rows:
+        cid, nome, kwp, pr, dt_inst, marca, ultima_leitura, g_mes, g_ano = r
+        kwp_f = float(kwp) if kwp else 0.0
+        pr_f = float(pr) if pr else 0.80
+        g_mes_f = round(float(g_mes), 1)
+        g_ano_f = round(float(g_ano), 1)
+        total_kwp += kwp_f
+        total_g_mes += g_mes_f
+        esperado_mes = round(kwp_f * hsp * dias_mes * pr_f, 1) if kwp_f else 0.0
+        esperado_ate_hoje = round(kwp_f * hsp * hoje.day * pr_f, 1) if kwp_f else 0.0
+        ritmo = round(g_mes_f / esperado_ate_hoje * 100) if esperado_ate_hoje > 0 else None
+        offline_flag = bool(ultima_leitura and ultima_leitura < datetime.utcnow() - timedelta(hours=2))
+        plantas.append({
+            "id": cid, "nome": nome, "potencia_kwp": kwp_f,
+            "data_instalacao": str(dt_inst) if dt_inst else None,
+            "marca_inversor": marca,
+            "geracao_mes_kwh": g_mes_f, "geracao_ano_kwh": g_ano_f,
+            "esperado_mes_kwh": esperado_mes, "esperado_ate_hoje_kwh": esperado_ate_hoje,
+            "ritmo_pct": ritmo, "offline": offline_flag
+        })
+    return {
+        "plantas": plantas,
+        "resumo": {
+            "total_plantas": len(plantas),
+            "total_kwp": round(total_kwp, 1),
+            "total_geracao_mes_kwh": round(total_g_mes, 1),
+            "mes_referencia": f"{MESES_NOMES[hoje.month-1]}/{hoje.year}"
+        }
+    }
+
+
+@app.get("/relatorio/desempenho")
+def relatorio_desempenho(integrador: dict = Depends(obter_integrador_atual)):
+    hoje = datetime.now()
+    # Gera lista dos últimos 12 meses
+    meses = []
+    for i in range(11, -1, -1):
+        dt = hoje.replace(day=1) - timedelta(days=30 * i)
+        meses.append({"ano": dt.year, "mes": dt.month,
+                      "label": f"{MESES_NOMES[dt.month-1]}/{dt.year % 100:02d}"})
+
+    conn = conectar_banco()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, nome, potencia_kwp, performance_ratio
+        FROM clientes WHERE integrador_id=%s AND potencia_kwp IS NOT NULL ORDER BY nome
+    """, (integrador["id"],))
+    clientes = cur.fetchall()
+
+    plantas_data = []
+    for cid, nome, kwp, pr in clientes:
+        kwp_f = float(kwp)
+        pr_f = float(pr) if pr else 0.80
+        meses_data = []
+        for m in meses:
+            esperado = round(kwp_f * HSP_MENSAIS[m["mes"]] * monthrange(m["ano"], m["mes"])[1] * pr_f, 1)
+            cur.execute("""
+                SELECT COALESCE(SUM(geracao_kwh), 0) FROM historico_geracao
+                WHERE cliente_id=%s AND EXTRACT(YEAR FROM data)=%s AND EXTRACT(MONTH FROM data)=%s
+            """, (cid, m["ano"], m["mes"]))
+            realizado = round(float(cur.fetchone()[0] or 0), 1)
+            meses_data.append({"label": m["label"], "esperado": esperado, "realizado": realizado})
+        plantas_data.append({"id": cid, "nome": nome, "potencia_kwp": kwp_f, "meses": meses_data})
+
+    cur.close()
+    conn.close()
+    return {"plantas": plantas_data, "labels": [m["label"] for m in meses]}
+
 
 @app.api_route("/admin/verificar-offline", methods=["GET", "POST"])
 def admin_verificar_offline():
