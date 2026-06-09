@@ -627,6 +627,23 @@ def salvar_no_banco(dados, cliente_id):
     conn.close()
     return conta_id
 
+def obter_seriais(serial_str: str) -> list:
+    """Retorna lista de seriais — suporta múltiplos separados por vírgula."""
+    if not serial_str:
+        return []
+    return [s.strip() for s in str(serial_str).split(',') if s.strip()]
+
+def foxess_get_diario_multi(api_key: str, seriais: list, ano: int, mes: int) -> list:
+    """Busca dados diários de múltiplos inversores FoxESS e soma por dia."""
+    totais: dict = {}
+    for sn in seriais:
+        for item in foxess_get_diario(api_key, sn, ano, mes):
+            totais[item["data"]] = round(totais.get(item["data"], 0) + item["total_kwh"], 2)
+    return [{"data": d, "total_kwh": v} for d, v in sorted(totais.items())]
+
+def foxess_get_mensal_multi(api_key: str, seriais: list, ano: int, mes: int) -> float:
+    return round(sum(foxess_get_mensal(api_key, sn, ano, mes) for sn in seriais), 2)
+
 def buscar_geracao_dia(cliente_id: int, data_busca):
     conn = conectar_banco()
     cur = conn.cursor()
@@ -1311,25 +1328,31 @@ def monitoramento(cliente_id: int):
     marca_lower = marca.lower()
 
     geracao_kw = injetado_kw = consumo_rede_kw = consumo_casa_kw = potencia_kw = 0.0
+    seriais = obter_seriais(serial)
 
     if marca_lower == "foxess":
+        if not seriais:
+            raise HTTPException(status_code=404, detail="Serial do inversor não configurado")
+        variaveis: dict = {}
         # Prioridade: credenciais (email+senha) → dispensa API key
         if inv_usuario and inv_senha:
-            data = foxess_old_get_realtime(inv_usuario, inv_senha, serial)
-            if data.get("errno") != 0:
-                raise HTTPException(status_code=400, detail=f"Erro FoxESS: {data.get('msg')}")
-            variaveis = data.get("variaveis", {})
+            for sn in seriais:
+                data = foxess_old_get_realtime(inv_usuario, inv_senha, sn)
+                if data.get("errno") != 0:
+                    raise HTTPException(status_code=400, detail=f"Erro FoxESS ({sn}): {data.get('msg')}")
+                for k, v in data.get("variaveis", {}).items():
+                    variaveis[k] = variaveis.get(k, 0) + v
         elif api_key:
-            raw = foxess_get_realtime(api_key, serial)
-            if raw.get("errno") != 0:
-                raise HTTPException(status_code=400, detail=f"Erro FoxESS: {raw.get('msg')}")
-            resultado = raw.get("result", [])
-            if not resultado:
-                raise HTTPException(status_code=404, detail="Sem dados FoxESS")
-            variaveis = {}
-            for item in resultado[0].get("datas", []):
-                try: variaveis[item["variable"]] = float(item.get("value") or 0)
-                except: variaveis[item["variable"]] = 0.0
+            for sn in seriais:
+                raw = foxess_get_realtime(api_key, sn)
+                if raw.get("errno") != 0:
+                    raise HTTPException(status_code=400, detail=f"Erro FoxESS ({sn}): {raw.get('msg')}")
+                resultado = raw.get("result", [])
+                if not resultado:
+                    raise HTTPException(status_code=404, detail=f"Sem dados FoxESS para {sn}")
+                for item in resultado[0].get("datas", []):
+                    try: variaveis[item["variable"]] = variaveis.get(item["variable"], 0) + float(item.get("value") or 0)
+                    except: pass
         else:
             raise HTTPException(status_code=404, detail="Configure e-mail/senha ou API Key do FoxESS")
         geracao_kw      = variaveis.get("pvPower", 0.0)
@@ -1391,17 +1414,16 @@ def monitoramento_mensal(cliente_id: int):
 
     # Sempre atualiza mês atual e mês anterior direto na FoxESS com dados DIÁRIOS REAIS
     if cliente and cliente[1] and cliente[1].lower() == "foxess" and cliente[3]:
-        serial, api_key = cliente[2], cliente[3]
+        seriais_m = obter_seriais(cliente[2])
+        api_key = cliente[3]
         prev = (hoje.replace(day=1) - timedelta(days=1))
         for ano, mes in [(hoje.year, hoje.month), (prev.year, prev.month)]:
-            # Busca dados diários reais e salva (substitui médias estimadas)
-            diarios = foxess_get_diario(api_key, serial, ano, mes)
+            diarios = foxess_get_diario_multi(api_key, seriais_m, ano, mes)
             if diarios:
                 salvar_historico_diario_banco(cliente_id, diarios)
                 banco[(ano, mes)] = round(sum(d["total_kwh"] for d in diarios), 2)
             else:
-                # Fallback para total mensal se diários não disponíveis
-                total = foxess_get_mensal(api_key, serial, ano, mes)
+                total = foxess_get_mensal_multi(api_key, seriais_m, ano, mes)
                 if total > 0:
                     banco[(ano, mes)] = total
                     salvar_historico_banco(cliente_id, [{"ano": ano, "mes_num": mes, "geracao_kwh": total}])
@@ -1410,12 +1432,12 @@ def monitoramento_mensal(cliente_id: int):
         if not banco:
             for i in range(12):
                 dm = hoje - timedelta(days=30 * i)
-                diarios = foxess_get_diario(api_key, serial, dm.year, dm.month)
+                diarios = foxess_get_diario_multi(api_key, seriais_m, dm.year, dm.month)
                 if diarios:
                     salvar_historico_diario_banco(cliente_id, diarios)
                     banco[(dm.year, dm.month)] = round(sum(d["total_kwh"] for d in diarios), 2)
                 else:
-                    total = foxess_get_mensal(api_key, serial, dm.year, dm.month)
+                    total = foxess_get_mensal_multi(api_key, seriais_m, dm.year, dm.month)
                     if total > 0:
                         banco[(dm.year, dm.month)] = total
                         salvar_historico_banco(cliente_id, [{"ano": dm.year, "mes_num": dm.month, "geracao_kwh": total}])
@@ -1538,10 +1560,11 @@ def geracao_diaria(cliente_id: int, dias: int = 30):
     cur.close()
     conn.close()
 
-    # FoxESS: busca dados diários reais direto na API (sem estimativa mensal)
+    # FoxESS: busca dados diários reais — suporta múltiplos seriais
     if c and c[0] and c[0].lower() == "foxess" and c[2]:
-        serial, api_key = c[1], c[2]
-        dados_dict = {}
+        seriais_d = obter_seriais(c[1])
+        api_key = c[2]
+        dados_dict: dict = {}
         meses = set()
         d = inicio
         while d <= fim:
@@ -1549,7 +1572,7 @@ def geracao_diaria(cliente_id: int, dias: int = 30):
             primeiro_prox = (d.replace(day=1) + timedelta(days=32)).replace(day=1)
             d = primeiro_prox
         for ano, mes in sorted(meses):
-            for item in foxess_get_diario(api_key, serial, ano, mes):
+            for item in foxess_get_diario_multi(api_key, seriais_d, ano, mes):
                 dados_dict[item["data"]] = item["total_kwh"]
         dados = [{"data": str(inicio + timedelta(days=i)),
                   "total_kwh": dados_dict.get(str(inicio + timedelta(days=i)), 0)}
@@ -1590,10 +1613,11 @@ def obter_performance_plantas(integrador_id: int, data_ref: date) -> list:
         g_ontem = float(g_ontem or 0)
         g_mes = float(g_mes or 0)
 
-        # FoxESS: sempre preferir dado real da API sobre estimativa do banco
+        # FoxESS: sempre preferir dado real da API — suporta múltiplos seriais
         if marca and marca.lower() == "foxess" and api_key:
             try:
-                for item in foxess_get_diario(api_key, serial, data_ref.year, data_ref.month):
+                seriais_p = obter_seriais(serial)
+                for item in foxess_get_diario_multi(api_key, seriais_p, data_ref.year, data_ref.month):
                     if item["data"] == str(data_ref):
                         g_ontem = item["total_kwh"]
                         break
