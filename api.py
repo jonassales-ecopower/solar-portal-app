@@ -1428,18 +1428,21 @@ def monitoramento_mensal(cliente_id: int):
                     banco[(ano, mes)] = total
                     salvar_historico_banco(cliente_id, [{"ano": ano, "mes_num": mes, "geracao_kwh": total}])
 
-        # Se banco ainda vazio (primeiro acesso), busca todos os 12 meses
-        if not banco:
-            for i in range(12):
-                dm = hoje - timedelta(days=30 * i)
+        # Se temos menos de 10 meses, faz backfill dos meses faltantes (até 12 meses atrás)
+        if len(banco) < 10:
+            for i in range(2, 13):  # começa do 2 — mês atual e anterior já foram buscados acima
+                dm = (hoje.replace(day=1) - timedelta(days=30 * i))
+                key = (dm.year, dm.month)
+                if key in banco:
+                    continue  # já tem dados para este mês, pula
                 diarios = foxess_get_diario_multi(api_key, seriais_m, dm.year, dm.month)
                 if diarios:
                     salvar_historico_diario_banco(cliente_id, diarios)
-                    banco[(dm.year, dm.month)] = round(sum(d["total_kwh"] for d in diarios), 2)
+                    banco[key] = round(sum(d["total_kwh"] for d in diarios), 2)
                 else:
                     total = foxess_get_mensal_multi(api_key, seriais_m, dm.year, dm.month)
                     if total > 0:
-                        banco[(dm.year, dm.month)] = total
+                        banco[key] = total
                         salvar_historico_banco(cliente_id, [{"ano": dm.year, "mes_num": dm.month, "geracao_kwh": total}])
 
     if not banco:
