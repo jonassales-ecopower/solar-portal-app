@@ -646,6 +646,7 @@ def buscar_geracao_periodo(cliente_id: int, data_inicio, data_fim):
     return [{"data": str(x[0]), "total_kwh": float(x[1])} for x in r]
 
 def salvar_historico_banco(cliente_id: int, dados_mensais: list):
+    """Salva estimativa mensal distribuída uniformemente por dia (fallback para inversores sem API diária)."""
     conn = conectar_banco()
     cur = conn.cursor()
     hoje_date = date.today()
@@ -655,9 +656,29 @@ def salvar_historico_banco(cliente_id: int, dados_mensais: list):
         for d in range(1, dias + 1):
             dt = datetime(m["ano"], m["mes_num"], d).date()
             if dt > hoje_date:
-                break  # não armazena dias futuros
+                break
             cur.execute("INSERT INTO historico_geracao (cliente_id,data,geracao_kwh) VALUES (%s,%s,%s) ON CONFLICT (cliente_id,data) DO UPDATE SET geracao_kwh=EXCLUDED.geracao_kwh",
                         (cliente_id, dt, round(val_dia, 2)))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+def salvar_historico_diario_banco(cliente_id: int, dados_diarios: list):
+    """Salva dados diários REAIS da API do inversor (substitui estimativas)."""
+    conn = conectar_banco()
+    cur = conn.cursor()
+    hoje_date = date.today()
+    for item in dados_diarios:
+        try:
+            dt = date.fromisoformat(item["data"])
+            if dt > hoje_date:
+                continue
+            cur.execute(
+                "INSERT INTO historico_geracao (cliente_id,data,geracao_kwh) VALUES (%s,%s,%s) ON CONFLICT (cliente_id,data) DO UPDATE SET geracao_kwh=EXCLUDED.geracao_kwh",
+                (cliente_id, dt, round(float(item["total_kwh"]), 2))
+            )
+        except Exception:
+            pass
     conn.commit()
     cur.close()
     conn.close()
@@ -1368,30 +1389,36 @@ def monitoramento_mensal(cliente_id: int):
     banco = {(int(r[0]), int(r[1])): round(float(r[2]), 2) for r in resultados if float(r[2]) > 0}
     hoje = datetime.now()
 
-    # Sempre atualiza mês atual e mês anterior direto na FoxESS (evita dados parciais/desatualizados)
+    # Sempre atualiza mês atual e mês anterior direto na FoxESS com dados DIÁRIOS REAIS
     if cliente and cliente[1] and cliente[1].lower() == "foxess" and cliente[3]:
         serial, api_key = cliente[2], cliente[3]
         prev = (hoje.replace(day=1) - timedelta(days=1))
         for ano, mes in [(hoje.year, hoje.month), (prev.year, prev.month)]:
-            total = foxess_get_mensal(api_key, serial, ano, mes)
-            if total > 0:
-                banco[(ano, mes)] = total
-        # Persiste os valores atualizados
-        novos = [{"ano": k[0], "mes_num": k[1], "geracao_kwh": v}
-                 for k, v in banco.items()
-                 if k in {(hoje.year, hoje.month), (prev.year, prev.month)}]
-        if novos:
-            salvar_historico_banco(cliente_id, novos)
+            # Busca dados diários reais e salva (substitui médias estimadas)
+            diarios = foxess_get_diario(api_key, serial, ano, mes)
+            if diarios:
+                salvar_historico_diario_banco(cliente_id, diarios)
+                banco[(ano, mes)] = round(sum(d["total_kwh"] for d in diarios), 2)
+            else:
+                # Fallback para total mensal se diários não disponíveis
+                total = foxess_get_mensal(api_key, serial, ano, mes)
+                if total > 0:
+                    banco[(ano, mes)] = total
+                    salvar_historico_banco(cliente_id, [{"ano": ano, "mes_num": mes, "geracao_kwh": total}])
 
-        # Se banco ainda vazio, busca todos os 12 meses da API
+        # Se banco ainda vazio (primeiro acesso), busca todos os 12 meses
         if not banco:
             for i in range(12):
                 dm = hoje - timedelta(days=30 * i)
-                total = foxess_get_mensal(api_key, serial, dm.year, dm.month)
-                if total > 0:
-                    banco[(dm.year, dm.month)] = total
-            if banco:
-                salvar_historico_banco(cliente_id, [{"ano": k[0], "mes_num": k[1], "geracao_kwh": v} for k, v in banco.items()])
+                diarios = foxess_get_diario(api_key, serial, dm.year, dm.month)
+                if diarios:
+                    salvar_historico_diario_banco(cliente_id, diarios)
+                    banco[(dm.year, dm.month)] = round(sum(d["total_kwh"] for d in diarios), 2)
+                else:
+                    total = foxess_get_mensal(api_key, serial, dm.year, dm.month)
+                    if total > 0:
+                        banco[(dm.year, dm.month)] = total
+                        salvar_historico_banco(cliente_id, [{"ano": dm.year, "mes_num": dm.month, "geracao_kwh": total}])
 
     if not banco:
         return {"cliente_id": cliente_id, "mensal": [], "total_periodo": 0, "fonte": "nenhuma"}
@@ -1563,15 +1590,15 @@ def obter_performance_plantas(integrador_id: int, data_ref: date) -> list:
         g_ontem = float(g_ontem or 0)
         g_mes = float(g_mes or 0)
 
-        # FoxESS sem dados no banco: busca direto na API
-        if g_ontem == 0 and marca and marca.lower() == "foxess" and api_key:
+        # FoxESS: sempre preferir dado real da API sobre estimativa do banco
+        if marca and marca.lower() == "foxess" and api_key:
             try:
                 for item in foxess_get_diario(api_key, serial, data_ref.year, data_ref.month):
                     if item["data"] == str(data_ref):
                         g_ontem = item["total_kwh"]
                         break
             except Exception:
-                pass
+                pass  # mantém valor do banco em caso de falha na API
 
         kwp_f = float(kwp) if kwp else 0.0
         pr_f = float(pr) if pr else 0.80
