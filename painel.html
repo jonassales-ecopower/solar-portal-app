@@ -1873,8 +1873,9 @@ function fecharModal(id) {
     }
 }
 
-// Close modals on overlay click
+// Close modals on overlay click — modal-cliente é excluído para não perder dados do formulário
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    if (overlay.id === 'modal-cliente') return;
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('ativo'); });
 });
 
