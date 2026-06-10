@@ -548,6 +548,30 @@
             </p>
         </div>
 
+        <!-- Rateio de Créditos -->
+        <div class="card" id="card-rateio" style="display:none;">
+            <div class="card-titulo">🔀 Rateio de Créditos (Lei 14.300/2022)</div>
+            <p style="font-size:13px;color:#64748b;margin-bottom:14px;">
+                Veja como os créditos de energia injetada na rede são distribuídos entre as suas UCs beneficiárias a cada mês.
+            </p>
+            <div id="rateio-beneficiarios-lista" style="margin-bottom:14px;display:flex;flex-wrap:wrap;gap:8px;"></div>
+            <div style="overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse;font-size:13px;" id="rateio-historico-tabela">
+                    <thead>
+                        <tr style="background:#f8fafc;">
+                            <th style="padding:8px 10px;text-align:left;color:#64748b;font-size:11px;text-transform:uppercase;">Mês</th>
+                            <th style="padding:8px 10px;text-align:right;color:#64748b;font-size:11px;text-transform:uppercase;">Injetado</th>
+                            <th style="padding:8px 10px;text-align:left;color:#64748b;font-size:11px;text-transform:uppercase;">Distribuição</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rateio-historico-tbody"></tbody>
+                </table>
+            </div>
+            <p style="font-size:11px;color:#94a3b8;text-align:center;margin-top:10px;">
+                Créditos calculados com base nas contas enviadas ao portal
+            </p>
+        </div>
+
         <!-- Card orientação leitura pela média -->
         <div class="card" style="border-left: 4px solid #8b5cf6; background: linear-gradient(135deg, #faf5ff, #f5f3ff);">
             <div class="card-titulo" style="color:#7c3aed;">📋 Dica Importante — Leitura do Medidor</div>
@@ -754,7 +778,8 @@
 
     async function carregarDados() {
         await Promise.all([ligarMonitoramento(), buscarGeracaoEsperada(), buscarGeracaoReal(),
-            buscarAlertas(), buscarHistoricoContas(), buscarSaldoCreditos(), buscarPrevisao()]);
+            buscarAlertas(), buscarHistoricoContas(), buscarSaldoCreditos(), buscarPrevisao(),
+            buscarRateio()]);
         desenharGrafico();
     }
 
@@ -900,6 +925,34 @@
             const d = await r.json();
             dadosSaldo = d.dados || [];
             renderSaldoCreditos(dadosSaldo, d.saldo_atual);
+        } catch(e) {}
+    }
+
+    async function buscarRateio() {
+        try {
+            const r = await fetch(`${API}/clientes/${idCliente}/rateio`);
+            if (!r.ok) return;
+            const d = await r.json();
+            if (!d.beneficiarios || !d.beneficiarios.length) return;
+            document.getElementById('card-rateio').style.display = 'block';
+            const bDiv = document.getElementById('rateio-beneficiarios-lista');
+            bDiv.innerHTML = d.beneficiarios.map(b =>
+                `<span style="background:#f0fdf4;border:1px solid #86efac;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600;color:#166534;">
+                    ${b.nome} — ${b.percentual}%
+                </span>`
+            ).join('');
+            const tbody = document.getElementById('rateio-historico-tbody');
+            if (!d.meses || !d.meses.length) { tbody.innerHTML = '<tr><td colspan="3" style="padding:8px;color:#94a3b8;font-size:12px;">Nenhuma conta enviada ainda</td></tr>'; return; }
+            tbody.innerHTML = d.meses.map(m => {
+                const dist = m.distribuicao.map(b =>
+                    `<span style="font-size:12px;">${b.nome}: <strong style="color:#059669;">${b.creditos_kwh} kWh</strong></span>`
+                ).join('<br>');
+                return `<tr style="border-bottom:1px solid #f1f5f9;">
+                    <td style="padding:8px 10px;font-weight:600;">${m.mes_referencia || '—'}</td>
+                    <td style="padding:8px 10px;text-align:right;color:#f59e0b;font-weight:700;">${m.injetado_kwh} kWh</td>
+                    <td style="padding:8px 10px;">${dist}</td>
+                </tr>`;
+            }).join('');
         } catch(e) {}
     }
 

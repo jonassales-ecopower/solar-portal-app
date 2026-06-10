@@ -553,6 +553,7 @@
             <button class="mc-tab"        id="mctab-projeto"  onclick="mcTab('projeto')">☀️ Projeto</button>
             <button class="mc-tab"        id="mctab-inversor" onclick="mcTab('inversor')">🔌 Inversor</button>
             <button class="mc-tab"        id="mctab-acesso"   onclick="mcTab('acesso')">🔑 Acesso</button>
+            <button class="mc-tab"        id="mctab-rateio"   onclick="mcTab('rateio')">🔀 Rateio</button>
         </div>
 
         <!-- Tab: Cliente -->
@@ -665,6 +666,41 @@
                 <div class="link-box" id="mc-link-txt" style="cursor:pointer;" onclick="mcCopiarLink()" title="Clique para copiar"></div>
                 <p class="sucesso" id="mc-link-copiado" style="display:none;margin-top:4px;">✅ Link copiado!</p>
             </div>
+        </div>
+
+        <!-- Tab: Rateio -->
+        <div class="mc-panel" id="mcpanel-rateio">
+            <div class="dica" style="margin-bottom:12px;">
+                💡 Configure as UCs beneficiárias que recebem os créditos do excedente solar deste cliente (Lei 14.300/2022). Os percentuais devem somar <strong>100%</strong>.
+            </div>
+            <div id="rateio-total-pct-box" style="display:none;margin-bottom:10px;padding:8px 12px;border-radius:6px;font-size:13px;font-weight:600;"></div>
+            <table style="width:100%;border-collapse:collapse;margin-bottom:12px;font-size:13px;" id="rateio-tabela">
+                <thead>
+                    <tr style="background:#f8fafc;">
+                        <th style="padding:7px 10px;text-align:left;color:#64748b;font-size:11px;text-transform:uppercase;">UC Beneficiária</th>
+                        <th style="padding:7px 10px;text-align:left;color:#64748b;font-size:11px;text-transform:uppercase;">Nº UC</th>
+                        <th style="padding:7px 10px;text-align:center;color:#64748b;font-size:11px;text-transform:uppercase;">%</th>
+                        <th style="padding:7px 10px;text-align:center;color:#64748b;font-size:11px;text-transform:uppercase;">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="rateio-tbody"></tbody>
+            </table>
+            <div style="background:#f8fafc;border-radius:8px;padding:12px;margin-bottom:12px;">
+                <p style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">+ Adicionar UC Beneficiária</p>
+                <div class="grid-2">
+                    <div class="campo"><label>Nome da UC *</label><input type="text" id="rateio-add-nome" placeholder="Ex: Casa, Escritório, Sítio"></div>
+                    <div class="campo"><label>Nº UC</label><input type="text" id="rateio-add-uc" placeholder="Ex: 4840248-2026-0-1"></div>
+                    <div class="campo"><label>Distribuidora</label><input type="text" id="rateio-add-distrib" placeholder="Ex: Energisa"></div>
+                    <div class="campo"><label>Percentual % *</label><input type="number" id="rateio-add-pct" placeholder="Ex: 60" min="0" max="100" step="0.01"></div>
+                </div>
+                <button class="azul pequeno" onclick="rateioAdicionarBeneficiario()" style="width:auto;margin-top:4px;">+ Adicionar</button>
+                <p class="erro" id="rateio-add-erro" style="margin-top:6px;"></p>
+            </div>
+            <div id="rateio-resumo-box" style="display:none;">
+                <p style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">📊 Distribuição Mensal</p>
+                <div id="rateio-resumo-conteudo"></div>
+            </div>
+            <p class="info" id="rateio-loading" style="display:none;">🔄 Carregando...</p>
         </div>
 
         <div class="modal-acoes" style="margin-top:20px;">
@@ -1582,10 +1618,11 @@ async function salvarInversor() {
 let mcClienteId = null;
 
 function mcTab(aba) {
-    ['info','projeto','inversor','acesso'].forEach(a => {
+    ['info','projeto','inversor','acesso','rateio'].forEach(a => {
         document.getElementById(`mctab-${a}`).classList.toggle('ativa', a === aba);
         document.getElementById(`mcpanel-${a}`).classList.toggle('ativa', a === aba);
     });
+    if (aba === 'rateio' && mcClienteId) mcCarregarRateio(mcClienteId);
 }
 
 function mcLimpar() {
@@ -2262,6 +2299,137 @@ async function enviarEmailTeste() {
     } catch(e) {
         alert('Erro ao enviar: ' + e.message);
     }
+}
+
+// ===== RATEIO =====
+let rateio_beneficiarios_cache = [];
+
+async function mcCarregarRateio(clienteId) {
+    document.getElementById('rateio-loading').style.display = 'block';
+    document.getElementById('rateio-tbody').innerHTML = '';
+    document.getElementById('rateio-resumo-box').style.display = 'none';
+    document.getElementById('rateio-add-erro').textContent = '';
+    try {
+        const r = await fetch(`${API}/rateio/${clienteId}`, {headers:{"Authorization":`Bearer ${token}`}});
+        const d = await r.json();
+        rateio_beneficiarios_cache = d.beneficiarios || [];
+        rateioRenderTabela(rateio_beneficiarios_cache, d.total_percentual);
+        if (rateio_beneficiarios_cache.length > 0) await mcCarregarRateioResumo(clienteId);
+    } catch(e) {
+        document.getElementById('rateio-tbody').innerHTML = '<tr><td colspan="4" style="color:#dc2626;padding:8px;">Erro ao carregar</td></tr>';
+    } finally {
+        document.getElementById('rateio-loading').style.display = 'none';
+    }
+}
+
+function rateioRenderTabela(lista, totalPct) {
+    const tbody = document.getElementById('rateio-tbody');
+    if (!lista.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="color:#94a3b8;padding:8px;font-size:12px;">Nenhuma UC beneficiária cadastrada</td></tr>';
+        document.getElementById('rateio-total-pct-box').style.display = 'none';
+        return;
+    }
+    tbody.innerHTML = lista.map(b => `
+        <tr style="border-bottom:1px solid #f1f5f9;">
+            <td style="padding:7px 10px;">${b.nome}</td>
+            <td style="padding:7px 10px;color:#64748b;">${b.numero_uc || '—'}</td>
+            <td style="padding:7px 10px;text-align:center;font-weight:700;color:#059669;">${b.percentual}%</td>
+            <td style="padding:7px 10px;text-align:center;">
+                <button class="pequeno" style="width:auto;padding:3px 8px;font-size:11px;margin:0 2px;" onclick="rateioEditarBeneficiario(${b.id})">✏️</button>
+                <button class="vermelho pequeno" style="width:auto;padding:3px 8px;font-size:11px;margin:0 2px;" onclick="rateioExcluirBeneficiario(${b.id})">🗑️</button>
+            </td>
+        </tr>`).join('');
+    const box = document.getElementById('rateio-total-pct-box');
+    box.style.display = 'block';
+    const ok = Math.abs(totalPct - 100) < 0.01;
+    box.style.background = ok ? '#dcfce7' : '#fef9c3';
+    box.style.color = ok ? '#166534' : '#854d0e';
+    box.style.border = `1px solid ${ok ? '#86efac' : '#fde047'}`;
+    box.textContent = `Total distribuído: ${totalPct}%${ok ? ' ✅' : ' ⚠️ (deve somar 100%)'}`;
+}
+
+async function mcCarregarRateioResumo(clienteId) {
+    try {
+        const r = await fetch(`${API}/rateio/${clienteId}/resumo`, {headers:{"Authorization":`Bearer ${token}`}});
+        const d = await r.json();
+        if (!d.meses || !d.meses.length) return;
+        const box = document.getElementById('rateio-resumo-box');
+        const conteudo = document.getElementById('rateio-resumo-conteudo');
+        box.style.display = 'block';
+        const rows = d.meses.slice(-6).reverse().map(m => {
+            const dist = m.distribuicao.map(b =>
+                `<span style="font-size:11px;color:#374151;">${b.nome}: <strong>${b.creditos_calculados_kwh} kWh</strong></span>`
+            ).join(' &nbsp;|&nbsp; ');
+            return `<tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="padding:6px 10px;font-size:12px;font-weight:600;">${m.mes_referencia || '—'}</td>
+                <td style="padding:6px 10px;font-size:12px;color:#f59e0b;font-weight:700;">${m.injetado_kwh} kWh injetados</td>
+                <td style="padding:6px 10px;font-size:12px;">${dist}</td>
+            </tr>`;
+        }).join('');
+        conteudo.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead><tr style="background:#f8fafc;">
+                <th style="padding:6px 10px;text-align:left;color:#64748b;font-size:11px;">Mês</th>
+                <th style="padding:6px 10px;text-align:left;color:#64748b;font-size:11px;">Injetado</th>
+                <th style="padding:6px 10px;text-align:left;color:#64748b;font-size:11px;">Distribuição</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+        </table>`;
+    } catch(e) {}
+}
+
+async function rateioAdicionarBeneficiario() {
+    if (!mcClienteId) { alert('Salve o cliente primeiro antes de configurar o rateio.'); return; }
+    const nome = document.getElementById('rateio-add-nome').value.trim();
+    const uc = document.getElementById('rateio-add-uc').value.trim();
+    const distrib = document.getElementById('rateio-add-distrib').value.trim();
+    const pct = parseFloat(document.getElementById('rateio-add-pct').value || '0');
+    const erroEl = document.getElementById('rateio-add-erro');
+    if (!nome) { erroEl.textContent = 'Nome é obrigatório'; return; }
+    if (pct <= 0 || pct > 100) { erroEl.textContent = 'Percentual deve ser entre 0 e 100'; return; }
+    erroEl.textContent = '';
+    try {
+        const r = await fetch(`${API}/rateio/${mcClienteId}`, {
+            method: 'POST',
+            headers: {"Authorization":`Bearer ${token}`, "Content-Type":"application/json"},
+            body: JSON.stringify({nome, numero_uc: uc, distribuidora: distrib, percentual: pct})
+        });
+        if (!r.ok) { erroEl.textContent = 'Erro ao adicionar'; return; }
+        ['rateio-add-nome','rateio-add-uc','rateio-add-distrib','rateio-add-pct'].forEach(id => document.getElementById(id).value = '');
+        await mcCarregarRateio(mcClienteId);
+    } catch(e) { erroEl.textContent = 'Erro de conexão'; }
+}
+
+async function rateioEditarBeneficiario(id) {
+    const b = rateio_beneficiarios_cache.find(x => x.id === id);
+    if (!b) return;
+    const nome = prompt('Nome da UC:', b.nome);
+    if (nome === null) return;
+    const uc = prompt('Número da UC:', b.numero_uc || '');
+    if (uc === null) return;
+    const pctStr = prompt('Percentual (%):', b.percentual);
+    if (pctStr === null) return;
+    const pct = parseFloat(pctStr);
+    if (isNaN(pct) || pct <= 0) { alert('Percentual inválido'); return; }
+    try {
+        await fetch(`${API}/rateio/beneficiario/${id}`, {
+            method: 'PUT',
+            headers: {"Authorization":`Bearer ${token}`, "Content-Type":"application/json"},
+            body: JSON.stringify({nome, numero_uc: uc, distribuidora: b.distribuidora, percentual: pct})
+        });
+        await mcCarregarRateio(mcClienteId);
+    } catch(e) { alert('Erro ao atualizar'); }
+}
+
+async function rateioExcluirBeneficiario(id) {
+    const b = rateio_beneficiarios_cache.find(x => x.id === id);
+    if (!confirm(`Remover "${b?.nome}" do rateio?`)) return;
+    try {
+        await fetch(`${API}/rateio/beneficiario/${id}`, {
+            method: 'DELETE',
+            headers: {"Authorization":`Bearer ${token}`}
+        });
+        await mcCarregarRateio(mcClienteId);
+    } catch(e) { alert('Erro ao remover'); }
 }
 </script>
 </body>

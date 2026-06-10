@@ -45,6 +45,32 @@ def inicializar_banco():
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS tarifa_kwh DECIMAL(6,4)")
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS consumo_medio_antes_kwh DECIMAL(8,2)")
         cur.execute("ALTER TABLE integradores ADD COLUMN IF NOT EXISTS alertas_diario_ativo BOOLEAN DEFAULT TRUE")
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS rateio_beneficiarios (
+                id SERIAL PRIMARY KEY,
+                cliente_id INTEGER NOT NULL,
+                nome TEXT NOT NULL,
+                numero_uc TEXT,
+                distribuidora TEXT,
+                percentual DECIMAL(5,2) NOT NULL DEFAULT 0,
+                ativo BOOLEAN DEFAULT TRUE,
+                criado_em TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS contas_beneficiario (
+                id SERIAL PRIMARY KEY,
+                beneficiario_id INTEGER NOT NULL,
+                mes_referencia TEXT,
+                creditos_recebidos_kwh DECIMAL(8,2),
+                consumo_kwh DECIMAL(8,2),
+                consumo_bruto_kwh DECIMAL(8,2),
+                saldo_anterior_kwh DECIMAL(8,2),
+                saldo_resultante_kwh DECIMAL(8,2),
+                valor_fatura DECIMAL(10,2),
+                criado_em TIMESTAMP DEFAULT NOW()
+            )
+        """)
         conn.commit()
     except Exception:
         conn.rollback()
@@ -1883,6 +1909,172 @@ def relatorio_desempenho(integrador: dict = Depends(obter_integrador_atual)):
     cur.close()
     conn.close()
     return {"plantas": plantas_data, "labels": [m["label"] for m in meses]}
+
+
+# ==================== RATEIO ====================
+
+@app.get("/rateio/{cliente_id}")
+def listar_beneficiarios(cliente_id: int, integrador: dict = Depends(obter_integrador_atual)):
+    conn = conectar_banco()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, nome, numero_uc, distribuidora, percentual, ativo
+        FROM rateio_beneficiarios WHERE cliente_id=%s AND ativo=TRUE ORDER BY id
+    """, (cliente_id,))
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    beneficiarios = [{"id": r[0], "nome": r[1], "numero_uc": r[2],
+                      "distribuidora": r[3], "percentual": float(r[4])} for r in rows]
+    total_pct = round(sum(b["percentual"] for b in beneficiarios), 2)
+    return {"beneficiarios": beneficiarios, "total_percentual": total_pct}
+
+@app.post("/rateio/{cliente_id}")
+def criar_beneficiario(cliente_id: int, dados: dict, integrador: dict = Depends(obter_integrador_atual)):
+    nome = dados.get("nome", "").strip()
+    if not nome:
+        raise HTTPException(status_code=400, detail="Nome obrigatório")
+    conn = conectar_banco()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO rateio_beneficiarios (cliente_id, nome, numero_uc, distribuidora, percentual)
+        VALUES (%s, %s, %s, %s, %s) RETURNING id
+    """, (cliente_id, nome, dados.get("numero_uc"), dados.get("distribuidora"),
+          float(dados.get("percentual", 0))))
+    new_id = cur.fetchone()[0]
+    conn.commit()
+    cur.close()
+    conn.close()
+    return {"id": new_id, "ok": True}
+
+@app.put("/rateio/beneficiario/{beneficiario_id}")
+def atualizar_beneficiario(beneficiario_id: int, dados: dict, integrador: dict = Depends(obter_integrador_atual)):
+    conn = conectar_banco()
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE rateio_beneficiarios SET nome=%s, numero_uc=%s, distribuidora=%s, percentual=%s
+        WHERE id=%s
+    """, (dados.get("nome"), dados.get("numero_uc"), dados.get("distribuidora"),
+          float(dados.get("percentual", 0)), beneficiario_id))
+    conn.commit()
+    cur.close()
+    conn.close()
+    return {"ok": True}
+
+@app.delete("/rateio/beneficiario/{beneficiario_id}")
+def excluir_beneficiario(beneficiario_id: int, integrador: dict = Depends(obter_integrador_atual)):
+    conn = conectar_banco()
+    cur = conn.cursor()
+    cur.execute("UPDATE rateio_beneficiarios SET ativo=FALSE WHERE id=%s", (beneficiario_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
+    return {"ok": True}
+
+@app.get("/rateio/{cliente_id}/resumo")
+def resumo_rateio(cliente_id: int, integrador: dict = Depends(obter_integrador_atual)):
+    conn = conectar_banco()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, nome, numero_uc, distribuidora, percentual
+        FROM rateio_beneficiarios WHERE cliente_id=%s AND ativo=TRUE ORDER BY id
+    """, (cliente_id,))
+    beneficiarios = [{"id": r[0], "nome": r[1], "numero_uc": r[2],
+                      "distribuidora": r[3], "percentual": float(r[4])} for r in cur.fetchall()]
+
+    cur.execute("""
+        SELECT mes_referencia, energia_injetada_kwh, consumo_bruto_kwh, consumo_kwh
+        FROM contas WHERE cliente_id=%s AND energia_injetada_kwh IS NOT NULL
+        ORDER BY criado_em ASC
+    """, (cliente_id,))
+    contas = cur.fetchall()
+
+    meses = []
+    for c in contas:
+        mes_ref = c[0]
+        injetado = float(c[1] or 0)
+        dist = []
+        for b in beneficiarios:
+            kwh = round(injetado * b["percentual"] / 100, 2)
+            cur.execute("""
+                SELECT creditos_recebidos_kwh, consumo_kwh, saldo_resultante_kwh, valor_fatura
+                FROM contas_beneficiario WHERE beneficiario_id=%s AND mes_referencia=%s
+                ORDER BY criado_em DESC LIMIT 1
+            """, (b["id"], mes_ref))
+            conta_ben = cur.fetchone()
+            dist.append({
+                "beneficiario_id": b["id"],
+                "nome": b["nome"],
+                "percentual": b["percentual"],
+                "creditos_calculados_kwh": kwh,
+                "tem_conta": conta_ben is not None,
+                "creditos_conta_kwh": float(conta_ben[0] or 0) if conta_ben else None,
+                "consumo_kwh": float(conta_ben[1] or 0) if conta_ben else None,
+                "saldo_resultante_kwh": float(conta_ben[2] or 0) if conta_ben else None,
+                "valor_fatura": float(conta_ben[3] or 0) if conta_ben else None,
+            })
+        meses.append({"mes_referencia": mes_ref, "injetado_kwh": injetado, "distribuicao": dist})
+
+    cur.close()
+    conn.close()
+    return {"beneficiarios": beneficiarios, "meses": meses}
+
+@app.post("/rateio/beneficiario/{beneficiario_id}/conta")
+def salvar_conta_beneficiario(beneficiario_id: int, dados: dict, integrador: dict = Depends(obter_integrador_atual)):
+    conn = conectar_banco()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO contas_beneficiario
+            (beneficiario_id, mes_referencia, creditos_recebidos_kwh, consumo_kwh,
+             consumo_bruto_kwh, saldo_anterior_kwh, saldo_resultante_kwh, valor_fatura)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+        ON CONFLICT DO NOTHING RETURNING id
+    """, (beneficiario_id, dados.get("mes_referencia"),
+          dados.get("creditos_recebidos_kwh"), dados.get("consumo_kwh"),
+          dados.get("consumo_bruto_kwh"), dados.get("saldo_anterior_kwh"),
+          dados.get("saldo_resultante_kwh"), dados.get("valor_fatura")))
+    conn.commit()
+    cur.close()
+    conn.close()
+    return {"ok": True}
+
+@app.get("/clientes/{cliente_id}/rateio")
+def rateio_publico(cliente_id: int):
+    conn = conectar_banco()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, nome, numero_uc, distribuidora, percentual
+        FROM rateio_beneficiarios WHERE cliente_id=%s AND ativo=TRUE ORDER BY id
+    """, (cliente_id,))
+    beneficiarios = [{"id": r[0], "nome": r[1], "numero_uc": r[2],
+                      "distribuidora": r[3], "percentual": float(r[4])} for r in cur.fetchall()]
+
+    if not beneficiarios:
+        cur.close()
+        conn.close()
+        return {"beneficiarios": [], "meses": []}
+
+    cur.execute("""
+        SELECT mes_referencia, energia_injetada_kwh
+        FROM contas WHERE cliente_id=%s AND energia_injetada_kwh IS NOT NULL
+        ORDER BY criado_em ASC
+    """, (cliente_id,))
+    contas = cur.fetchall()
+
+    meses = []
+    for c in contas:
+        mes_ref = c[0]
+        injetado = float(c[1] or 0)
+        dist = []
+        for b in beneficiarios:
+            kwh = round(injetado * b["percentual"] / 100, 2)
+            dist.append({"nome": b["nome"], "percentual": b["percentual"],
+                         "creditos_kwh": kwh})
+        meses.append({"mes_referencia": mes_ref, "injetado_kwh": injetado, "distribuicao": dist})
+
+    cur.close()
+    conn.close()
+    return {"beneficiarios": beneficiarios, "meses": list(reversed(meses))}
 
 
 @app.api_route("/admin/verificar-offline", methods=["GET", "POST"])
