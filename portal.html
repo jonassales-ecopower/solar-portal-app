@@ -548,27 +548,36 @@
             </p>
         </div>
 
-        <!-- Rateio de Créditos -->
+        <!-- Rateio de Créditos — Conferência -->
         <div class="card" id="card-rateio" style="display:none;">
-            <div class="card-titulo">🔀 Rateio de Créditos (Lei 14.300/2022)</div>
-            <p style="font-size:13px;color:#64748b;margin-bottom:14px;">
-                Veja como os créditos de energia injetada na rede são distribuídos entre as suas UCs beneficiárias a cada mês.
+            <div class="card-titulo">🔀 Rateio de Créditos — Conferência Mensal</div>
+            <p style="font-size:13px;color:#64748b;margin-bottom:10px;">
+                Acompanhe se os créditos do seu sistema solar estão sendo corretamente repassados para cada UC beneficiária. Envie a conta de cada UC para confirmar a compensação.
             </p>
-            <div id="rateio-beneficiarios-lista" style="margin-bottom:14px;display:flex;flex-wrap:wrap;gap:8px;"></div>
-            <div style="overflow-x:auto;">
-                <table style="width:100%;border-collapse:collapse;font-size:13px;" id="rateio-historico-tabela">
-                    <thead>
-                        <tr style="background:#f8fafc;">
-                            <th style="padding:8px 10px;text-align:left;color:#64748b;font-size:11px;text-transform:uppercase;">Mês</th>
-                            <th style="padding:8px 10px;text-align:right;color:#64748b;font-size:11px;text-transform:uppercase;">Injetado</th>
-                            <th style="padding:8px 10px;text-align:left;color:#64748b;font-size:11px;text-transform:uppercase;">Distribuição</th>
-                        </tr>
-                    </thead>
-                    <tbody id="rateio-historico-tbody"></tbody>
-                </table>
+
+            <!-- Legenda de status -->
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;">
+                <span style="background:#dcfce7;color:#166534;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;">✅ Compensado</span>
+                <span style="background:#fef9c3;color:#854d0e;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;">⚠️ Parcial</span>
+                <span style="background:#fee2e2;color:#991b1b;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;">❌ Não compensado</span>
+                <span style="background:#dbeafe;color:#1e40af;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;">📄 Enviar conta</span>
+                <span style="background:#f1f5f9;color:#64748b;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;">⚡ Sem excedente</span>
             </div>
-            <p style="font-size:11px;color:#94a3b8;text-align:center;margin-top:10px;">
-                Créditos calculados com base nas contas enviadas ao portal
+
+            <!-- Seções por beneficiária -->
+            <div id="rateio-secoes"></div>
+
+            <!-- Input oculto de arquivo (único, reutilizado) -->
+            <input type="file" id="rateio-input-arquivo" accept=".pdf" style="display:none">
+
+            <!-- Loading de upload -->
+            <div id="rateio-upload-loading" style="display:none;text-align:center;padding:20px;">
+                <div style="font-size:28px;animation:spin 1.5s linear infinite;display:inline-block;">🤖</div>
+                <p style="font-size:13px;color:#64748b;margin-top:8px;">Analisando conta com Inteligência Artificial...</p>
+            </div>
+
+            <p style="font-size:11px;color:#94a3b8;text-align:center;margin-top:14px;">
+                Os créditos calculados são baseados nas contas da UC geradora enviadas ao portal
             </p>
         </div>
 
@@ -928,6 +937,16 @@
         } catch(e) {}
     }
 
+    let _rateioUploadTarget = null; // {beneficiario_id, mes_referencia, nome}
+
+    const _rateioStatus = {
+        compensado:    { bg:'#dcfce7', color:'#166534', txt:'✅ Compensado' },
+        parcial:       { bg:'#fef9c3', color:'#854d0e', txt:'⚠️ Parcial' },
+        nao_compensado:{ bg:'#fee2e2', color:'#991b1b', txt:'❌ Não compensado' },
+        aguardando:    { bg:'#dbeafe', color:'#1e40af', txt:'📄 Enviar conta' },
+        sem_excedente: { bg:'#f1f5f9', color:'#64748b', txt:'⚡ Sem excedente' },
+    };
+
     async function buscarRateio() {
         try {
             const r = await fetch(`${API}/clientes/${idCliente}/rateio`);
@@ -935,25 +954,134 @@
             const d = await r.json();
             if (!d.beneficiarios || !d.beneficiarios.length) return;
             document.getElementById('card-rateio').style.display = 'block';
-            const bDiv = document.getElementById('rateio-beneficiarios-lista');
-            bDiv.innerHTML = d.beneficiarios.map(b =>
-                `<span style="background:#f0fdf4;border:1px solid #86efac;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600;color:#166534;">
-                    ${b.nome} — ${b.percentual}%
-                </span>`
-            ).join('');
-            const tbody = document.getElementById('rateio-historico-tbody');
-            if (!d.meses || !d.meses.length) { tbody.innerHTML = '<tr><td colspan="3" style="padding:8px;color:#94a3b8;font-size:12px;">Nenhuma conta enviada ainda</td></tr>'; return; }
-            tbody.innerHTML = d.meses.map(m => {
-                const dist = m.distribuicao.map(b =>
-                    `<span style="font-size:12px;">${b.nome}: <strong style="color:#059669;">${b.creditos_kwh} kWh</strong></span>`
-                ).join('<br>');
+            renderRateio(d);
+        } catch(e) {}
+    }
+
+    function renderRateio(d) {
+        const secoes = document.getElementById('rateio-secoes');
+        if (!d.meses || !d.meses.length) {
+            secoes.innerHTML = '<p style="color:#94a3b8;font-size:13px;text-align:center;padding:16px;">Nenhuma conta da geradora enviada ainda. Envie a conta da UC geradora primeiro.</p>';
+            return;
+        }
+
+        // Organizar dados por beneficiário
+        const bMap = {};
+        d.beneficiarios.forEach(b => { bMap[b.id] = { ...b, meses: [] }; });
+        d.meses.forEach(m => {
+            m.distribuicao.forEach(b => {
+                if (bMap[b.beneficiario_id]) {
+                    bMap[b.beneficiario_id].meses.push({ ...b, mes_referencia: m.mes_referencia, injetado_kwh: m.injetado_kwh });
+                }
+            });
+        });
+
+        secoes.innerHTML = Object.values(bMap).map(b => {
+            const totalMeses = b.meses.length;
+            const compensados = b.meses.filter(m => m.status === 'compensado').length;
+            const pendentes = b.meses.filter(m => m.status === 'aguardando').length;
+
+            const linhas = b.meses.map(m => {
+                const st = _rateioStatus[m.status] || _rateioStatus.aguardando;
+                const badgeSt = `<span style="background:${st.bg};color:${st.color};border-radius:12px;padding:2px 8px;font-size:11px;font-weight:600;white-space:nowrap;">${st.txt}</span>`;
+
+                let colConta = '<span style="color:#94a3b8;font-size:12px;">—</span>';
+                let colAcao = '';
+                if (m.conta) {
+                    const rec = m.conta.creditos_recebidos_kwh;
+                    const delta = rec - m.creditos_calculados_kwh;
+                    const deltaStr = delta >= 0 ? `+${delta.toFixed(1)}` : delta.toFixed(1);
+                    colConta = `<strong style="color:${m.status==='compensado'?'#059669':m.status==='parcial'?'#d97706':'#dc2626'};">${rec.toFixed(1)} kWh</strong>
+                        <span style="font-size:10px;color:#94a3b8;margin-left:4px;">(${deltaStr})</span>`;
+                    colAcao = `<button onclick="rateioVerDetalhes(${JSON.stringify(m.conta).replace(/"/g,'&quot;')}, '${b.nome}', '${m.mes_referencia}')"
+                        style="background:none;border:1px solid #cbd5e1;color:#64748b;padding:3px 8px;font-size:11px;border-radius:6px;cursor:pointer;width:auto;margin:0;">
+                        Ver</button>`;
+                } else if (m.status === 'aguardando') {
+                    colAcao = `<button onclick="rateioIniciarUpload(${b.id}, '${m.mes_referencia}', '${b.nome}')"
+                        style="background:linear-gradient(135deg,#1e293b,#334155);color:white;padding:3px 10px;font-size:11px;border-radius:6px;cursor:pointer;width:auto;margin:0;">
+                        📤 Enviar</button>`;
+                }
+
                 return `<tr style="border-bottom:1px solid #f1f5f9;">
-                    <td style="padding:8px 10px;font-weight:600;">${m.mes_referencia || '—'}</td>
-                    <td style="padding:8px 10px;text-align:right;color:#f59e0b;font-weight:700;">${m.injetado_kwh} kWh</td>
-                    <td style="padding:8px 10px;">${dist}</td>
+                    <td style="padding:8px 10px;font-size:13px;font-weight:600;white-space:nowrap;">${m.mes_referencia||'—'}</td>
+                    <td style="padding:8px 10px;font-size:12px;color:#f59e0b;font-weight:700;text-align:right;white-space:nowrap;">${m.injetado_kwh} kWh</td>
+                    <td style="padding:8px 10px;font-size:12px;text-align:right;white-space:nowrap;">${m.creditos_calculados_kwh} kWh</td>
+                    <td style="padding:8px 10px;font-size:12px;text-align:right;">${colConta}</td>
+                    <td style="padding:8px 10px;text-align:center;">${badgeSt}</td>
+                    <td style="padding:8px 10px;text-align:center;">${colAcao}</td>
                 </tr>`;
             }).join('');
-        } catch(e) {}
+
+            const infoUC = [b.numero_uc, b.distribuidora].filter(Boolean).join(' • ');
+            return `
+            <div style="border:1px solid #e2e8f0;border-radius:10px;margin-bottom:14px;overflow:hidden;">
+                <div style="background:linear-gradient(135deg,#0f172a,#1e293b);color:white;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                    <div>
+                        <span style="font-size:14px;font-weight:700;">${b.nome}</span>
+                        ${infoUC ? `<span style="font-size:11px;color:#94a3b8;margin-left:10px;">${infoUC}</span>` : ''}
+                    </div>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span style="background:rgba(245,158,11,0.2);color:#fbbf24;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700;">${b.percentual}%</span>
+                        <span style="font-size:11px;color:#94a3b8;">${compensados}/${totalMeses} confirmados${pendentes>0?` • ${pendentes} pendente${pendentes>1?'s':''}`:''}  </span>
+                    </div>
+                </div>
+                <div style="overflow-x:auto;">
+                    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                        <thead><tr style="background:#f8fafc;">
+                            <th style="padding:7px 10px;text-align:left;color:#64748b;font-size:10px;text-transform:uppercase;">Mês</th>
+                            <th style="padding:7px 10px;text-align:right;color:#64748b;font-size:10px;text-transform:uppercase;">Injetado</th>
+                            <th style="padding:7px 10px;text-align:right;color:#64748b;font-size:10px;text-transform:uppercase;">Calculado</th>
+                            <th style="padding:7px 10px;text-align:right;color:#64748b;font-size:10px;text-transform:uppercase;">Na conta</th>
+                            <th style="padding:7px 10px;text-align:center;color:#64748b;font-size:10px;text-transform:uppercase;">Status</th>
+                            <th style="padding:7px 10px;text-align:center;color:#64748b;font-size:10px;text-transform:uppercase;"></th>
+                        </tr></thead>
+                        <tbody>${linhas}</tbody>
+                    </table>
+                </div>
+            </div>`;
+        }).join('');
+
+        // Listener único do file input
+        const inp = document.getElementById('rateio-input-arquivo');
+        inp.onchange = null;
+        inp.onchange = () => rateioEnviarArquivo(inp);
+    }
+
+    function rateioIniciarUpload(beneficiario_id, mes_referencia, nome) {
+        _rateioUploadTarget = { beneficiario_id, mes_referencia, nome };
+        document.getElementById('rateio-input-arquivo').value = '';
+        document.getElementById('rateio-input-arquivo').click();
+    }
+
+    async function rateioEnviarArquivo(input) {
+        if (!input.files[0] || !_rateioUploadTarget) return;
+        const { beneficiario_id, mes_referencia, nome } = _rateioUploadTarget;
+        const loadEl = document.getElementById('rateio-upload-loading');
+        const secoesEl = document.getElementById('rateio-secoes');
+        loadEl.style.display = 'block';
+        secoesEl.style.opacity = '0.4';
+        try {
+            const form = new FormData();
+            form.append('arquivo', input.files[0]);
+            const r = await fetch(`${API}/rateio/beneficiario/${beneficiario_id}/conta/upload`, {
+                method: 'POST', body: form
+            });
+            if (!r.ok) {
+                const err = await r.json();
+                alert('Erro na análise: ' + (err.detail || 'Tente novamente'));
+                return;
+            }
+            await buscarRateio();
+        } catch(e) {
+            alert('Erro de conexão. Tente novamente.');
+        } finally {
+            loadEl.style.display = 'none';
+            secoesEl.style.opacity = '1';
+        }
+    }
+
+    function rateioVerDetalhes(conta, nome, mes) {
+        alert(`📄 ${nome} — ${mes}\n\nCréditos recebidos: ${conta.creditos_recebidos_kwh} kWh\nConsumo bruto: ${conta.consumo_bruto_kwh} kWh\nConsumo faturado: ${conta.consumo_kwh} kWh\nSaldo anterior: ${conta.saldo_anterior_kwh} kWh\nSaldo resultante: ${conta.saldo_resultante_kwh} kWh\nValor da fatura: R$ ${conta.valor_fatura?.toFixed(2)}`);
     }
 
     async function buscarPrevisao() {

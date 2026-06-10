@@ -68,7 +68,8 @@ def inicializar_banco():
                 saldo_anterior_kwh DECIMAL(8,2),
                 saldo_resultante_kwh DECIMAL(8,2),
                 valor_fatura DECIMAL(10,2),
-                criado_em TIMESTAMP DEFAULT NOW()
+                criado_em TIMESTAMP DEFAULT NOW(),
+                UNIQUE (beneficiario_id, mes_referencia)
             )
         """)
         conn.commit()
@@ -268,6 +269,56 @@ Retorne EXATAMENTE neste formato JSON:
 Texto da conta:
 {texto_pdf}"""
     resposta = cliente_ia.chat.completions.create(model="openrouter/auto", messages=[{"role": "user", "content": prompt}])
+    return resposta.choices[0].message.content
+
+def analisar_conta_beneficiario(texto_pdf: str) -> str:
+    cliente_ia = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_KEY)
+    prompt = f"""Você é um especialista em contas de energia elétrica brasileiras com foco em Geração Distribuída (GD) e rateio de créditos (Lei 14.300/2022).
+
+Esta conta pertence a uma UC BENEFICIÁRIA — ela recebe créditos de energia de uma UC geradora solar.
+
+Analise o texto e retorne SOMENTE um JSON válido, sem texto adicional.
+
+CAMPOS A EXTRAIR:
+
+1. MÊS DE REFERÊNCIA: Campo "REF: MÊS / ANO" impresso na fatura. Ex: "Maio / 2026".
+
+2. CRÉDITOS RECEBIDOS (kWh): Energia recebida via rateio/compensação de GD.
+   Procure por linhas como:
+   - "Energia Recebida em Transferência"
+   - "GD Energia Recebida"
+   - "Compensação GD"
+   - "Energia Cedida" ou "Energia Transferida"
+   - Qualquer linha indicando créditos recebidos de outra UC via compensação.
+   Se não encontrar nenhum crédito de GD recebido, retornar 0.
+
+3. CONSUMO BRUTO (kWh): Leitura real do medidor no período (Leitura Atual - Leitura Anterior × Constante).
+
+4. CONSUMO FATURADO (kWh): Consumo após dedução dos créditos GD. Valor final cobrado.
+
+5. SALDO ANTERIOR (kWh): Saldo de créditos trazido do mês anterior. Se não houver, 0.
+
+6. SALDO RESULTANTE (kWh): Saldo de créditos restante após este mês. Se não houver, 0.
+
+7. VALOR DA FATURA: Valor total a pagar (R$).
+
+Retorne EXATAMENTE neste formato JSON:
+{{
+  "mes_referencia": "",
+  "creditos_recebidos_kwh": 0.0,
+  "consumo_bruto_kwh": 0.0,
+  "consumo_kwh": 0.0,
+  "saldo_anterior_kwh": 0.0,
+  "saldo_resultante_kwh": 0.0,
+  "valor_fatura": 0.0
+}}
+
+Texto da conta:
+{texto_pdf}"""
+    resposta = cliente_ia.chat.completions.create(
+        model="openrouter/auto",
+        messages=[{"role": "user", "content": prompt}]
+    )
     return resposta.choices[0].message.content
 
 # ==================== CÁLCULO DE CONSUMO ====================
@@ -2019,24 +2070,60 @@ def resumo_rateio(cliente_id: int, integrador: dict = Depends(obter_integrador_a
     conn.close()
     return {"beneficiarios": beneficiarios, "meses": meses}
 
-@app.post("/rateio/beneficiario/{beneficiario_id}/conta")
-def salvar_conta_beneficiario(beneficiario_id: int, dados: dict, integrador: dict = Depends(obter_integrador_atual)):
-    conn = conectar_banco()
-    cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO contas_beneficiario
-            (beneficiario_id, mes_referencia, creditos_recebidos_kwh, consumo_kwh,
-             consumo_bruto_kwh, saldo_anterior_kwh, saldo_resultante_kwh, valor_fatura)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-        ON CONFLICT DO NOTHING RETURNING id
-    """, (beneficiario_id, dados.get("mes_referencia"),
-          dados.get("creditos_recebidos_kwh"), dados.get("consumo_kwh"),
-          dados.get("consumo_bruto_kwh"), dados.get("saldo_anterior_kwh"),
-          dados.get("saldo_resultante_kwh"), dados.get("valor_fatura")))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return {"ok": True}
+@app.post("/rateio/beneficiario/{beneficiario_id}/conta/upload")
+async def upload_conta_beneficiario(beneficiario_id: int, arquivo: UploadFile = File(...)):
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        tmp.write(await arquivo.read())
+        tmp_path = tmp.name
+    try:
+        texto = extrair_texto_pdf(tmp_path)
+        resultado_raw = analisar_conta_beneficiario(texto)
+        resultado_raw = re.sub(r"```json|```", "", resultado_raw).strip()
+        dados = json.loads(resultado_raw)
+
+        conn = conectar_banco()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO contas_beneficiario
+                (beneficiario_id, mes_referencia, creditos_recebidos_kwh, consumo_kwh,
+                 consumo_bruto_kwh, saldo_anterior_kwh, saldo_resultante_kwh, valor_fatura)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+            ON CONFLICT (beneficiario_id, mes_referencia) DO UPDATE SET
+                creditos_recebidos_kwh = EXCLUDED.creditos_recebidos_kwh,
+                consumo_kwh = EXCLUDED.consumo_kwh,
+                consumo_bruto_kwh = EXCLUDED.consumo_bruto_kwh,
+                saldo_anterior_kwh = EXCLUDED.saldo_anterior_kwh,
+                saldo_resultante_kwh = EXCLUDED.saldo_resultante_kwh,
+                valor_fatura = EXCLUDED.valor_fatura
+            RETURNING id
+        """, (beneficiario_id, dados.get("mes_referencia"),
+              dados.get("creditos_recebidos_kwh"), dados.get("consumo_kwh"),
+              dados.get("consumo_bruto_kwh"), dados.get("saldo_anterior_kwh"),
+              dados.get("saldo_resultante_kwh"), dados.get("valor_fatura")))
+        conta_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        conn.close()
+        return {"ok": True, "dados": dados, "id": conta_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro na análise: {str(e)}")
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+
+def _calcular_status_rateio(calculado: float, recebido) -> str:
+    if calculado <= 0:
+        return "sem_excedente"
+    if recebido is None:
+        return "aguardando"
+    rec = float(recebido or 0)
+    if rec >= calculado * 0.90:
+        return "compensado"
+    if rec > 0:
+        return "parcial"
+    return "nao_compensado"
 
 @app.get("/clientes/{cliente_id}/rateio")
 def rateio_publico(cliente_id: int):
@@ -2067,9 +2154,34 @@ def rateio_publico(cliente_id: int):
         injetado = float(c[1] or 0)
         dist = []
         for b in beneficiarios:
-            kwh = round(injetado * b["percentual"] / 100, 2)
-            dist.append({"nome": b["nome"], "percentual": b["percentual"],
-                         "creditos_kwh": kwh})
+            calculado = round(injetado * b["percentual"] / 100, 2)
+            cur.execute("""
+                SELECT creditos_recebidos_kwh, consumo_kwh, consumo_bruto_kwh,
+                       saldo_anterior_kwh, saldo_resultante_kwh, valor_fatura
+                FROM contas_beneficiario
+                WHERE beneficiario_id=%s AND mes_referencia=%s
+                ORDER BY criado_em DESC LIMIT 1
+            """, (b["id"], mes_ref))
+            row = cur.fetchone()
+            conta_b = None
+            if row:
+                conta_b = {
+                    "creditos_recebidos_kwh": float(row[0] or 0),
+                    "consumo_kwh": float(row[1] or 0),
+                    "consumo_bruto_kwh": float(row[2] or 0),
+                    "saldo_anterior_kwh": float(row[3] or 0),
+                    "saldo_resultante_kwh": float(row[4] or 0),
+                    "valor_fatura": float(row[5] or 0),
+                }
+            status = _calcular_status_rateio(calculado, conta_b["creditos_recebidos_kwh"] if conta_b else None)
+            dist.append({
+                "beneficiario_id": b["id"],
+                "nome": b["nome"],
+                "percentual": b["percentual"],
+                "creditos_calculados_kwh": calculado,
+                "conta": conta_b,
+                "status": status,
+            })
         meses.append({"mes_referencia": mes_ref, "injetado_kwh": injetado, "distribuicao": dist})
 
     cur.close()
