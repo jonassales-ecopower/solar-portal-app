@@ -91,6 +91,11 @@ def enviar_email_offline(integrador_email: str, integrador_nome: str, cliente_no
         pass
 
 def verificar_clientes_offline():
+    # Inversor não gera à noite — só alertar entre 7h e 18h (horário de Brasília, UTC-3)
+    hora_brt = (datetime.utcnow() - timedelta(hours=3)).hour
+    if hora_brt < 7 or hora_brt >= 18:
+        return
+
     conn = conectar_banco()
     cur = conn.cursor()
     try:
