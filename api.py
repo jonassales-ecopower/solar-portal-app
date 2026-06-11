@@ -190,6 +190,52 @@ def extrair_texto_pdf(caminho_pdf):
             texto += pagina.extract_text()
     return texto
 
+# ==================== MEDIDOR REGEX ====================
+
+def _parse_br_num(s: str) -> float:
+    """Converte número BR ('1.864,00' ou '505') para float."""
+    s = s.strip()
+    if ',' in s:
+        s = s.replace('.', '').replace(',', '.')
+    return float(s)
+
+def extrair_medicoes_medidor(texto: str):
+    """
+    Extrai consumo ativo e energia injetada diretamente do texto da fatura
+    usando a tabela RESERVADO AO FISCO (Energisa e similares).
+
+    Formato esperado (página 1, extraído limpo pelo PyPDF2):
+      [Medidor] Energia ativa em kWh [Posto] [Anterior] [Atual] [K] [Consumo]
+      [Medidor] Energia injetada     [Posto] [Anterior] [Atual] [K] [Injetado]
+
+    Retorna (consumo_kwh, injetado_kwh) — None se não encontrado.
+    """
+    NUM = r'[\d.,]+'
+
+    consumo = None
+    m = re.search(
+        r'Energia ativa em kWh\s+\w+\s+(' + NUM + r')\s+(' + NUM + r')\s+(' + NUM + r')\s+(' + NUM + r')',
+        texto
+    )
+    if m:
+        try:
+            consumo = _parse_br_num(m.group(4))
+        except ValueError:
+            pass
+
+    injetado = None
+    m2 = re.search(
+        r'Energia injetada\s+\w+\s+(' + NUM + r')\s+(' + NUM + r')\s+(' + NUM + r')\s+(' + NUM + r')',
+        texto
+    )
+    if m2:
+        try:
+            injetado = _parse_br_num(m2.group(4))
+        except ValueError:
+            pass
+
+    return consumo, injetado
+
 # ==================== IA ====================
 
 def analisar_conta(texto_pdf):
@@ -1227,6 +1273,14 @@ async def upload_conta(cliente_id: int, arquivo: UploadFile = File(...)):
         resultado_raw = analisar_conta(texto)
         resultado_raw = re.sub(r"```json|```", "", resultado_raw).strip()
         dados = json.loads(resultado_raw)
+
+        # Override com regex — mais confiável que IA para estes campos estruturados
+        consumo_rx, injetado_rx = extrair_medicoes_medidor(texto)
+        if consumo_rx is not None:
+            dados["consumo_bruto_kwh"] = consumo_rx
+            dados["consumo_rede_kwh"] = consumo_rx
+        if injetado_rx is not None:
+            dados["energia_injetada_kwh"] = injetado_rx
 
         conn = conectar_banco()
         cur = conn.cursor()
