@@ -1262,6 +1262,16 @@ async def upload_conta(cliente_id: int, arquivo: UploadFile = File(...)):
             dados["consumo_rede_kwh"] = consumo_rx
         if injetado_rx is not None:
             dados["energia_injetada_kwh"] = injetado_rx
+        # Status e percentual derivam de injetada/consumo — recalcula com os
+        # valores corrigidos (a IA os computa com a extração dela, que pode errar)
+        try:
+            inj = float(dados.get("energia_injetada_kwh") or 0)
+            cons = float(dados.get("consumo_bruto_kwh") or 0)
+            if cons > 0:
+                dados["status_sistema"] = "SUPERAVITÁRIO" if inj >= cons else "DEFICITÁRIO"
+                dados["percentual_gerado"] = round(inj / cons * 100, 1)
+        except (TypeError, ValueError):
+            pass
         # Mesmo formato canônico nos dois lados da junção geradora ↔ beneficiárias
         mes_rx = extrair_mes_referencia(texto)
         if mes_rx:

@@ -71,6 +71,25 @@ N6201931612 Energia ativa em kWh Ponta 22750 22895 1 145
 Leitura Anterior:05/05/2026 Leitura Atual: 05/06/2026 Dias: 31
 """
 
+# ESMAILY — UC geradora, Energisa Sul-Sudeste (MG). LAYOUT B: o PyPDF2 emite
+# a tabela do fisco com colunas em outra ordem ([K] [Consumo] [Atual] [Anterior])
+# e as datas de leitura ANTES dos rótulos, em ordem invertida. Bug real de
+# 11/06/2026: o layout A não casava, a IA assumia e devolvia a leitura
+# anterior (6358) como injetada. Valores corretos: consumo 389, injetado 365.
+TEXTO_ESMAILY = """\
+ENERGISA SUL-SUDESTE - DISTRIBUIDORA DE ENERGIA S.A.
+08/07/2026 07/05/2026 32 08/06/2026
+Insc. Est.:B PONTE NOVAESMAILY HENRIQUE SANTANA DE LIMA
+Energia Atv Injetada GDII
+Contrib de Ilum PubLANÇAMENTOS E SERVIÇOSAdic. B. AmarelaAjuste GDII - TRF Reduzida(Lei 14.300/22) - Conv.Consumo em kWh
+0,976610 -356,46
+N6175974810 Ponta Energia ativa em kWh 1 389 2886 2497
+N6175974810 Ponta Energia injetada 1 365 6723 6358Art. 42, inciso I, alínea c do RICMS/MG - 2002
+EMITIDO EM CONTINGÊNCIA Pendente de Autorização19/06/2026 R$ 98,81 Junho / 2026600.747.006-17NOTA FISCAL Nº: 001.858.620
+Total11,27 Serviço de distribuição08/06/2026 Leitura Atual: 07/05/2026 Leitura Anterior: Dias: 325,00
+13,00
+"""
+
 # ==================== _parse_br_num ====================
 
 def test_parse_br_num_inteiro():
@@ -102,6 +121,23 @@ def test_medidor_nao_confunde_gdii_com_injetada():
 
 def test_medidor_ausente():
     assert extrair_medicoes_medidor("fatura sem tabela do fisco") == (None, None)
+
+def test_medidor_layout_b_sul_sudeste():
+    # ESMAILY: injetado real 365 — NÃO a leitura anterior 6358 (último número da linha)
+    assert extrair_medicoes_medidor(TEXTO_ESMAILY) == (389.0, 365.0)
+
+def test_medidor_validacao_aritmetica_escolhe_layout():
+    # A aritmética consumo == (atual − anterior) × K confirma o layout B
+    # mesmo quando um falso candidato A existe no texto.
+    texto = ("123 Energia ativa em kWh 1 389 2886 2497\n"
+             "Ponta Energia ativa em kWh 1 389 2886 2497")
+    assert extrair_medicoes_medidor(texto)[0] == 389.0
+
+def test_medidor_sem_validacao_usa_primeiro_candidato():
+    # Leitura por média / virada de medidor: aritmética não fecha,
+    # mantém o comportamento original (campo Consumo do layout que casou).
+    texto = "N123 Energia ativa em kWh Ponta 100 200 1 999"
+    assert extrair_medicoes_medidor(texto)[0] == 999.0
 
 # ==================== normalizar_mes_referencia ====================
 
@@ -139,6 +175,13 @@ def test_mes_referencia_nas_tres_faturas():
 
 def test_datas_leitura_geradora():
     assert extrair_datas_leitura(TEXTO_ACADEMIA) == ('05/05/2026', '05/06/2026')
+
+def test_datas_leitura_layout_b_data_antes_do_rotulo():
+    # Sul-Sudeste: '08/06/2026 Leitura Atual: 07/05/2026 Leitura Anterior:'
+    assert extrair_datas_leitura(TEXTO_ESMAILY) == ('07/05/2026', '08/06/2026')
+
+def test_mes_referencia_esmaily():
+    assert extrair_mes_referencia(TEXTO_ESMAILY) == 'Junho / 2026'
 
 def test_datas_leitura_sem_rotulo_nao_casa():
     # Datas soltas da página 1 (emissão, vencimento) não podem ser confundidas
