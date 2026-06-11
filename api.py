@@ -207,19 +207,24 @@ REGRAS CRÍTICAS DE EXTRAÇÃO:
 
 3. DATA DE VENCIMENTO: Campo "VENCIMENTO" em destaque. NÃO confundir com data de emissão.
 
-4. CONSUMO BRUTO (kWh): ATENÇÃO CRÍTICA — use o ÚLTIMO campo da linha "Energia ativa em kWh"
-   na tabela de medidores (parte inferior da fatura).
-   Formato da linha: Medidor | Grandeza | Posto | Leitura_Anterior | Leitura_Atual | Constante | Consumo_kWh
-   O valor correto é sempre o ÚLTIMO número (Consumo_kWh = diferença das leituras × constante).
+4. CONSUMO BRUTO (kWh): Energia consumida desta UC no período de faturamento.
 
-   EXEMPLO EXATO (Energisa GD_II):
+   MÉTODO PRIMÁRIO — Itens da Fatura:
+   Procure a linha que começa com "Consumo em kWh" nos itens cobrados.
+   A QUANTIDADE (primeiro número após a unidade KWH) é o consumo_bruto_kwh.
+   Exemplos:
+   "Consumo em kWh KWH 505,00 0,976610 493,19"  → consumo_bruto_kwh = 505
+   "Consumo em kWh KWH 666,00 0,976610 650,42"  → consumo_bruto_kwh = 666
+   "Consumo em kWh KWH 145,00 0,976610 141,60"  → consumo_bruto_kwh = 145
+   NÃO confunda com "Energia Atv Injetada GDII" que pode ter o mesmo número com valor negativo.
+
+   MÉTODO ALTERNATIVO (apenas se não houver linha "Consumo em kWh" nos itens):
+   Tabela de medidores — linha "Energia ativa em kWh" — use o ÚLTIMO campo (Consumo_kWh).
    "N6201931610 Energia ativa em kWh Ponta 1864 2369 1 505" → consumo_bruto_kwh = 505
-   • 505 é o ÚLTIMO campo = consumo real do período ← USE ESTE
-   • 1864 = Leitura Anterior (acumulado do medidor) ← NUNCA use como consumo
-   • 2369 = Leitura Atual (acumulado do medidor) ← NUNCA use como consumo
+   • 1864 = Leitura Anterior ← NUNCA use como consumo
+   • 2369 = Leitura Atual ← NUNCA use como consumo
 
-   NUNCA use "Consumo até 80kWh-BR" — é faixa tarifária zerada, NÃO é consumo real.
-   NUNCA use "Consumo acima de 80kWh-BR" isoladamente.
+   NUNCA use "Consumo até 80kWh-BR" isoladamente (é faixa tarifária, não consumo total).
 
 5. CONSUMO FATURADO (kWh): Valor no histórico dos últimos 13 meses referente ao mês atual.
    É MENOR que consumo bruto em sistemas GD. Ex: ABR/26 = 420,63 kWh; MAI/26 = 277,45 kWh.
