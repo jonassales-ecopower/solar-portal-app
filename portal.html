@@ -2,7 +2,8 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1e293b">
     <title>Solar Portal — Meu Sistema Solar</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -26,7 +27,8 @@
         .header-cliente .nome { font-weight: 600; font-size: 15px; text-align: right; }
         .header-cliente .sub { opacity: 0.6; font-size: 12px; text-align: right; }
 
-        .nav-abas { display: flex; overflow-x: auto; }
+        .nav-abas { display: flex; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+        .nav-abas::-webkit-scrollbar { display: none; }
         .aba { padding: 14px 20px; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.6); cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; transition: all 0.2s; }
         .aba:hover { color: white; background: rgba(255,255,255,0.05); }
         .aba.ativa { color: #f59e0b; border-bottom-color: #f59e0b; }
@@ -196,8 +198,9 @@
             /* Upload */
             .upload-zone { padding: 24px 16px; }
             .upload-zone .icone { font-size: 36px; }
-            .btn { font-size: 14px; padding: 12px; }
-            .btn-del { font-size: 11px; padding: 5px 10px; }
+            .btn { font-size: 14px; padding: 13px; }
+            /* Alvo de toque >= 40px de altura */
+            .btn-del { font-size: 12px; padding: 9px 14px; }
 
             /* Alertas */
             .alerta-titulo { font-size: 13px; }
@@ -269,9 +272,63 @@
             .saldo-destaque .sd-val { font-size:36px; }
         }
 
+        /* ===== RATEIO ===== */
+        .rt-scroll { overflow-x: auto; }
+        .rt-tabela { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .rt-tabela thead tr { background: #f8fafc; }
+        .rt-tabela th { padding: 7px 10px; text-align: left; color: #64748b; font-size: 10px; text-transform: uppercase; font-weight: 600; }
+        .rt-tabela th.rt-th-num { text-align: right; }
+        .rt-tabela th.rt-th-mid { text-align: center; }
+        .rt-row { border-bottom: 1px solid #f1f5f9; }
+        .rt-row td { padding: 8px 10px; font-size: 12px; }
+        .rt-mes { font-size: 13px; font-weight: 600; white-space: nowrap; }
+        .rt-exc, .rt-calc { text-align: right; white-space: nowrap; }
+        .rt-exc .rt-val { color: #f59e0b; font-weight: 700; }
+        .rt-conta { text-align: right; }
+        .rt-status, .rt-acao { text-align: center; }
+        .rt-surplus-info { font-size: 10px; color: #94a3b8; font-weight: 400; display: block; }
+        .rt-delta { font-size: 10px; color: #94a3b8; margin-left: 4px; }
+        .rt-vazio { color: #94a3b8; font-size: 12px; }
+        .rt-badge { border-radius: 12px; padding: 2px 8px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+        .rt-btn { border-radius: 6px; cursor: pointer; width: auto; margin: 0; font-family: inherit; }
+        .rt-btn-ver { background: none; border: 1px solid #cbd5e1; color: #64748b; padding: 3px 8px; font-size: 11px; }
+        .rt-btn-enviar { background: linear-gradient(135deg, #1e293b, #334155); color: white; border: none; padding: 3px 10px; font-size: 11px; }
+
+        /* Modal detalhe rateio */
+        #modal-rateio-detalhe > div { max-height: 90vh; max-height: 90dvh; overflow-y: auto; }
+
+        @media (max-width: 640px) {
+            /* Tabela do rateio vira cartões empilhados por mês */
+            .rt-tabela thead { display: none; }
+            .rt-tabela, .rt-tabela tbody { display: block; width: 100%; }
+            .rt-row { display: grid; grid-template-columns: 1fr auto; gap: 7px 10px; align-items: center; padding: 13px 14px; }
+            .rt-row td { display: block; padding: 0; }
+            .rt-mes { grid-column: 1; font-size: 14px; }
+            .rt-status { grid-column: 2; grid-row: 1; text-align: right; }
+            .rt-exc, .rt-calc, .rt-conta { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; white-space: normal; }
+            .rt-exc::before, .rt-calc::before, .rt-conta::before {
+                content: attr(data-label); color: #94a3b8; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px;
+            }
+            .rt-surplus-info { display: inline; margin-left: 6px; }
+            .rt-acao { grid-column: 1 / -1; }
+            .rt-acao:empty { display: none; }
+            .rt-acao .rt-btn { width: 100%; padding: 12px; font-size: 13px; font-weight: 700; }
+            .rt-btn-ver { background: #f8fafc; }
+
+            /* Modal vira bottom-sheet */
+            #modal-rateio-detalhe { align-items: flex-end !important; padding: 0 !important; }
+            #modal-rateio-detalhe > div {
+                border-radius: 18px 18px 0 0 !important;
+                max-width: 100% !important;
+                max-height: 88vh; max-height: 88dvh;
+                padding-bottom: env(safe-area-inset-bottom);
+            }
+        }
+
         /* ===== LOGIN ===== */
         #tela-login {
             min-height: 100vh;
+            min-height: 100dvh; /* mobile: ignora o salto da barra de endereço */
             background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0f172a 100%);
             display: flex;
             align-items: center;
@@ -292,7 +349,8 @@
         .login-logo p { font-size: 13px; color: #94a3b8; margin-top: 4px; }
         .login-campo { margin-bottom: 16px; }
         .login-campo label { display: block; font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.6px; }
-        .login-campo input { width: 100%; padding: 13px 16px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 15px; font-family: 'Segoe UI', sans-serif; transition: border-color 0.2s; box-sizing: border-box; }
+        /* font-size >= 16px evita o zoom automático do iOS ao focar o campo */
+        .login-campo input { width: 100%; padding: 13px 16px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 16px; font-family: 'Segoe UI', sans-serif; transition: border-color 0.2s; box-sizing: border-box; }
         .login-campo input:focus { outline: none; border-color: #f59e0b; }
         .btn-login { width: 100%; padding: 14px; background: linear-gradient(135deg, #f59e0b, #d97706); color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 6px; font-family: 'Segoe UI', sans-serif; transition: opacity 0.2s; }
         .btn-login:hover { opacity: 0.9; }
@@ -999,37 +1057,30 @@
 
             const linhas = b.meses.map(m => {
                 const st = _rateioStatus[m.status] || _rateioStatus.aguardando;
-                const badgeSt = `<span style="background:${st.bg};color:${st.color};border-radius:12px;padding:2px 8px;font-size:11px;font-weight:600;white-space:nowrap;">${st.txt}</span>`;
+                const badgeSt = `<span class="rt-badge" style="background:${st.bg};color:${st.color};">${st.txt}</span>`;
 
-                let colConta = '<span style="color:#94a3b8;font-size:12px;">—</span>';
+                let colConta = '<span class="rt-vazio">—</span>';
                 let colAcao = '';
                 if (m.conta) {
                     const rec = m.conta.creditos_recebidos_kwh;
                     const delta = rec - m.creditos_calculados_kwh;
                     const deltaStr = delta >= 0 ? `+${delta.toFixed(1)}` : delta.toFixed(1);
-                    colConta = `<strong style="color:${m.status==='compensado'?'#059669':m.status==='parcial'?'#d97706':'#dc2626'};">${rec.toFixed(1)} kWh</strong>
-                        <span style="font-size:10px;color:#94a3b8;margin-left:4px;">(${deltaStr})</span>`;
-                    colAcao = `<button onclick="rateioVerDetalhes(${JSON.stringify(m.conta).replace(/"/g,'&quot;')}, '${b.nome}', '${m.mes_referencia}', ${m.creditos_calculados_kwh}, '${m.status}')"
-                        style="background:none;border:1px solid #cbd5e1;color:#64748b;padding:3px 8px;font-size:11px;border-radius:6px;cursor:pointer;width:auto;margin:0;">
-                        Ver</button>`;
+                    colConta = `<strong style="color:${m.status==='compensado'?'#059669':m.status==='parcial'?'#d97706':'#dc2626'};">${rec.toFixed(1)} kWh</strong><span class="rt-delta">(${deltaStr})</span>`;
+                    colAcao = `<button class="rt-btn rt-btn-ver" onclick="rateioVerDetalhes(${JSON.stringify(m.conta).replace(/"/g,'&quot;')}, '${b.nome}', '${m.mes_referencia}', ${m.creditos_calculados_kwh}, '${m.status}')">Ver</button>`;
                 } else if (m.status === 'aguardando') {
-                    colAcao = `<button onclick="rateioIniciarUpload(${b.id}, '${m.mes_referencia}', '${b.nome}')"
-                        style="background:linear-gradient(135deg,#1e293b,#334155);color:white;padding:3px 10px;font-size:11px;border-radius:6px;cursor:pointer;width:auto;margin:0;">
-                        📤 Enviar</button>`;
+                    colAcao = `<button class="rt-btn rt-btn-enviar" onclick="rateioIniciarUpload(${b.id}, '${m.mes_referencia}', '${b.nome}')">📤 Enviar</button>`;
                 }
 
                 const surplusInfo = m.surplus_kwh != null
-                    ? `<span style="font-size:10px;color:#94a3b8;display:block;">${m.injetado_kwh}−${m.consumo_geradora_kwh}=${m.surplus_kwh} kWh</span>`
+                    ? `<span class="rt-surplus-info">${m.injetado_kwh}−${m.consumo_geradora_kwh}=${m.surplus_kwh} kWh</span>`
                     : '';
-                return `<tr style="border-bottom:1px solid #f1f5f9;">
-                    <td style="padding:8px 10px;font-size:13px;font-weight:600;white-space:nowrap;">${m.mes_referencia||'—'}</td>
-                    <td style="padding:8px 10px;font-size:12px;color:#f59e0b;font-weight:700;text-align:right;white-space:nowrap;">
-                        ${m.surplus_kwh ?? m.injetado_kwh} kWh${surplusInfo}
-                    </td>
-                    <td style="padding:8px 10px;font-size:12px;text-align:right;white-space:nowrap;">${m.creditos_calculados_kwh} kWh</td>
-                    <td style="padding:8px 10px;font-size:12px;text-align:right;">${colConta}</td>
-                    <td style="padding:8px 10px;text-align:center;">${badgeSt}</td>
-                    <td style="padding:8px 10px;text-align:center;">${colAcao}</td>
+                return `<tr class="rt-row">
+                    <td class="rt-mes">${m.mes_referencia||'—'}</td>
+                    <td class="rt-exc" data-label="Excedente"><span class="rt-val">${m.surplus_kwh ?? m.injetado_kwh} kWh${surplusInfo}</span></td>
+                    <td class="rt-calc" data-label="Calculado"><span class="rt-val">${m.creditos_calculados_kwh} kWh</span></td>
+                    <td class="rt-conta" data-label="Na conta"><span class="rt-val">${colConta}</span></td>
+                    <td class="rt-status">${badgeSt}</td>
+                    <td class="rt-acao">${colAcao}</td>
                 </tr>`;
             }).join('');
 
@@ -1046,15 +1097,15 @@
                         <span style="font-size:11px;color:#94a3b8;">${compensados}/${totalMeses} confirmados${pendentes>0?` • ${pendentes} pendente${pendentes>1?'s':''}`:''}  </span>
                     </div>
                 </div>
-                <div style="overflow-x:auto;">
-                    <table style="width:100%;border-collapse:collapse;font-size:12px;">
-                        <thead><tr style="background:#f8fafc;">
-                            <th style="padding:7px 10px;text-align:left;color:#64748b;font-size:10px;text-transform:uppercase;">Mês</th>
-                            <th style="padding:7px 10px;text-align:right;color:#64748b;font-size:10px;text-transform:uppercase;">Excedente</th>
-                            <th style="padding:7px 10px;text-align:right;color:#64748b;font-size:10px;text-transform:uppercase;">Calculado</th>
-                            <th style="padding:7px 10px;text-align:right;color:#64748b;font-size:10px;text-transform:uppercase;">Na conta</th>
-                            <th style="padding:7px 10px;text-align:center;color:#64748b;font-size:10px;text-transform:uppercase;">Status</th>
-                            <th style="padding:7px 10px;text-align:center;color:#64748b;font-size:10px;text-transform:uppercase;"></th>
+                <div class="rt-scroll">
+                    <table class="rt-tabela">
+                        <thead><tr>
+                            <th>Mês</th>
+                            <th class="rt-th-num">Excedente</th>
+                            <th class="rt-th-num">Calculado</th>
+                            <th class="rt-th-num">Na conta</th>
+                            <th class="rt-th-mid">Status</th>
+                            <th class="rt-th-mid"></th>
                         </tr></thead>
                         <tbody>${linhas}</tbody>
                     </table>
