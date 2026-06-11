@@ -236,6 +236,35 @@ def extrair_medicoes_medidor(texto: str):
 
     return consumo, injetado
 
+_MESES_PT = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+             'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+
+def normalizar_mes_referencia(valor):
+    """
+    Normaliza qualquer variação ('junho/2026', 'JUNHO / 2026', 'Junho/2026')
+    para o formato canônico 'Junho / 2026'.
+
+    Crítico: mes_referencia é a chave de junção entre a conta da geradora e as
+    contas das beneficiárias no rateio — formatos divergentes quebram o vínculo.
+    """
+    if not valor:
+        return None
+    m = re.search(r'(' + '|'.join(_MESES_PT) + r')\s*/?\s*(\d{4})', str(valor), re.IGNORECASE)
+    if not m:
+        return None
+    mes_canon = next((x for x in _MESES_PT if x.lower() == m.group(1).lower()), None)
+    if not mes_canon:
+        return None
+    return f"{mes_canon} / {m.group(2)}"
+
+def extrair_mes_referencia(texto):
+    """
+    Extrai o mês de referência direto do texto da fatura (campo 'REF: MÊS / ANO').
+    O primeiro nome de mês por extenso seguido de ano é sempre o REF — o histórico
+    de consumo usa abreviações (JUN/26) que não casam com o padrão.
+    """
+    return normalizar_mes_referencia(texto)
+
 # ==================== IA ====================
 
 def analisar_conta(texto_pdf):
@@ -1290,6 +1319,12 @@ async def upload_conta(cliente_id: int, arquivo: UploadFile = File(...)):
             dados["consumo_rede_kwh"] = consumo_rx
         if injetado_rx is not None:
             dados["energia_injetada_kwh"] = injetado_rx
+        # Mesmo formato canônico nos dois lados da junção geradora ↔ beneficiárias
+        mes_rx = extrair_mes_referencia(texto)
+        if mes_rx:
+            dados["mes_referencia"] = mes_rx
+        else:
+            dados["mes_referencia"] = normalizar_mes_referencia(dados.get("mes_referencia")) or dados.get("mes_referencia")
 
         conn = conectar_banco()
         cur = conn.cursor()
@@ -2183,6 +2218,19 @@ async def upload_conta_beneficiario(beneficiario_id: int, arquivo: UploadFile = 
         resultado_raw = analisar_conta_beneficiario(texto)
         resultado_raw = re.sub(r"```json|```", "", resultado_raw).strip()
         dados = json.loads(resultado_raw)
+
+        # Overrides determinísticos — regex é mais confiável que IA nestes campos.
+        # creditos_recebidos_kwh NÃO entra aqui: o texto extraído embaralha os
+        # valores das linhas oUC, e corrigi-lo pelo valor calculado anularia a
+        # própria conferência.
+        consumo_rx, _ = extrair_medicoes_medidor(texto)
+        if consumo_rx is not None:
+            dados["consumo_bruto_kwh"] = consumo_rx
+        mes_rx = extrair_mes_referencia(texto)
+        if mes_rx:
+            dados["mes_referencia"] = mes_rx
+        else:
+            dados["mes_referencia"] = normalizar_mes_referencia(dados.get("mes_referencia")) or dados.get("mes_referencia")
 
         conn = conectar_banco()
         cur = conn.cursor()
