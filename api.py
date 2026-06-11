@@ -207,29 +207,47 @@ REGRAS CRÍTICAS DE EXTRAÇÃO:
 
 3. DATA DE VENCIMENTO: Campo "VENCIMENTO" em destaque. NÃO confundir com data de emissão.
 
-4. CONSUMO BRUTO (kWh): ATENÇÃO CRÍTICA — é a leitura REAL DO MEDIDOR no período.
-   Localize a tabela "ESTRUTURA DO CONSUMO" ou "DADOS DO CONSUMO" ou tabela de medidores.
-   Use o campo "FATURADO" ou "Consumo kWh" da linha "Energia ativa em kWh".
-   Exemplo: "Energia ativa em kWh Ponta | 8557 | 10054 | 1 | 1497" → consumo_bruto_kwh = 1497.
-   Exemplo: "Energia ativa em kWh Ponta | 10054 | 10930 | 1 | 876" → consumo_bruto_kwh = 876.
-   NUNCA use "Consumo até 80kWh-BR" — é faixa tarifária zerada pelo governo, NÃO é consumo real!
+4. CONSUMO BRUTO (kWh): ATENÇÃO CRÍTICA — use o ÚLTIMO campo da linha "Energia ativa em kWh"
+   na tabela de medidores (parte inferior da fatura).
+   Formato da linha: Medidor | Grandeza | Posto | Leitura_Anterior | Leitura_Atual | Constante | Consumo_kWh
+   O valor correto é sempre o ÚLTIMO número (Consumo_kWh = diferença das leituras × constante).
+
+   EXEMPLO EXATO (Energisa GD_II):
+   "N6201931610 Energia ativa em kWh Ponta 1864 2369 1 505" → consumo_bruto_kwh = 505
+   • 505 é o ÚLTIMO campo = consumo real do período ← USE ESTE
+   • 1864 = Leitura Anterior (acumulado do medidor) ← NUNCA use como consumo
+   • 2369 = Leitura Atual (acumulado do medidor) ← NUNCA use como consumo
+
+   NUNCA use "Consumo até 80kWh-BR" — é faixa tarifária zerada, NÃO é consumo real.
    NUNCA use "Consumo acima de 80kWh-BR" isoladamente.
-   O consumo bruto real é SEMPRE: (Leitura Atual - Leitura Anterior) × Constante.
 
 5. CONSUMO FATURADO (kWh): Valor no histórico dos últimos 13 meses referente ao mês atual.
    É MENOR que consumo bruto em sistemas GD. Ex: ABR/26 = 420,63 kWh; MAI/26 = 277,45 kWh.
 
 6. CONSUMO DA REDE (kWh): Mesmo valor que consumo_bruto_kwh.
 
-7. ENERGIA INJETADA (kWh): SEMPRE em kWh, nunca em R$.
-   Na tabela de medidores, localize a linha "Energia injetada".
-   O formato é: Medidor | Grandeza | Postos | Leitura_Anterior | Leitura_Atual | Constante | Consumo_kWh
-   O valor correto é o ÚLTIMO campo (Consumo_kWh = Leitura_Atual − Leitura_Anterior × Constante).
-   NUNCA use Leitura_Anterior nem Leitura_Atual como resposta — esses são os contadores acumulados do medidor.
-   ATENÇÃO: leituras acumuladas como 5681 ou 6411 NÃO são energia injetada. A diferença (730) é o valor correto.
-   Exemplo: "N620... Energia injetada Ponta 5681 6411 1 730" → energia_injetada_kwh = 730 (NÃO 5681, NÃO 6411)
-   Exemplo: "Energia injetada Ponta | 7321 | 8016 | 1 | 695" → energia_injetada_kwh = 695
-   Exemplo: "Energia injetada Ponta | 8016 | 8350 | 1 | 334" → energia_injetada_kwh = 334
+7. ENERGIA INJETADA (kWh): DISTINÇÃO CRÍTICA para contas GD_II com rateio (Lei 14.300/22):
+
+   ⚠️ ARMADILHA COMUM: a seção "Itens da Fatura" mostra "Energia Atv Injetada GDII = X kWh".
+   Esse X é o crédito APLICADO ao consumo desta UC (limitado ao próprio consumo da geradora).
+   Exemplo: se injetado real = 730 e consumo = 505, os itens mostram 505 (só abate o que consumiu).
+   NÃO use esse valor — ele é MENOR que o injetado real quando há surplus para beneficiárias.
+
+   ✅ USE SOMENTE a linha "Energia injetada" na TABELA DE MEDIDORES (parte inferior da fatura).
+   Formato: Medidor | Grandeza | Posto | Leitura_Anterior | Leitura_Atual | Constante | Consumo_kWh
+   O valor correto é o ÚLTIMO campo da linha.
+
+   EXEMPLO EXATO (Energisa GD_II com rateio):
+   • Itens da Fatura: "Energia Atv Injetada GDII 505,00 kWh" → NÃO use 505 (é crédito aplicado, não injetado real)
+   • Tabela de medidores: "N6201931610 Energia injetada Ponta 5681 6411 1 730" → energia_injetada_kwh = 730 ✅
+   • 5681 = Leitura Anterior ← NUNCA use
+   • 6411 = Leitura Atual ← NUNCA use
+   • 730 = ÚLTIMO campo = energia realmente injetada na rede ← USE ESTE
+
+   Outros exemplos:
+   "Energia injetada Ponta 7321 8016 1 695" → energia_injetada_kwh = 695
+   "Energia injetada Ponta 8016 8350 1 334" → energia_injetada_kwh = 334
+   Se não houver linha "Energia injetada" na tabela de medidores, retornar 0.
 
 8. SALDO ACUMULADO (kWh): Campo "Saldo Acumulado". Se zero, retornar 0.
 
