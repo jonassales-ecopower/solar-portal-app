@@ -647,6 +647,16 @@
                                 <td style="text-align:right;" class="cor-az" id="plan-injetado">—</td>
                                 <td style="color:#64748b;font-size:12px;">Sobra enviada à distribuidora como créditos</td>
                             </tr>
+                            <tr id="linha-compensado" style="display:none;">
+                                <td style="padding-left:28px;">↳ <strong>Compensado nesta UC</strong></td>
+                                <td style="text-align:right;" id="plan-compensado">—</td>
+                                <td style="color:#64748b;font-size:12px;">Parte do injetado que abateu o consumo desta unidade</td>
+                            </tr>
+                            <tr id="linha-rateio-credito" style="display:none;">
+                                <td style="padding-left:28px;">↳ <strong>Crédito p/ Rateio</strong></td>
+                                <td style="text-align:right;" class="cor-vd" id="plan-rateio-credito">—</td>
+                                <td style="color:#64748b;font-size:12px;">Excedente — vai para as beneficiárias ou acumula como saldo</td>
+                            </tr>
                             <tr id="linha-inst">
                                 <td>🏠 <strong>Consumo Instantâneo</strong></td>
                                 <td style="text-align:right;" class="cor-az" id="plan-inst">—</td>
@@ -1614,6 +1624,16 @@
                 }
 
                 document.getElementById("plan-injetado").textContent = ei.toFixed(2) + " kWh";
+
+                // Desdobramento do injetado: compensado na própria UC vs crédito p/ rateio
+                if (ei > 0 && cr > 0) {
+                    const compensado = Math.min(ei, cr);
+                    const excedente = Math.max(0, ei - cr);
+                    document.getElementById("linha-compensado").style.display = "table-row";
+                    document.getElementById("plan-compensado").textContent = compensado.toFixed(2) + " kWh";
+                    document.getElementById("linha-rateio-credito").style.display = "table-row";
+                    document.getElementById("plan-rateio-credito").textContent = excedente.toFixed(2) + " kWh";
+                }
 
                 // Consumo Instantâneo — sempre visível
                 if (injetadoMaiorQueGerado) {

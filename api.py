@@ -460,6 +460,15 @@ def gerar_mensagem_consumo(dados: dict, consumo_anterior: float = None) -> str:
             f"Sua casa consumiu {consumo_rede:.1f} kWh da distribuidora."
         )
 
+    if energia_injetada > 0 and consumo_rede > 0:
+        compensado = min(energia_injetada, consumo_rede)
+        excedente = round(max(0.0, energia_injetada - consumo_rede), 1)
+        if excedente > 0:
+            partes.append(
+                f"🔀 Dos {energia_injetada:.1f} kWh injetados, {compensado:.1f} kWh compensaram o consumo "
+                f"desta unidade e {excedente:.1f} kWh viraram crédito para rateio/saldo."
+            )
+
     if consumo_total > 0 and consumo_rede > 0:
         partes.append(
             f"📊 Consumo total da casa: {consumo_total:.1f} kWh "
