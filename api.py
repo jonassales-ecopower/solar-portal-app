@@ -74,6 +74,19 @@ def inicializar_banco():
                 UNIQUE (beneficiario_id, mes_referencia)
             )
         """)
+        # Migração: tabelas criadas por versões antigas não têm o UNIQUE acima
+        # (CREATE TABLE IF NOT EXISTS não altera tabela existente) e o upsert
+        # ON CONFLICT (beneficiario_id, mes_referencia) falha sem ele.
+        # Remove duplicatas mantendo a mais recente e cria o índice único.
+        cur.execute("""
+            DELETE FROM contas_beneficiario a USING contas_beneficiario b
+            WHERE a.id < b.id AND a.beneficiario_id = b.beneficiario_id
+              AND a.mes_referencia IS NOT DISTINCT FROM b.mes_referencia
+        """)
+        cur.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS contas_beneficiario_unico
+            ON contas_beneficiario (beneficiario_id, mes_referencia)
+        """)
         conn.commit()
     except Exception:
         conn.rollback()
