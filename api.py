@@ -222,9 +222,14 @@ REGRAS CRÍTICAS DE EXTRAÇÃO:
 6. CONSUMO DA REDE (kWh): Mesmo valor que consumo_bruto_kwh.
 
 7. ENERGIA INJETADA (kWh): SEMPRE em kWh, nunca em R$.
-   Tabela medidores linha "Energia injetada": campo "Consumo kWh" ou "FATURADO".
-   Exemplo: "Energia injetada Ponta | 7321 | 8016 | 1 | 695" → energia_injetada_kwh = 695.
-   Exemplo: "Energia injetada Ponta | 8016 | 8350 | 1 | 334" → energia_injetada_kwh = 334.
+   Na tabela de medidores, localize a linha "Energia injetada".
+   O formato é: Medidor | Grandeza | Postos | Leitura_Anterior | Leitura_Atual | Constante | Consumo_kWh
+   O valor correto é o ÚLTIMO campo (Consumo_kWh = Leitura_Atual − Leitura_Anterior × Constante).
+   NUNCA use Leitura_Anterior nem Leitura_Atual como resposta — esses são os contadores acumulados do medidor.
+   ATENÇÃO: leituras acumuladas como 5681 ou 6411 NÃO são energia injetada. A diferença (730) é o valor correto.
+   Exemplo: "N620... Energia injetada Ponta 5681 6411 1 730" → energia_injetada_kwh = 730 (NÃO 5681, NÃO 6411)
+   Exemplo: "Energia injetada Ponta | 7321 | 8016 | 1 | 695" → energia_injetada_kwh = 695
+   Exemplo: "Energia injetada Ponta | 8016 | 8350 | 1 | 334" → energia_injetada_kwh = 334
 
 8. SALDO ACUMULADO (kWh): Campo "Saldo Acumulado". Se zero, retornar 0.
 
@@ -283,14 +288,16 @@ CAMPOS A EXTRAIR:
 
 1. MÊS DE REFERÊNCIA: Campo "REF: MÊS / ANO" impresso na fatura. Ex: "Maio / 2026".
 
-2. CRÉDITOS RECEBIDOS (kWh): Energia recebida via rateio/compensação de GD.
-   Procure por linhas como:
-   - "Energia Recebida em Transferência"
-   - "GD Energia Recebida"
-   - "Compensação GD"
-   - "Energia Cedida" ou "Energia Transferida"
-   - Qualquer linha indicando créditos recebidos de outra UC via compensação.
-   Se não encontrar nenhum crédito de GD recebido, retornar 0.
+2. CRÉDITOS RECEBIDOS (kWh): Energia recebida via rateio da UC geradora NESTE MÊS.
+   Procure pela linha que contenha "oUC" (origem UC) — representa créditos do mês atual enviados pela geradora.
+   Padrões comuns na Energisa:
+   - "Energia Atv Injetada GDII oUC 6/2026 mPT" → use o valor em kWh DESTA linha (ex: 45 ou 180 kWh)
+   - "Energia Atv Injetada GDII oUC" → créditos do mês atual = valor kWh desta linha
+   IGNORE linhas com "mUC" — são compensações de saldos de MESES ANTERIORES, não créditos novos recebidos.
+   IGNORE linhas com "Ajuste GDII" — é apenas diferença tarifária em R$, não representa kWh recebidos.
+   IGNORE linhas com "Ajuste GDII - TRF Reduzida" — idem, ajuste tarifário, não kWh.
+   Outros padrões possíveis: "Energia Recebida em Transferência", "GD Energia Recebida", "Compensação GD".
+   Se não encontrar nenhuma linha "oUC" ou equivalente, retornar 0.
 
 3. CONSUMO BRUTO (kWh): Leitura real do medidor no período (Leitura Atual - Leitura Anterior × Constante).
 
@@ -2034,7 +2041,7 @@ def resumo_rateio(cliente_id: int, integrador: dict = Depends(obter_integrador_a
                       "distribuidora": r[3], "percentual": float(r[4])} for r in cur.fetchall()]
 
     cur.execute("""
-        SELECT mes_referencia, energia_injetada_kwh, consumo_bruto_kwh, consumo_kwh
+        SELECT mes_referencia, energia_injetada_kwh, consumo_bruto_kwh
         FROM contas WHERE cliente_id=%s AND energia_injetada_kwh IS NOT NULL
         ORDER BY criado_em ASC
     """, (cliente_id,))
@@ -2044,9 +2051,11 @@ def resumo_rateio(cliente_id: int, integrador: dict = Depends(obter_integrador_a
     for c in contas:
         mes_ref = c[0]
         injetado = float(c[1] or 0)
+        consumo_geradora = float(c[2] or 0)
+        surplus = round(max(0.0, injetado - consumo_geradora), 2)
         dist = []
         for b in beneficiarios:
-            kwh = round(injetado * b["percentual"] / 100, 2)
+            kwh = round(surplus * b["percentual"] / 100, 2)
             cur.execute("""
                 SELECT creditos_recebidos_kwh, consumo_kwh, saldo_resultante_kwh, valor_fatura
                 FROM contas_beneficiario WHERE beneficiario_id=%s AND mes_referencia=%s
@@ -2064,7 +2073,13 @@ def resumo_rateio(cliente_id: int, integrador: dict = Depends(obter_integrador_a
                 "saldo_resultante_kwh": float(conta_ben[2] or 0) if conta_ben else None,
                 "valor_fatura": float(conta_ben[3] or 0) if conta_ben else None,
             })
-        meses.append({"mes_referencia": mes_ref, "injetado_kwh": injetado, "distribuicao": dist})
+        meses.append({
+            "mes_referencia": mes_ref,
+            "injetado_kwh": injetado,
+            "consumo_geradora_kwh": consumo_geradora,
+            "surplus_kwh": surplus,
+            "distribuicao": dist,
+        })
 
     cur.close()
     conn.close()
@@ -2142,7 +2157,7 @@ def rateio_publico(cliente_id: int):
         return {"beneficiarios": [], "meses": []}
 
     cur.execute("""
-        SELECT mes_referencia, energia_injetada_kwh
+        SELECT mes_referencia, energia_injetada_kwh, consumo_bruto_kwh
         FROM contas WHERE cliente_id=%s AND energia_injetada_kwh IS NOT NULL
         ORDER BY criado_em ASC
     """, (cliente_id,))
@@ -2152,9 +2167,12 @@ def rateio_publico(cliente_id: int):
     for c in contas:
         mes_ref = c[0]
         injetado = float(c[1] or 0)
+        consumo_geradora = float(c[2] or 0)
+        # Surplus = o que sobra após cobrir o consumo da própria geradora
+        surplus = round(max(0.0, injetado - consumo_geradora), 2)
         dist = []
         for b in beneficiarios:
-            calculado = round(injetado * b["percentual"] / 100, 2)
+            calculado = round(surplus * b["percentual"] / 100, 2)
             cur.execute("""
                 SELECT creditos_recebidos_kwh, consumo_kwh, consumo_bruto_kwh,
                        saldo_anterior_kwh, saldo_resultante_kwh, valor_fatura
@@ -2182,7 +2200,13 @@ def rateio_publico(cliente_id: int):
                 "conta": conta_b,
                 "status": status,
             })
-        meses.append({"mes_referencia": mes_ref, "injetado_kwh": injetado, "distribuicao": dist})
+        meses.append({
+            "mes_referencia": mes_ref,
+            "injetado_kwh": injetado,
+            "consumo_geradora_kwh": consumo_geradora,
+            "surplus_kwh": surplus,
+            "distribuicao": dist,
+        })
 
     cur.close()
     conn.close()
