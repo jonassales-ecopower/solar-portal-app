@@ -1665,6 +1665,7 @@
             document.getElementById("resultado-conta").style.display = "block";
             mostrarResumoInicio(c);
             await buscarHistoricoContas();
+            await buscarRateio();
         } catch(e) {
             alert("Erro ao processar a conta. Tente novamente.");
         } finally {
