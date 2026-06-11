@@ -299,7 +299,9 @@ CAMPOS A EXTRAIR:
    Outros padrões possíveis: "Energia Recebida em Transferência", "GD Energia Recebida", "Compensação GD".
    Se não encontrar nenhuma linha "oUC" ou equivalente, retornar 0.
 
-3. CONSUMO BRUTO (kWh): Leitura real do medidor no período (Leitura Atual - Leitura Anterior × Constante).
+3. CONSUMO BRUTO (kWh): Resultado da conta: (Leitura_Atual − Leitura_Anterior) × Constante.
+   NUNCA use Leitura_Atual ou Leitura_Anterior diretamente — esses são os acumulados do medidor.
+   Use somente a diferença calculada (tipicamente entre 100 e 600 kWh para uma residência).
 
 4. CONSUMO FATURADO (kWh): Consumo após dedução dos créditos GD. Valor final cobrado.
 
