@@ -265,6 +265,23 @@ def extrair_mes_referencia(texto):
     """
     return normalizar_mes_referencia(texto)
 
+def extrair_datas_leitura(texto):
+    """
+    Extrai as datas de leitura direto do texto da fatura.
+    Âncora (página 2, Energisa): 'Leitura Anterior:05/05/2026 Leitura Atual: 05/06/2026 Dias: 31'
+    Essas datas definem o período exato para somar a geração do inversor —
+    a conta cobre leitura a leitura (ex.: 13/04 a 14/05), não o mês-calendário.
+
+    Retorna (anterior, atual) em DD/MM/AAAA, ou (None, None) se não encontrar.
+    """
+    m = re.search(
+        r'Leitura\s+Anterior:\s*(\d{2}/\d{2}/\d{4})\s+Leitura\s+Atual:\s*(\d{2}/\d{2}/\d{4})',
+        texto
+    )
+    if m:
+        return m.group(1), m.group(2)
+    return None, None
+
 # ==================== IA ====================
 
 def analisar_conta(texto_pdf):
@@ -677,7 +694,13 @@ def foxess_get_diario(api_key: str, serial: str, ano: int, mes: int) -> list:
     return []
 
 def foxess_get_geracao_periodo(api_key: str, serial: str, data_inicio: date, data_fim: date) -> float:
-    """Soma a geração real da FoxESS dia a dia para o período exato de faturamento."""
+    """
+    Soma a geração real da FoxESS dia a dia para o período exato de faturamento.
+
+    Intervalo: [data_inicio, data_fim) — inclui o dia da leitura anterior e exclui
+    o dia da leitura atual. Assim o total cobre exatamente os "Dias: N" da fatura
+    e o dia da leitura atual entra apenas na conta seguinte (sem dupla contagem).
+    """
     meses = set()
     d = data_inicio
     while d <= data_fim:
@@ -690,7 +713,7 @@ def foxess_get_geracao_periodo(api_key: str, serial: str, data_inicio: date, dat
     for ano, mes in sorted(meses):
         for item in foxess_get_diario(api_key, serial, ano, mes):
             item_date = date.fromisoformat(item["data"])
-            if data_inicio <= item_date <= data_fim:
+            if data_inicio <= item_date < data_fim:
                 total += item["total_kwh"]
     return round(total, 2)
 
@@ -1325,6 +1348,11 @@ async def upload_conta(cliente_id: int, arquivo: UploadFile = File(...)):
             dados["mes_referencia"] = mes_rx
         else:
             dados["mes_referencia"] = normalizar_mes_referencia(dados.get("mes_referencia")) or dados.get("mes_referencia")
+        # Datas de leitura definem o período exato da soma de geração do inversor
+        ant_rx, atu_rx = extrair_datas_leitura(texto)
+        if ant_rx and atu_rx:
+            dados["leitura_anterior_data"] = ant_rx
+            dados["leitura_atual_data"] = atu_rx
 
         conn = conectar_banco()
         cur = conn.cursor()
@@ -1364,7 +1392,8 @@ async def upload_conta(cliente_id: int, arquivo: UploadFile = File(...)):
                     if ant_str and atu_str and ant_str != "DD/MM/AAAA" and atu_str != "DD/MM/AAAA":
                         data_ant = datetime.strptime(ant_str, "%d/%m/%Y").date()
                         data_atu = datetime.strptime(atu_str, "%d/%m/%Y").date()
-                        registros = buscar_geracao_periodo(cliente_id, data_ant, data_atu)
+                        # [data_ant, data_atu) — mesma convenção de foxess_get_geracao_periodo
+                        registros = buscar_geracao_periodo(cliente_id, data_ant, data_atu - timedelta(days=1))
                         g = sum(r["total_kwh"] for r in registros)
                         if g > 0:
                             geracao_total_kwh = g
