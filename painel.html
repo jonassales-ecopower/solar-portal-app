@@ -500,6 +500,14 @@
                     </select>
                     <button class="verde pequeno" onclick="imprimirRelatorioCliente()">🖨️ Exportar PDF</button>
                 </div>
+                <div class="sel-campo" style="margin-top:8px;">
+                    <label>Relatório p/ Cliente</label>
+                    <select id="rel-sel-conta">
+                        <option value="">— Mês da conta —</option>
+                    </select>
+                    <button class="verde pequeno" onclick="gerarRelatorioConta()">📄 Relatório da Conta (PDF)</button>
+                    <span style="font-size:11px;color:#64748b;margin-left:6px;">Resumo visual da análise da conta, em linguagem simples, para enviar ao cliente</span>
+                </div>
                 <div id="rel-cliente-kpis" class="rel-kpi-row"></div>
                 <div id="rel-cliente-charts">
                     <div class="empty-state"><div class="e-icon">👤</div><p>Selecione um cliente acima</p></div>
@@ -2031,6 +2039,7 @@ async function carregarRelatorioCliente() {
     if (!clienteId) {
         kpisEl.innerHTML = '';
         chartsEl.innerHTML = '<div class="empty-state"><div class="e-icon">👤</div><p>Selecione um cliente acima</p></div>';
+        document.getElementById('rel-sel-conta').innerHTML = '<option value="">— Mês da conta —</option>';
         return;
     }
     chartsEl.innerHTML = '<div class="empty-state"><div class="e-icon"><span class="spin">⟳</span></div><p>Carregando...</p></div>';
@@ -2049,6 +2058,13 @@ async function carregarRelatorioCliente() {
 function renderRelatorioCliente(clienteId, rMensal, rContas, rEsperado, periodo) {
     const tarifa = rEsperado.tarifa_kwh || 0;
     const consumoAntes = rEsperado.consumo_medio_antes_kwh || 0;
+
+    // Alimenta o seletor do Relatório da Conta (PDF p/ cliente)
+    _relContasCliente = rContas || [];
+    _relTarifaCliente = tarifa;
+    document.getElementById('rel-sel-conta').innerHTML =
+        '<option value="">— Mês da conta —</option>' +
+        _relContasCliente.map(c => `<option value="${c.id}">${c.mes_referencia || 'Sem mês'}</option>`).join('');
 
     // Pega os últimos N meses de geração
     const mensal = (rMensal.mensal || []).slice(-periodo);
@@ -2140,6 +2156,194 @@ function imprimirRelatorioCliente() {
         <body><h1>☀️ Relatório Solar — ${nome}</h1><p>Gerado em ${new Date().toLocaleDateString('pt-BR')}</p>${conteudo}</body></html>`);
     janela.document.close();
     setTimeout(() => { janela.print(); }, 600);
+}
+
+// ---- RELATÓRIO DA CONTA (PDF visual para o cliente leigo) ----
+let _relContasCliente = [];
+let _relTarifaCliente = 0;
+
+async function gerarRelatorioConta() {
+    const clienteId = document.getElementById('rel-sel-cliente').value;
+    const contaId = document.getElementById('rel-sel-conta').value;
+    if (!clienteId) { alert('Selecione um cliente primeiro'); return; }
+    if (!contaId) { alert('Selecione o mês da conta'); return; }
+    const conta = _relContasCliente.find(c => String(c.id) === contaId);
+    if (!conta) { alert('Conta não encontrada. Recarregue o relatório do cliente.'); return; }
+    const nomeCliente = document.getElementById('rel-sel-cliente').selectedOptions[0].text;
+
+    // Rateio do mês (se o cliente tiver beneficiárias)
+    let rateioMes = null;
+    try {
+        const r = await fetch(`${API}/clientes/${clienteId}/rateio`);
+        if (r.ok) {
+            const d = await r.json();
+            rateioMes = (d.meses || []).find(m => m.mes_referencia === conta.mes_referencia) || null;
+        }
+    } catch(e) {}
+
+    const janela = window.open('', '_blank');
+    janela.document.write(_htmlRelatorioConta(nomeCliente, conta, rateioMes, _relTarifaCliente));
+    janela.document.close();
+    setTimeout(() => { janela.print(); }, 700);
+}
+
+function _htmlRelatorioConta(nomeCliente, c, rateioMes, tarifa) {
+    const num = v => parseFloat(v) || 0;
+    const fmt = v => num(v).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+    const rs  = v => num(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const gerado       = num(c.geracao_total_kwh);
+    const injetado     = num(c.energia_injetada_kwh);
+    const consumoRede  = num(c.consumo_bruto_kwh) || num(c.consumo_kwh);
+    const instantaneo  = num(c.consumo_instantaneo_kwh);
+    const consumoTotal = num(c.consumo_total_kwh) || (consumoRede + instantaneo);
+    const compensado   = Math.min(injetado, consumoRede);
+    const excedente    = Math.max(0, injetado - consumoRede);
+    const saldo        = num(c.saldo_acumulado_kwh);
+    const fatura       = num(c.valor_fatura);
+    const economia     = tarifa > 0 ? (instantaneo + compensado) * tarifa : 0;
+    const sup          = c.status_sistema === 'SUPERAVITÁRIO';
+    const hoje         = new Date().toLocaleDateString('pt-BR');
+    const temFluxo     = gerado > 0 && injetado <= gerado;
+
+    const banner = sup
+        ? `<div class="banner vd">✅ <strong>Mês positivo!</strong> Sua energia solar cobriu o consumo desta unidade e ainda gerou créditos.</div>`
+        : `<div class="banner am">☁️ Neste mês, o consumo foi maior que a energia enviada à rede — a diferença veio da distribuidora. Isso é normal em meses de maior consumo ou menos sol.</div>`;
+
+    const cards = [
+        gerado > 0   ? `<div class="kard vd"><div class="kv">${fmt(gerado)}</div><div class="ku">kWh</div><div class="kl">☀️ Gerado pelos painéis</div></div>` : '',
+        economia > 0 ? `<div class="kard am"><div class="kv">R$ ${rs(economia)}</div><div class="ku">&nbsp;</div><div class="kl">💰 Economia estimada no mês</div></div>` : '',
+        `<div class="kard az"><div class="kv">${fmt(consumoTotal)}</div><div class="ku">kWh</div><div class="kl">🏠 Consumo total da casa</div></div>`,
+        `<div class="kard ci"><div class="kv">R$ ${rs(fatura)}</div><div class="ku">&nbsp;</div><div class="kl">📄 Valor da fatura</div></div>`,
+    ].filter(Boolean).join('');
+
+    const fluxo = temFluxo ? `
+        <div class="sec">⚡ Para onde foi a energia que você gerou?</div>
+        <div class="fx-top">☀️ Seus painéis geraram <strong>${fmt(gerado)} kWh</strong></div>
+        <div class="fx-item az">🏠 <strong>${fmt(instantaneo)} kWh</strong> foram usados na sua casa na hora em que foram gerados — energia que você não comprou da rede</div>
+        <div class="fx-item vd">🔌 <strong>${fmt(injetado)} kWh</strong> sobraram e foram enviados à distribuidora, virando créditos:</div>
+        <div class="fx-sub">✔️ <strong>${fmt(compensado)} kWh</strong> abateram o consumo desta conta</div>
+        ${excedente > 0 ? `<div class="fx-sub">➜ <strong>${fmt(excedente)} kWh</strong> viraram crédito para suas outras unidades ou saldo</div>` : ''}
+    ` : '';
+
+    let rateioHtml = '';
+    if (rateioMes && rateioMes.distribuicao && rateioMes.distribuicao.length) {
+        const stMap = {
+            compensado:    ['✅', 'Recebido corretamente', '#16a34a'],
+            parcial:       ['⚠️', 'Recebido parcialmente', '#d97706'],
+            nao_compensado:['❌', 'Não recebido — verificar', '#dc2626'],
+            aguardando:    ['📄', 'Aguardando conta da unidade', '#2563eb'],
+            sem_excedente: ['⚡', 'Sem excedente neste mês', '#64748b'],
+        };
+        const linhas = rateioMes.distribuicao.map(d => {
+            const st = stMap[d.status] || stMap.aguardando;
+            const naConta = d.conta ? `${fmt(d.conta.creditos_recebidos_kwh)} kWh` : '—';
+            return `<tr>
+                <td><strong>${d.nome}</strong> <span class="mut">(${d.percentual}%)</span></td>
+                <td class="dir">${fmt(d.creditos_calculados_kwh)} kWh</td>
+                <td class="dir">${naConta}</td>
+                <td><span style="color:${st[2]};font-weight:700;">${st[0]} ${st[1]}</span></td>
+            </tr>`;
+        }).join('');
+        rateioHtml = `
+            <div class="sec">🔀 Créditos enviados às suas outras unidades</div>
+            <table class="tab">
+                <thead><tr><th>Unidade</th><th class="dir">Crédito calculado</th><th class="dir">Na conta dela</th><th>Situação</th></tr></thead>
+                <tbody>${linhas}</tbody>
+            </table>`;
+    }
+
+    return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<title>Relatório Solar — ${nomeCliente} — ${c.mes_referencia || ''}</title>
+<style>
+    @page { size: A4; margin: 11mm; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', sans-serif; color: #1e293b; font-size: 13px;
+           -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .topo { background: linear-gradient(135deg, #1e293b, #334155); color: white; border-radius: 12px;
+            padding: 18px 22px; display: flex; justify-content: space-between; align-items: center; }
+    .topo h1 { font-size: 19px; }
+    .topo .sub { font-size: 12px; opacity: .75; margin-top: 3px; }
+    .topo .mes { text-align: right; }
+    .topo .mes .m { font-size: 17px; font-weight: 800; color: #fbbf24; }
+    .topo .mes .d { font-size: 11px; opacity: .7; margin-top: 2px; }
+    .banner { border-radius: 10px; padding: 12px 16px; margin-top: 12px; font-size: 13.5px; line-height: 1.5; }
+    .banner.vd { background: #dcfce7; color: #14532d; }
+    .banner.am { background: #fef3c7; color: #713f12; }
+    .kards { display: flex; gap: 10px; margin-top: 12px; }
+    .kard { flex: 1; border-radius: 10px; padding: 13px 8px; text-align: center; background: #f8fafc; border-top: 3px solid #cbd5e1; }
+    .kard.vd { border-top-color: #22c55e; background: #f0fdf4; }
+    .kard.am { border-top-color: #f59e0b; background: #fffbeb; }
+    .kard.az { border-top-color: #3b82f6; background: #eff6ff; }
+    .kard.ci { border-top-color: #64748b; }
+    .kard .kv { font-size: 21px; font-weight: 800; }
+    .kard .ku { font-size: 10px; color: #94a3b8; }
+    .kard .kl { font-size: 10.5px; color: #64748b; margin-top: 4px; font-weight: 600; }
+    .sec { font-size: 13px; font-weight: 800; color: #334155; text-transform: uppercase; letter-spacing: .5px;
+           margin: 18px 0 8px; border-bottom: 2px solid #f1f5f9; padding-bottom: 5px; }
+    .fx-top { background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 10px 14px; font-size: 13.5px; }
+    .fx-item { border-radius: 8px; padding: 9px 14px; margin: 6px 0 0 18px; font-size: 12.5px; line-height: 1.45; }
+    .fx-item.az { background: #eff6ff; border-left: 4px solid #3b82f6; }
+    .fx-item.vd { background: #f0fdf4; border-left: 4px solid #22c55e; }
+    .fx-sub { border-radius: 8px; padding: 7px 14px; margin: 5px 0 0 44px; font-size: 12px;
+              background: #f8fafc; border-left: 3px solid #cbd5e1; }
+    .tab { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .tab th { background: #f1f5f9; padding: 7px 10px; text-align: left; color: #64748b; font-size: 10.5px; text-transform: uppercase; }
+    .tab td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; }
+    .tab .dir { text-align: right; }
+    .tab .mut { color: #94a3b8; font-weight: 400; }
+    .tab .expl { color: #94a3b8; font-size: 11px; }
+    .boxinfo { border-radius: 10px; padding: 11px 15px; margin-top: 8px; font-size: 12.5px; line-height: 1.55; }
+    .boxinfo.az { background: #eff6ff; border-left: 4px solid #3b82f6; color: #1e3a8a; }
+    .boxinfo.vd { background: #f0fdf4; border-left: 4px solid #22c55e; color: #14532d; }
+    .boxinfo.am { background: #fffbeb; border-left: 4px solid #f59e0b; color: #713f12; }
+    .rodape { margin-top: 20px; padding-top: 10px; border-top: 1px solid #e2e8f0; display: flex;
+              justify-content: space-between; font-size: 10.5px; color: #94a3b8; }
+</style></head><body>
+    <div class="topo">
+        <div>
+            <h1>☀️ Relatório Mensal de Energia Solar</h1>
+            <div class="sub">${nomeCliente}</div>
+        </div>
+        <div class="mes">
+            <div class="m">${c.mes_referencia || '—'}</div>
+            <div class="d">Análise da conta de energia</div>
+        </div>
+    </div>
+
+    ${banner}
+    <div class="kards">${cards}</div>
+    ${c.leitura_por_media ? `<div class="boxinfo am" style="margin-top:10px;">⚠️ <strong>Atenção:</strong> esta conta veio com leitura pela média (acumulada). Os valores cobrem mais de um mês.</div>` : ''}
+
+    ${fluxo}
+
+    <div class="sec">📊 Balanço completo do período</div>
+    <table class="tab">
+        <thead><tr><th>O quê</th><th class="dir">Quantidade</th><th>O que significa</th></tr></thead>
+        <tbody>
+            ${gerado > 0 ? `<tr><td>☀️ <strong>Gerado pelos painéis</strong></td><td class="dir"><strong>${fmt(gerado)} kWh</strong></td><td class="expl">Toda a energia que seu sistema produziu</td></tr>` : ''}
+            <tr><td>🔌 <strong>Enviado à rede</strong></td><td class="dir"><strong>${fmt(injetado)} kWh</strong></td><td class="expl">Sobra que virou crédito na distribuidora</td></tr>
+            <tr><td style="padding-left:24px;">↳ Abateu esta conta</td><td class="dir">${fmt(compensado)} kWh</td><td class="expl">Crédito usado nesta unidade</td></tr>
+            ${excedente > 0 ? `<tr><td style="padding-left:24px;">↳ Crédito p/ rateio</td><td class="dir">${fmt(excedente)} kWh</td><td class="expl">Foi para suas outras unidades ou saldo</td></tr>` : ''}
+            ${instantaneo > 0 ? `<tr><td>🏠 <strong>Usado na hora</strong></td><td class="dir"><strong>${fmt(instantaneo)} kWh</strong></td><td class="expl">Energia solar consumida direto, sem passar pela rede</td></tr>` : ''}
+            <tr><td>🌙 <strong>Comprado da rede</strong></td><td class="dir"><strong>${fmt(consumoRede)} kWh</strong></td><td class="expl">Período noturno e dias nublados</td></tr>
+            <tr><td>📊 <strong>Consumo total da casa</strong></td><td class="dir"><strong>${fmt(consumoTotal)} kWh</strong></td><td class="expl">Tudo que a casa consumiu no período</td></tr>
+        </tbody>
+    </table>
+
+    ${rateioHtml}
+
+    ${saldo > 0 ? `<div class="sec">🏦 Seus créditos</div>
+    <div class="boxinfo vd">Você tem <strong>${fmt(saldo)} kWh</strong> de créditos acumulados na distribuidora — eles serão usados automaticamente nas próximas contas.</div>` : ''}
+
+    ${c.analise_consumo ? `<div class="sec">💡 Resumo do mês</div>
+    <div class="boxinfo az">${c.analise_consumo}</div>` : ''}
+
+    <div class="rodape">
+        <span>Relatório gerado por <strong>${nomeUsuario || 'seu integrador'}</strong> em ${hoje}</span>
+        <span>☀️ Solar Portal</span>
+    </div>
+</body></html>`;
 }
 
 // ---- DESEMPENHO ----
