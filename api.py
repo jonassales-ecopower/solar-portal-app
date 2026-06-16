@@ -267,8 +267,9 @@ def buscar_hsp_pvgis(cidade: str, latitude: float = None, longitude: float = Non
         # 1. PRIORIDADE 1: Dados específicos de cidade (validados pelo integrador)
         cidade_upper = cidade.upper()
         if cidade_upper in HSP_FALLBACK_CIDADE:
-            print(f"[HSP] Usando dados validados de cidade: {cidade_upper}")
-            return HSP_FALLBACK_CIDADE[cidade_upper]
+            resultado = HSP_FALLBACK_CIDADE[cidade_upper]
+            print(f"[HSP] ✓ USANDO EXTREMA: {resultado} (maio={resultado[4]})")
+            return resultado
 
         # 2. PRIORIDADE 2: Tenta APIs externas (dados genéricos)
         apis = [
@@ -1362,14 +1363,19 @@ def validar_cidade(cidade: str, latitude: float = None, longitude: float = None,
         media_anual = round(sum(hsp_mensal) / 12, 2)
 
         # 3. Salva no banco para próximas requisições
-        cur.execute(
-            """INSERT INTO cidades_hsp (nome_cidade, latitude, longitude, hsp_mensal, media_anual)
-               VALUES (%s, %s, %s, %s, %s)
-               ON CONFLICT (nome_cidade) DO UPDATE SET
-               hsp_mensal = EXCLUDED.hsp_mensal, atualizado_em = NOW()""",
-            (cidade, latitude, longitude, json.dumps(hsp_mensal), media_anual)
-        )
-        conn.commit()
+        try:
+            cur.execute(
+                """INSERT INTO cidades_hsp (nome_cidade, latitude, longitude, hsp_mensal, media_anual)
+                   VALUES (%s, %s, %s, %s, %s)
+                   ON CONFLICT (nome_cidade) DO UPDATE SET
+                   hsp_mensal = EXCLUDED.hsp_mensal, atualizado_em = NOW()""",
+                (cidade, latitude, longitude, json.dumps(hsp_mensal), media_anual)
+            )
+            conn.commit()
+            print(f"[VALIDAR] Salvo em BD: {cidade} com HSP maio={hsp_mensal[4]}")
+        except Exception as e:
+            print(f"[VALIDAR] ERRO ao salvar {cidade}: {e}")
+            conn.rollback()
 
         return {
             "cidade": cidade,
