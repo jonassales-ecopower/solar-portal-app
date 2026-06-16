@@ -580,6 +580,16 @@
         <div class="mc-panel" id="mcpanel-projeto">
             <div class="grid-2">
                 <div class="campo"><label>Potência do sistema (kWp) *</label><input type="number" id="mc-potencia" placeholder="Ex: 5.5" step="0.1"></div>
+                <div class="campo"><label>Cidade (para irradiância solar)</label>
+                    <div style="display:flex;gap:6px;">
+                        <input type="text" id="mc-cidade" placeholder="Ex: EXTREMA - MG" style="flex:1;">
+                        <button class="amarelo pequeno" onclick="mcValidarCidade()" style="white-space:nowrap;">✓ Validar</button>
+                    </div>
+                    <p class="info" id="mc-hsp-info" style="display:none;margin-top:4px;font-size:11px;"></p>
+                    <p class="erro" id="mc-cidade-erro" style="margin-top:4px;"></p>
+                </div>
+            </div>
+            <div class="grid-2">
                 <div class="campo"><label>Data de instalação</label><input type="date" id="mc-data-inst"></div>
                 <div class="campo">
                     <label>Tarifa de energia (R$/kWh)</label>
@@ -1636,7 +1646,7 @@ function mcTab(aba) {
 function mcLimpar() {
     ['mc-nome','mc-email','mc-telefone','mc-uc','mc-distribuidora','mc-tipo-gd',
      'mc-potencia','mc-data-inst','mc-tarifa','mc-consumo-antes','mc-endereco','mc-lat','mc-lng',
-     'mc-serial','mc-apikey','mc-foxess-apikey','mc-deye-app-id','mc-deye-app-secret',
+     'mc-cidade','mc-serial','mc-apikey','mc-foxess-apikey','mc-deye-app-id','mc-deye-app-secret',
      'mc-senha','mc-senha2'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
     document.getElementById('mc-pr').value = '0.80';
     document.getElementById('mc-marca').value = '';
@@ -1647,6 +1657,8 @@ function mcLimpar() {
     document.getElementById('mc-instrucoes-api').innerHTML = '';
     document.getElementById('mc-endereco-ok').style.display = 'none';
     document.getElementById('mc-endereco-erro').textContent = '';
+    document.getElementById('mc-cidade-erro').textContent = '';
+    document.getElementById('mc-hsp-info').style.display = 'none';
     document.getElementById('mc-foxess-erro').textContent = '';
     document.getElementById('mc-link-box').style.display = 'none';
     document.getElementById('mc-sucesso').style.display = 'none';
@@ -1685,6 +1697,7 @@ async function editarCliente(clienteId) {
         if (d.performance_ratio) document.getElementById('mc-pr').value = d.performance_ratio;
         if (d.tarifa_kwh) document.getElementById('mc-tarifa').value = d.tarifa_kwh;
         if (d.consumo_medio_antes_kwh) document.getElementById('mc-consumo-antes').value = d.consumo_medio_antes_kwh;
+        if (d.cidade) document.getElementById('mc-cidade').value = d.cidade;
         if (d.latitude) document.getElementById('mc-lat').value = d.latitude;
         if (d.longitude) document.getElementById('mc-lng').value = d.longitude;
         if (d.marca_inversor) {
@@ -1725,7 +1738,7 @@ async function salvarModalCliente() {
         } else {
             const resp = await fetch(`${API}/clientes/${clienteId}`, {
                 method:'PUT', headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},
-                body: JSON.stringify({nome, email: document.getElementById('mc-email').value, telefone: document.getElementById('mc-telefone').value, numero_uc: document.getElementById('mc-uc').value, distribuidora: document.getElementById('mc-distribuidora').value, tipo_gd: document.getElementById('mc-tipo-gd').value})
+                body: JSON.stringify({nome, email: document.getElementById('mc-email').value, telefone: document.getElementById('mc-telefone').value, numero_uc: document.getElementById('mc-uc').value, distribuidora: document.getElementById('mc-distribuidora').value, tipo_gd: document.getElementById('mc-tipo-gd').value, cidade: document.getElementById('mc-cidade').value.trim()})
             });
             if (!resp.ok) { const d = await resp.json(); document.getElementById('mc-erro').textContent = d.detail||'Erro ao atualizar cliente'; return; }
         }
@@ -1828,6 +1841,40 @@ async function mcBuscarCoordenadas() {
         } catch(e) { continue; }
     }
     document.getElementById('mc-endereco-erro').textContent = 'Endereço não encontrado. Insira as coordenadas manualmente.';
+}
+
+async function mcValidarCidade() {
+    const cidade = document.getElementById('mc-cidade').value.trim();
+    const erroEl = document.getElementById('mc-cidade-erro');
+    const infoEl = document.getElementById('mc-hsp-info');
+    erroEl.textContent = '';
+    infoEl.style.display = 'none';
+
+    if (!cidade) {
+        erroEl.textContent = 'Digite o nome da cidade';
+        return;
+    }
+
+    try {
+        const resp = await fetch(`${API}/validar-cidade?cidade=${encodeURIComponent(cidade)}`, {
+            headers: {"Authorization": `Bearer ${token}`}
+        });
+        const data = await resp.json();
+
+        if (!resp.ok) {
+            erroEl.textContent = data.detail || 'Erro ao validar cidade';
+            return;
+        }
+
+        // Mostra o HSP mensal validado
+        const hsp = data.hsp_mensal;
+        const media = data.media_anual;
+        const fonte = data.fonte === 'pvgis' ? '🌐 PVGIS' : '💾 Cache';
+        infoEl.innerHTML = `✅ ${fonte} | HSP médio: ${media.toFixed(2)} kWh/m²/dia | Meses: ${hsp.map(h => h.toFixed(1)).join(', ')}`;
+        infoEl.style.display = 'block';
+    } catch(e) {
+        erroEl.textContent = 'Erro ao validar cidade: ' + e.message;
+    }
 }
 
 function mcAtualizarInstrucoes() {
