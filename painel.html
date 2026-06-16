@@ -1764,9 +1764,27 @@ async function salvarModalCliente() {
             if (!resp.ok) { const d = await resp.json(); document.getElementById('mc-erro').textContent = d.detail||'Erro ao criar cliente'; return; }
             const d = await resp.json(); clienteId = d.id;
         } else {
+            // Lê os 12 campos de geração esperada (JAN-DEZ) ANTES de fazer o primeiro PUT
+            let geracaoEsperada = null;
+            const valores = [];
+            for (let i = 1; i <= 12; i++) {
+                const val = document.getElementById(`mc-ger-${i.toString().padStart(2,'0')}`).value.trim();
+                if (val) {
+                    const num = parseFloat(val);
+                    if (!isNaN(num)) valores.push(num);
+                }
+            }
+            // Se tem 12 valores válidos, envia
+            if (valores.length === 12) {
+                geracaoEsperada = JSON.stringify(valores);
+            }
+
+            const clienteData = {nome, email: document.getElementById('mc-email').value, telefone: document.getElementById('mc-telefone').value, numero_uc: document.getElementById('mc-uc').value, distribuidora: document.getElementById('mc-distribuidora').value, tipo_gd: document.getElementById('mc-tipo-gd').value, cidade: document.getElementById('mc-cidade').value.trim()};
+            if (geracaoEsperada) clienteData.geracao_esperada_mensal = geracaoEsperada;
+
             const resp = await fetch(`${API}/clientes/${clienteId}`, {
                 method:'PUT', headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},
-                body: JSON.stringify({nome, email: document.getElementById('mc-email').value, telefone: document.getElementById('mc-telefone').value, numero_uc: document.getElementById('mc-uc').value, distribuidora: document.getElementById('mc-distribuidora').value, tipo_gd: document.getElementById('mc-tipo-gd').value, cidade: document.getElementById('mc-cidade').value.trim()})
+                body: JSON.stringify(clienteData)
             });
             if (!resp.ok) { const d = await resp.json(); document.getElementById('mc-erro').textContent = d.detail||'Erro ao atualizar cliente'; return; }
         }
@@ -1776,7 +1794,7 @@ async function salvarModalCliente() {
         const lat = parseFloat(document.getElementById('mc-lat').value);
         const lng = parseFloat(document.getElementById('mc-lng').value);
 
-        // Lê os 12 campos de geração esperada (JAN-DEZ)
+        // Lê os 12 campos de geração esperada (JAN-DEZ) para projeto também
         let geracaoEsperada = null;
         const valores = [];
         for (let i = 1; i <= 12; i++) {
