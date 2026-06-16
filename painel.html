@@ -615,8 +615,12 @@
             <div class="campo">
                 <label style="color:#7c3aed;font-weight:700;">📊 Geração Esperada Mensal (kWh) — MÉTODO 1 (Preferencial)</label>
                 <p style="font-size:11px;color:#666;margin-bottom:8px;">⭐ Cole os 12 valores de JANEIRO a DEZEMBRO da proposta. Se preenchido, substitui o cálculo por HSP e garante 100% alinhamento.</p>
-                <textarea id="mc-geracao-esperada" placeholder="Cola os 12 valores (jan-dez), separados por vírgula, linha ou espaço:&#10;&#10;709.84,689.13,647.88,590.49,506.45,456.23,488.94,623.64,621.77,712.54,707.8,782.58&#10;&#10;ou linha por linha:&#10;709.84&#10;689.13&#10;647.88&#10;..." style="font-family:monospace;font-size:12px;height:100px;"></textarea>
-                <p style="font-size:11px;color:#888;margin-top:4px;">✓ Aceita: 709.84,689,13,... ou 709.84 689.13 648... ou um valor por linha.</p>
+                <div style="display:flex;gap:8px;margin-bottom:8px;">
+                    <input type="file" id="mc-pdf-proposta" accept=".pdf" placeholder="Ou selecione PDF da proposta" style="flex:1;">
+                    <button class="azul pequeno" onclick="mcExtrairDosPDF()" style="white-space:nowrap;">📄 Extrair PDF</button>
+                </div>
+                <textarea id="mc-geracao-esperada" placeholder="Cole os 12 valores (jan-dez), separados por vírgula, linha ou espaço:&#10;&#10;709.84,689.13,647.88,590.49,506.45,456.23,488.94,623.64,621.77,712.54,707.8,782.58&#10;&#10;ou linha por linha:&#10;709.84&#10;689.13&#10;647.88&#10;...&#10;&#10;ou extraia do PDF acima" style="font-family:monospace;font-size:12px;height:100px;"></textarea>
+                <p style="font-size:11px;color:#888;margin-top:4px;">✓ Aceita: valores manual (vírgula/linha/espaço separado) ou upload de PDF da proposta.</p>
             </div>
             <div class="campo">
                 <label>Endereço da instalação</label>
@@ -1889,6 +1893,38 @@ async function mcValidarCidade() {
     }
 }
 
+
+async function mcExtrairDosPDF() {
+    const fileInput = document.getElementById('mc-pdf-proposta');
+    const file = fileInput.files[0];
+    if (!file) {
+        alert('Selecione um arquivo PDF');
+        return;
+    }
+
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const resp = await fetch(`${API}/extrair-geracao-pdf`, {
+            method: 'POST',
+            headers: {"Authorization": `Bearer ${token}`},
+            body: formData
+        });
+        const data = await resp.json();
+
+        if (!resp.ok) {
+            alert('Erro ao extrair: ' + (data.detail || 'Tente com outro PDF'));
+            return;
+        }
+
+        // Preenche o textarea com os valores extraídos
+        document.getElementById('mc-geracao-esperada').value = data.valores.join(',');
+        alert('✓ Extraído com sucesso:\n' + data.valores.join(', ') + '\n\nRevise antes de salvar!');
+    } catch(e) {
+        alert('Erro: ' + e.message);
+    }
+}
 
 function mcAtualizarInstrucoes() {
     const marca = document.getElementById('mc-marca').value;

@@ -8,6 +8,8 @@ import secrets
 import asyncio
 import psycopg2
 import requests
+import io
+import PyPDF2
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, date
 from calendar import monthrange
@@ -1365,6 +1367,52 @@ def limpar_cache_cidade(cidade: str, integrador: dict = Depends(obter_integrador
     cur.close()
     conn.close()
     return {"cidade": cidade, "deletados": deletados}
+
+@app.post("/extrair-geracao-pdf")
+def extrair_geracao_pdf(file: UploadFile = File(...), integrador: dict = Depends(obter_integrador_atual)):
+    """
+    Extrai os 12 valores mensais de geração de um PDF de proposta.
+    Busca padrões de números (400-800 kWh) organizados mensalmente.
+    """
+    try:
+        import PyPDF2
+        import re
+
+        # Lê o PDF
+        pdf_content = file.file.read()
+        pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
+
+        # Extrai texto de todas as páginas
+        texto_completo = ""
+        for page in pdf_reader.pages:
+            texto_completo += page.extract_text() + "\n"
+
+        # Busca padrões de números que parecem ser geração mensal (400-800 kWh)
+        # Procura por sequências de 12 números separados por vírgula, espaço ou quebra de linha
+        numeros = re.findall(r'(\d{2,3}[.,]\d{1,2}|\d{3,4})', texto_completo)
+
+        # Filtra números na faixa esperada (400-800 kWh) e pega os primeiros 12
+        valores = []
+        for num_str in numeros:
+            num = float(num_str.replace(',', '.'))
+            if 400 <= num <= 800 and len(valores) < 12:
+                valores.append(round(num, 2))
+
+        if len(valores) < 12:
+            raise HTTPException(status_code=400, detail=f"Encontrei apenas {len(valores)} valores, esperava 12. Talvez o PDF não tenha os dados estruturados.")
+
+        return {
+            "valores": valores[:12],
+            "encontrados": len(valores),
+            "fonte": "pdf",
+            "mensagem": "✓ Extraído do PDF. Revise os valores antes de salvar."
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Erro ao extrair PDF: {e}")
+        raise HTTPException(status_code=400, detail=f"Erro ao processar PDF: {str(e)}")
 
 @app.post("/validar-cidade")
 def validar_cidade(cidade: str, latitude: float = None, longitude: float = None,
