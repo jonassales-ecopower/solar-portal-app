@@ -1419,22 +1419,10 @@ def extrair_geracao_ia(dados: dict, integrador: dict = Depends(obter_integrador_
                         },
                         {
                             "type": "text",
-                            "text": """Você é um especialista em leitura de gráficos de geração solar.
+                            "text": """Extraia os valores de geração solar mensal deste gráfico.
 
-TAREFA: Extraia os 12 valores mensais de geração esperada de um gráfico de barras.
-
-INSTRUÇÕES:
-1. Identifique cada barra do gráfico (janeiro a dezembro, da esquerda para direita)
-2. Leia o valor numérico associado a cada barra
-3. Mantenha os decimais se presentes (ex: 736.66, não 736)
-4. Se ver apenas inteiros, use inteiros (ex: 500, não 500.00)
-5. Confira a escala do eixo Y se houver dúvida
-
-RETORNE APENAS JSON (sem explicação, sem markdown):
-{"valores": [janeiro, fevereiro, março, abril, maio, junho, julho, agosto, setembro, outubro, novembro, dezembro]}
-
-EXEMPLO:
-{"valores": [736.66, 693.46, 671.44, 611.96, 524.87, 472.82, 506.72, 646.32, 643.38, 738.45, 733.54, 811.04]}
+Responda APENAS em JSON:
+{"valores": [jan, fev, mar, abr, mai, jun, jul, ago, set, out, nov, dez]}
 """
                         }
                     ]
