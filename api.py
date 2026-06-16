@@ -1645,7 +1645,12 @@ def atualizar_projeto(cliente_id: int, dados: dict, integrador: dict = Depends(o
                 pass
 
         # Só atualiza geracao_esperada_mensal se foi fornecido no request
-        if dados.get("geracao_esperada_mensal"):
+        ger_recebido = dados.get("geracao_esperada_mensal")
+        print(f"[PROJETO] geracao_esperada_mensal recebido: {repr(ger_recebido)[:60] if ger_recebido else 'None'}")
+        print(f"[PROJETO] geracao_esperada_mensal parseado: {repr(geracao_esperada_mensal)[:60] if geracao_esperada_mensal else 'None'}")
+
+        if ger_recebido:
+            print(f"[PROJETO] Atualizando com geracao_esperada_mensal={repr(geracao_esperada_mensal)[:60]}")
             cur.execute("""UPDATE clientes SET potencia_kwp=%s,latitude=%s,longitude=%s,data_instalacao=%s,
                         performance_ratio=%s,tarifa_kwh=%s,consumo_medio_antes_kwh=%s,geracao_esperada_mensal=%s
                         WHERE id=%s AND integrador_id=%s RETURNING id,nome""",
@@ -1654,6 +1659,7 @@ def atualizar_projeto(cliente_id: int, dados: dict, integrador: dict = Depends(o
                          geracao_esperada_mensal,cliente_id,integrador["id"]))
         else:
             # Não atualiza geracao_esperada_mensal
+            print(f"[PROJETO] NÃO atualizando geracao_esperada_mensal")
             cur.execute("""UPDATE clientes SET potencia_kwp=%s,latitude=%s,longitude=%s,data_instalacao=%s,
                         performance_ratio=%s,tarifa_kwh=%s,consumo_medio_antes_kwh=%s
                         WHERE id=%s AND integrador_id=%s RETURNING id,nome""",
