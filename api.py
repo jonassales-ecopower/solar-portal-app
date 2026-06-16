@@ -1457,10 +1457,10 @@ Responda APENAS JSON:
         if len(valores) != 12:
             raise HTTPException(status_code=400, detail=f"Extraído {len(valores)} valores, esperava 12")
 
-        # Valida range (muito flexível para sistemas de diferentes tamanhos)
+        # Valida range (extremamente flexível para sistemas de diferentes tamanhos)
         for v in valores:
-            if not (100 <= v <= 3000):
-                raise HTTPException(status_code=400, detail=f"Valor {v} fora do range esperado (100-3000 kWh)")
+            if not (1 <= v <= 5000):
+                raise HTTPException(status_code=400, detail=f"Valor {v} fora do range esperado (1-5000 kWh)")
 
         return {"valores": valores}
 
