@@ -1644,12 +1644,22 @@ def atualizar_projeto(cliente_id: int, dados: dict, integrador: dict = Depends(o
             except:
                 pass
 
-        cur.execute("""UPDATE clientes SET potencia_kwp=%s,latitude=%s,longitude=%s,data_instalacao=%s,
-                    performance_ratio=%s,tarifa_kwh=%s,consumo_medio_antes_kwh=%s,geracao_esperada_mensal=%s
-                    WHERE id=%s AND integrador_id=%s RETURNING id,nome""",
-                    (dados.get("potencia_kwp"),dados.get("latitude"),dados.get("longitude"),dados.get("data_instalacao"),
-                     dados.get("performance_ratio",0.80),dados.get("tarifa_kwh"),dados.get("consumo_medio_antes_kwh"),
-                     geracao_esperada_mensal,cliente_id,integrador["id"]))
+        # Só atualiza geracao_esperada_mensal se foi fornecido no request
+        if dados.get("geracao_esperada_mensal"):
+            cur.execute("""UPDATE clientes SET potencia_kwp=%s,latitude=%s,longitude=%s,data_instalacao=%s,
+                        performance_ratio=%s,tarifa_kwh=%s,consumo_medio_antes_kwh=%s,geracao_esperada_mensal=%s
+                        WHERE id=%s AND integrador_id=%s RETURNING id,nome""",
+                        (dados.get("potencia_kwp"),dados.get("latitude"),dados.get("longitude"),dados.get("data_instalacao"),
+                         dados.get("performance_ratio",0.80),dados.get("tarifa_kwh"),dados.get("consumo_medio_antes_kwh"),
+                         geracao_esperada_mensal,cliente_id,integrador["id"]))
+        else:
+            # Não atualiza geracao_esperada_mensal
+            cur.execute("""UPDATE clientes SET potencia_kwp=%s,latitude=%s,longitude=%s,data_instalacao=%s,
+                        performance_ratio=%s,tarifa_kwh=%s,consumo_medio_antes_kwh=%s
+                        WHERE id=%s AND integrador_id=%s RETURNING id,nome""",
+                        (dados.get("potencia_kwp"),dados.get("latitude"),dados.get("longitude"),dados.get("data_instalacao"),
+                         dados.get("performance_ratio",0.80),dados.get("tarifa_kwh"),dados.get("consumo_medio_antes_kwh"),
+                         cliente_id,integrador["id"]))
         c = cur.fetchone()
         conn.commit()
         if not c:
