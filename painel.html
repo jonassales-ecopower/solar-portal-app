@@ -1867,11 +1867,8 @@ async function mcValidarCidade() {
             return;
         }
 
-        // Mostra o HSP mensal validado
-        const hsp = data.hsp_mensal;
-        const media = data.media_anual;
-        const fonte = data.fonte === 'pvgis' ? '🌐 PVGIS' : '💾 Cache';
-        infoEl.innerHTML = `✅ ${fonte} | HSP médio: ${media.toFixed(2)} kWh/m²/dia | Meses: ${hsp.map(h => h.toFixed(1)).join(', ')}`;
+        // Validação bem-sucedida — mostra apenas "✓ OK" em verde e BOLD
+        infoEl.innerHTML = `<strong style="color: #16a34a;">✓ OK</strong>`;
         infoEl.style.display = 'block';
     } catch(e) {
         erroEl.textContent = 'Erro ao validar cidade: ' + e.message;
