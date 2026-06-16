@@ -1421,14 +1421,16 @@ def extrair_geracao_ia(dados: dict, integrador: dict = Depends(obter_integrador_
                             "type": "text",
                             "text": """Leia este gráfico de geração solar esperada mensal.
 
-EXTRAIA os 12 valores mensais (JAN-DEZ) com MÁXIMA PRECISÃO.
+EXTRAIA os 12 valores mensais (JAN-DEZ) com MÁXIMA PRECISÃO dos dados VISÍVEIS na imagem.
 
-RESPONDA em JSON puro, sem markdown, sem explicações:
-{"valores": [709.84, 689.13, 647.88, 590.49, 506.45, 456.23, 488.94, 623.64, 621.77, 712.54, 707.8, 782.58]}
+RESPONDA APENAS em JSON puro, sem markdown, sem explicações, sem prefixo/sufixo:
+{"valores": [jan, fev, mar, abr, mai, jun, jul, ago, set, out, nov, dez]}
+
+Onde jan/fev/etc são os valores numéricos lidos do gráfico.
 
 Ordem obrigatória: [Janeiro, Fevereiro, Março, Abril, Maio, Junho, Julho, Agosto, Setembro, Outubro, Novembro, Dezembro]
 
-VALIDAÇÃO: 12 números? Ordem jan→dez? Valores entre 400-850 kWh?
+VALIDAÇÃO: 12 números? Ordem jan→dez? Valores entre 300-900 kWh?
 """
                         }
                     ]
