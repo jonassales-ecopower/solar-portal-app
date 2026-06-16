@@ -1766,7 +1766,7 @@ async function salvarModalCliente() {
         } else {
             const resp = await fetch(`${API}/clientes/${clienteId}`, {
                 method:'PUT', headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},
-                body: JSON.stringify({nome, email: document.getElementById('mc-email').value, telefone: document.getElementById('mc-telefone').value, numero_uc: document.getElementById('mc-uc').value, distribuidora: document.getElementById('mc-distribuidora').value, tipo_gd: document.getElementById('mc-tipo-gd').value, cidade: document.getElementById('mc-cidade').value.trim(), geracao_esperada_mensal: document.getElementById('mc-geracao-esperada').value.trim()})
+                body: JSON.stringify({nome, email: document.getElementById('mc-email').value, telefone: document.getElementById('mc-telefone').value, numero_uc: document.getElementById('mc-uc').value, distribuidora: document.getElementById('mc-distribuidora').value, tipo_gd: document.getElementById('mc-tipo-gd').value, cidade: document.getElementById('mc-cidade').value.trim()})
             });
             if (!resp.ok) { const d = await resp.json(); document.getElementById('mc-erro').textContent = d.detail||'Erro ao atualizar cliente'; return; }
         }
@@ -1792,7 +1792,7 @@ async function salvarModalCliente() {
         if (potencia && lat && lng) {
             const tarifa = parseFloat(document.getElementById('mc-tarifa').value) || null;
             const consumoAntes = parseFloat(document.getElementById('mc-consumo-antes').value) || null;
-            await fetch(`${API}/clientes/${clienteId}/projeto`, {
+            const respProj = await fetch(`${API}/clientes/${clienteId}/projeto`, {
                 method:'PUT', headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},
                 body: JSON.stringify({potencia_kwp: potencia, latitude: lat, longitude: lng,
                     data_instalacao: document.getElementById('mc-data-inst').value||null,
@@ -1800,6 +1800,7 @@ async function salvarModalCliente() {
                     tarifa_kwh: tarifa, consumo_medio_antes_kwh: consumoAntes,
                     geracao_esperada_mensal: geracaoEsperada})
             });
+            if (!respProj.ok) { const d = await respProj.json(); document.getElementById('mc-erro').textContent = d.detail||'Erro ao salvar projeto'; return; }
         }
 
         // 3. Inversor (se preenchido)
@@ -1815,10 +1816,11 @@ async function salvarModalCliente() {
                 apiKey = document.getElementById('mc-apikey').value.trim();
             }
             if (apiKey || marca === 'foxess') {
-                await fetch(`${API}/clientes/${clienteId}/inversor`, {
+                const respInv = await fetch(`${API}/clientes/${clienteId}/inversor`, {
                     method:'PUT', headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},
                     body: JSON.stringify({marca_inversor: marca, serial_inversor: serial, api_key_inversor: apiKey})
                 });
+                if (!respInv.ok) { const d = await respInv.json(); document.getElementById('mc-erro').textContent = d.detail||'Erro ao salvar inversor'; return; }
             }
         }
 
