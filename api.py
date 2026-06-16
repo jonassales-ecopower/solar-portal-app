@@ -1156,8 +1156,7 @@ def atualizar_cliente(cliente_id: int, dados: dict, integrador: dict = Depends(o
                         ger_list = json.loads(ger)
                         if isinstance(ger_list, list) and len(ger_list) == 12:
                             geracao_esperada_mensal = json.dumps([float(v) for v in ger_list])
-                    except json.JSONDecodeError as e:
-                        print(f"[ERRO] JSON decode: {e}, tentando CSV")
+                    except json.JSONDecodeError:
                         # Se não for JSON, tenta parse como CSV
                         valores = [v.strip() for v in ger.replace("\n", ",").split(",") if v.strip()]
                         valores = [float(v) for v in valores]
@@ -1168,27 +1167,14 @@ def atualizar_cliente(cliente_id: int, dados: dict, integrador: dict = Depends(o
             except Exception as e:
                 print(f"[ERRO] Parse geracao_esperada_mensal: {e}")
 
-        print(f"[SAVE] Antes do UPDATE: geracao_esperada_mensal={repr(geracao_esperada_mensal)[:60] if geracao_esperada_mensal else 'None'}")
-
-        try:
-            cur.execute("""
-                UPDATE clientes SET nome=%s, email=%s, telefone=%s, numero_uc=%s, distribuidora=%s, tipo_gd=%s, cidade=%s, geracao_esperada_mensal=%s
-                WHERE id=%s AND integrador_id=%s RETURNING id, nome, cidade
-            """, (dados.get("nome"), dados.get("email"), dados.get("telefone"),
-                  dados.get("numero_uc"), dados.get("distribuidora"), dados.get("tipo_gd"),
-                  cidade, geracao_esperada_mensal, cliente_id, integrador["id"]))
-            c = cur.fetchone()
-            print(f"[SAVE] UPDATE executado, rowcount={cur.rowcount}")
-        except Exception as e:
-            print(f"[ERRO] UPDATE: {e}")
-            raise
-
-        try:
-            conn.commit()
-            print(f"[SAVE] Commit bem-sucedido")
-        except Exception as e:
-            print(f"[ERRO] Commit: {e}")
-            raise
+        cur.execute("""
+            UPDATE clientes SET nome=%s, email=%s, telefone=%s, numero_uc=%s, distribuidora=%s, tipo_gd=%s, cidade=%s, geracao_esperada_mensal=%s
+            WHERE id=%s AND integrador_id=%s RETURNING id, nome, cidade
+        """, (dados.get("nome"), dados.get("email"), dados.get("telefone"),
+              dados.get("numero_uc"), dados.get("distribuidora"), dados.get("tipo_gd"),
+              cidade, geracao_esperada_mensal, cliente_id, integrador["id"]))
+        c = cur.fetchone()
+        conn.commit()
 
         if not c:
             cur.close()
@@ -1647,16 +1633,11 @@ def atualizar_projeto(cliente_id: int, dados: dict, integrador: dict = Depends(o
                             geracao_esperada_mensal = json.dumps(valores)
                 elif isinstance(ger, list) and len(ger) == 12:
                     geracao_esperada_mensal = json.dumps([float(v) for v in ger])
-            except Exception as e:
-                print(f"[PROJETO] Erro ao parsear: {e}")
+            except Exception:
+                pass
 
         # Só atualiza geracao_esperada_mensal se foi fornecido no request
-        ger_recebido = dados.get("geracao_esperada_mensal")
-        print(f"[PROJETO] geracao_esperada_mensal recebido: {repr(ger_recebido)[:60] if ger_recebido else 'None'}")
-        print(f"[PROJETO] geracao_esperada_mensal parseado: {repr(geracao_esperada_mensal)[:60] if geracao_esperada_mensal else 'None'}")
-
-        if ger_recebido:
-            print(f"[PROJETO] Atualizando com geracao_esperada_mensal={repr(geracao_esperada_mensal)[:60]}")
+        if dados.get("geracao_esperada_mensal"):
             cur.execute("""UPDATE clientes SET potencia_kwp=%s,latitude=%s,longitude=%s,data_instalacao=%s,
                         performance_ratio=%s,tarifa_kwh=%s,consumo_medio_antes_kwh=%s,geracao_esperada_mensal=%s
                         WHERE id=%s AND integrador_id=%s RETURNING id,nome""",
@@ -1665,7 +1646,6 @@ def atualizar_projeto(cliente_id: int, dados: dict, integrador: dict = Depends(o
                          geracao_esperada_mensal,cliente_id,integrador["id"]))
         else:
             # Não atualiza geracao_esperada_mensal
-            print(f"[PROJETO] NÃO atualizando geracao_esperada_mensal")
             cur.execute("""UPDATE clientes SET potencia_kwp=%s,latitude=%s,longitude=%s,data_instalacao=%s,
                         performance_ratio=%s,tarifa_kwh=%s,consumo_medio_antes_kwh=%s
                         WHERE id=%s AND integrador_id=%s RETURNING id,nome""",
