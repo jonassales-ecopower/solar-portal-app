@@ -1512,12 +1512,28 @@ def atualizar_projeto(cliente_id: int, dados: dict, integrador: dict = Depends(o
     conn = conectar_banco()
     cur = conn.cursor()
     try:
+        # Parse geração esperada mensal (12 valores)
+        geracao_esperada_mensal = None
+        if dados.get("geracao_esperada_mensal"):
+            try:
+                ger = dados.get("geracao_esperada_mensal")
+                if isinstance(ger, str):
+                    # Parse: "700, 650, 680..." ou "700\n650\n680..."
+                    valores = [v.strip() for v in ger.replace("\n", ",").split(",") if v.strip()]
+                    valores = [float(v) for v in valores]
+                    if len(valores) == 12:
+                        geracao_esperada_mensal = json.dumps(valores)
+                elif isinstance(ger, list) and len(ger) == 12:
+                    geracao_esperada_mensal = json.dumps([float(v) for v in ger])
+            except:
+                pass
+
         cur.execute("""UPDATE clientes SET potencia_kwp=%s,latitude=%s,longitude=%s,data_instalacao=%s,
-                    performance_ratio=%s,tarifa_kwh=%s,consumo_medio_antes_kwh=%s
+                    performance_ratio=%s,tarifa_kwh=%s,consumo_medio_antes_kwh=%s,geracao_esperada_mensal=%s
                     WHERE id=%s AND integrador_id=%s RETURNING id,nome""",
                     (dados.get("potencia_kwp"),dados.get("latitude"),dados.get("longitude"),dados.get("data_instalacao"),
                      dados.get("performance_ratio",0.80),dados.get("tarifa_kwh"),dados.get("consumo_medio_antes_kwh"),
-                     cliente_id,integrador["id"]))
+                     geracao_esperada_mensal,cliente_id,integrador["id"]))
         c = cur.fetchone()
         conn.commit()
         if not c:
