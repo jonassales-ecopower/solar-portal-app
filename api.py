@@ -17,6 +17,7 @@ from fastapi import Depends, FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from openai import OpenAI
+from anthropic import Anthropic
 from auth import criptografar_senha, verificar_senha, criar_token, verificar_token
 from extracao import (extrair_medicoes_medidor, normalizar_mes_referencia,
                       extrair_mes_referencia, extrair_datas_leitura, somar_geracao_periodo)
@@ -1401,8 +1402,6 @@ def extrair_geracao_ia(dados: dict, integrador: dict = Depends(obter_integrador_
             raise HTTPException(status_code=400, detail="Imagem não fornecida")
 
         # Chama Claude Vision (Anthropic) - melhor para leitura de gráficos
-        from anthropic import Anthropic
-
         client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 
         message = client.messages.create(
