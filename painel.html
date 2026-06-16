@@ -613,14 +613,27 @@
                 <p style="font-size:11px;color:#888;margin-top:4px;">Entre 0,75 e 0,85 para sistemas residenciais.</p>
             </div>
             <div class="campo">
-                <label style="color:#7c3aed;font-weight:700;">📊 Geração Esperada Mensal (kWh) — MÉTODO 1 (Preferencial)</label>
-                <p style="font-size:11px;color:#666;margin-bottom:8px;">⭐ Cole os 12 valores de JANEIRO a DEZEMBRO da proposta. Se preenchido, substitui o cálculo por HSP e garante 100% alinhamento.</p>
-                <div style="display:flex;gap:8px;margin-bottom:8px;">
-                    <input type="file" id="mc-pdf-proposta" accept=".pdf" placeholder="Ou selecione PDF da proposta" style="flex:1;">
-                    <button class="azul pequeno" onclick="mcExtrairDosPDF()" style="white-space:nowrap;">📄 Extrair PDF</button>
+                <label style="color:#7c3aed;font-weight:700;">📊 Geração Esperada Mensal (kWh)</label>
+                <p style="font-size:11px;color:#666;margin-bottom:8px;">⭐ Opção 1: Upload imagem/PDF → IA extrai. Opção 2: Digite manualmente.</p>
+                <div style="display:flex;gap:8px;margin-bottom:12px;">
+                    <input type="file" id="mc-ger-imagem" accept="image/*,.pdf" style="flex:1;">
+                    <button class="azul pequeno" onclick="mcExtrairGeracaoIA()" style="white-space:nowrap;">🤖 Extrair IA</button>
                 </div>
-                <textarea id="mc-geracao-esperada" placeholder="Cole os 12 valores (jan-dez), separados por vírgula, linha ou espaço:&#10;&#10;709.84,689.13,647.88,590.49,506.45,456.23,488.94,623.64,621.77,712.54,707.8,782.58&#10;&#10;ou linha por linha:&#10;709.84&#10;689.13&#10;647.88&#10;...&#10;&#10;ou extraia do PDF acima" style="font-family:monospace;font-size:12px;height:100px;"></textarea>
-                <p style="font-size:11px;color:#888;margin-top:4px;">✓ Aceita: valores manual (vírgula/linha/espaço separado) ou upload de PDF da proposta.</p>
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
+                    <div><label style="font-size:10px;color:#666;">Jan</label><input type="number" id="mc-ger-01" placeholder="kWh" step="0.01" style="width:100%;"></div>
+                    <div><label style="font-size:10px;color:#666;">Fev</label><input type="number" id="mc-ger-02" placeholder="kWh" step="0.01" style="width:100%;"></div>
+                    <div><label style="font-size:10px;color:#666;">Mar</label><input type="number" id="mc-ger-03" placeholder="kWh" step="0.01" style="width:100%;"></div>
+                    <div><label style="font-size:10px;color:#666;">Abr</label><input type="number" id="mc-ger-04" placeholder="kWh" step="0.01" style="width:100%;"></div>
+                    <div><label style="font-size:10px;color:#666;">Mai</label><input type="number" id="mc-ger-05" placeholder="kWh" step="0.01" style="width:100%;"></div>
+                    <div><label style="font-size:10px;color:#666;">Jun</label><input type="number" id="mc-ger-06" placeholder="kWh" step="0.01" style="width:100%;"></div>
+                    <div><label style="font-size:10px;color:#666;">Jul</label><input type="number" id="mc-ger-07" placeholder="kWh" step="0.01" style="width:100%;"></div>
+                    <div><label style="font-size:10px;color:#666;">Ago</label><input type="number" id="mc-ger-08" placeholder="kWh" step="0.01" style="width:100%;"></div>
+                    <div><label style="font-size:10px;color:#666;">Set</label><input type="number" id="mc-ger-09" placeholder="kWh" step="0.01" style="width:100%;"></div>
+                    <div><label style="font-size:10px;color:#666;">Out</label><input type="number" id="mc-ger-10" placeholder="kWh" step="0.01" style="width:100%;"></div>
+                    <div><label style="font-size:10px;color:#666;">Nov</label><input type="number" id="mc-ger-11" placeholder="kWh" step="0.01" style="width:100%;"></div>
+                    <div><label style="font-size:10px;color:#666;">Dez</label><input type="number" id="mc-ger-12" placeholder="kWh" step="0.01" style="width:100%;"></div>
+                </div>
+                <p style="font-size:11px;color:#888;">Preencha os 12 meses conforme a proposta do integrador.</p>
             </div>
             <div class="campo">
                 <label>Endereço da instalação</label>
@@ -1762,7 +1775,20 @@ async function salvarModalCliente() {
         const potencia = parseFloat(document.getElementById('mc-potencia').value);
         const lat = parseFloat(document.getElementById('mc-lat').value);
         const lng = parseFloat(document.getElementById('mc-lng').value);
-        const geracaoEsperada = document.getElementById('mc-geracao-esperada').value.trim();
+
+        // Lê os 12 campos de geração esperada (JAN-DEZ)
+        let geracaoEsperada = null;
+        let todosPreenchidos = true;
+        const valores = [];
+        for (let i = 1; i <= 12; i++) {
+            const val = parseFloat(document.getElementById(`mc-ger-${i.toString().padStart(2,'0')}`).value);
+            if (val) valores.push(val);
+            else todosPreenchidos = false;
+        }
+        if (todosPreenchidos && valores.length === 12) {
+            geracaoEsperada = JSON.stringify(valores);
+        }
+
         if (potencia && lat && lng) {
             const tarifa = parseFloat(document.getElementById('mc-tarifa').value) || null;
             const consumoAntes = parseFloat(document.getElementById('mc-consumo-antes').value) || null;
@@ -1894,33 +1920,44 @@ async function mcValidarCidade() {
 }
 
 
-async function mcExtrairDosPDF() {
-    const fileInput = document.getElementById('mc-pdf-proposta');
+async function mcExtrairGeracaoIA() {
+    const fileInput = document.getElementById('mc-ger-imagem');
     const file = fileInput.files[0];
     if (!file) {
-        alert('Selecione um arquivo PDF');
+        alert('Selecione uma imagem ou PDF');
         return;
     }
 
     try {
-        const formData = new FormData();
-        formData.append('file', file);
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const base64 = e.target.result.split(',')[1];
 
-        const resp = await fetch(`${API}/extrair-geracao-pdf`, {
-            method: 'POST',
-            headers: {"Authorization": `Bearer ${token}`},
-            body: formData
-        });
-        const data = await resp.json();
+            const resp = await fetch(`${API}/extrair-geracao-ia`, {
+                method: 'POST',
+                headers: {"Content-Type": "application/json", "Authorization": `Bearer ${token}`},
+                body: JSON.stringify({imagem_base64: base64})
+            });
+            const data = await resp.json();
 
-        if (!resp.ok) {
-            alert('Erro ao extrair: ' + (data.detail || 'Tente com outro PDF'));
-            return;
-        }
+            if (!resp.ok) {
+                alert('Erro: ' + (data.detail || 'Tente com imagem mais clara'));
+                return;
+            }
 
-        // Preenche o textarea com os valores extraídos
-        document.getElementById('mc-geracao-esperada').value = data.valores.join(',');
-        alert('✓ Extraído com sucesso:\n' + data.valores.join(', ') + '\n\nRevise antes de salvar!');
+            // Parse formato: "Janeiro; 709.84 Fevereiro; 689.13 ..."
+            const valores = data.valores;
+            if (valores && valores.length === 12) {
+                // Preenche os 12 campos
+                for (let i = 0; i < 12; i++) {
+                    document.getElementById(`mc-ger-${(i+1).toString().padStart(2,'0')}`).value = valores[i];
+                }
+                alert('✓ Extraído com sucesso! Revise os valores.');
+            } else {
+                alert('Erro: Não consegui extrair 12 valores. Tente preencher manualmente.');
+            }
+        };
+        reader.readAsDataURL(file);
     } catch(e) {
         alert('Erro: ' + e.message);
     }

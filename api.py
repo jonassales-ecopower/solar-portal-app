@@ -1368,72 +1368,84 @@ def limpar_cache_cidade(cidade: str, integrador: dict = Depends(obter_integrador
     conn.close()
     return {"cidade": cidade, "deletados": deletados}
 
-@app.post("/extrair-geracao-pdf")
-def extrair_geracao_pdf(file: UploadFile = File(...), integrador: dict = Depends(obter_integrador_atual)):
+@app.post("/extrair-geracao-ia")
+def extrair_geracao_ia(dados: dict, integrador: dict = Depends(obter_integrador_atual)):
     """
-    Extrai os 12 valores mensais de geração de um PDF de proposta.
-    Busca padrões de números (400-800 kWh) organizados mensalmente.
+    Extrai os 12 valores mensais de geração de uma imagem/PDF usando IA.
+    Retorna formato estruturado: [jan_valor, fev_valor, ..., dez_valor]
     """
     try:
-        import PyPDF2
-        import re
+        imagem_base64 = dados.get("imagem_base64")
+        if not imagem_base64:
+            raise HTTPException(status_code=400, detail="Imagem não fornecida")
 
-        # Lê o PDF
-        pdf_content = file.file.read()
-        pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
-
-        # Extrai texto de todas as páginas
-        texto_completo = ""
-        for page in pdf_reader.pages:
-            texto_completo += page.extract_text() + "\n"
-
-        # Procura especificamente pela seção de "Produção estimada" ou "média mensal"
-        # Esta seção contém o gráfico com os 12 valores mensais
-        match_secao = re.search(
-            r'[Pp]rodução\s+estimada.*?[Mm]édia\s+[Mm]ensal.*?(?:Janeiro|Jan).*?(?:Dezembro|Dez)',
-            texto_completo,
-            re.DOTALL
-        )
-
-        if match_secao:
-            secao_grafico = match_secao.group(0)
-        else:
-            # Se não encontrar, tenta procurar na seção "Detalhes do seu projeto"
-            match_secao = re.search(
-                r'[Dd]etalhes.*?seu\s+projeto.*?(?:Janeiro|Jan).*?(?:Dezembro|Dez)',
-                texto_completo,
-                re.DOTALL
-            )
-            if match_secao:
-                secao_grafico = match_secao.group(0)
-            else:
-                secao_grafico = texto_completo
-
-        # Busca números na seção do gráfico (650-850 kWh é range mais realista para gráfico)
-        numeros = re.findall(r'(\d{2,3}[.,]\d{1,2}|\d{3,4})', secao_grafico)
-
-        # Filtra números na faixa esperada (450-850 kWh) e pega os primeiros 12
-        valores = []
-        for num_str in numeros:
-            num = float(num_str.replace(',', '.'))
-            if 450 <= num <= 850 and len(valores) < 12:
-                valores.append(round(num, 2))
-
-        if len(valores) < 12:
-            raise HTTPException(status_code=400, detail=f"Encontrei apenas {len(valores)} valores no gráfico, esperava 12. Tente copiar manualmente os valores.")
-
-        return {
-            "valores": valores[:12],
-            "encontrados": len(valores),
-            "fonte": "pdf",
-            "mensagem": "✓ Extraído do PDF. Revise os valores antes de salvar."
+        # Chama OpenRouter com vision
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_KEY}",
+            "HTTP-Referer": "https://solar-portal.com",
+            "X-Title": "Solar Portal",
         }
+
+        payload = {
+            "model": "openrouter/auto",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "image": imagem_base64,
+                        },
+                        {
+                            "type": "text",
+                            "text": """Leia este gráfico de geração solar esperada mensal.
+
+EXTRAIA os 12 valores mensais (JAN-DEZ) com MÁXIMA PRECISÃO.
+
+RESPONDA em JSON puro, sem markdown, sem explicações:
+{"valores": [709.84, 689.13, 647.88, 590.49, 506.45, 456.23, 488.94, 623.64, 621.77, 712.54, 707.8, 782.58]}
+
+Ordem obrigatória: [Janeiro, Fevereiro, Março, Abril, Maio, Junho, Julho, Agosto, Setembro, Outubro, Novembro, Dezembro]
+
+VALIDAÇÃO: 12 números? Ordem jan→dez? Valores entre 400-850 kWh?
+"""
+                        }
+                    ]
+                }
+            ]
+        }
+
+        r = requests.post("https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers, timeout=30)
+
+        if r.status_code != 200:
+            raise HTTPException(status_code=400, detail=f"Erro na IA: {r.status_code}")
+
+        resposta = r.json()
+        conteudo = resposta["choices"][0]["message"]["content"]
+
+        # Parse JSON da resposta
+        match = re.search(r'\{.*"valores"\s*:\s*\[([\d.,\s]+)\].*\}', conteudo, re.DOTALL)
+        if not match:
+            raise HTTPException(status_code=400, detail="Formato de resposta inválido. Tente novamente.")
+
+        valores_str = match.group(1)
+        valores = [float(v.strip().replace(',', '.')) for v in valores_str.split(",")]
+
+        if len(valores) != 12:
+            raise HTTPException(status_code=400, detail=f"Extraído {len(valores)} valores, esperava 12")
+
+        # Valida range
+        for v in valores:
+            if not (400 <= v <= 850):
+                raise HTTPException(status_code=400, detail=f"Valor {v} fora do range esperado (400-850 kWh)")
+
+        return {"valores": valores}
 
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Erro ao extrair PDF: {e}")
-        raise HTTPException(status_code=400, detail=f"Erro ao processar PDF: {str(e)}")
+        print(f"Erro ao extrair geração: {e}")
+        raise HTTPException(status_code=400, detail=f"Erro ao processar imagem: {str(e)}")
 
 @app.post("/validar-cidade")
 def validar_cidade(cidade: str, latitude: float = None, longitude: float = None,
