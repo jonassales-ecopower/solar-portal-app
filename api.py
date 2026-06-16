@@ -1180,6 +1180,12 @@ def atualizar_cliente(cliente_id: int, dados: dict, integrador: dict = Depends(o
         c = cur.fetchone()
         conn.commit()
         print(f"[CLIENTE] ✓ Commit realizado, cliente={c}")
+
+        # Verifica se foi realmente salvo no banco
+        cur.execute("SELECT id, nome, geracao_esperada_mensal FROM clientes WHERE id=%s", (cliente_id,))
+        verificacao = cur.fetchone()
+        print(f"[CLIENTE] VERIFICAÇÃO PÓS-SAVE: id={verificacao[0]}, nome={verificacao[1]}, geracao_esperada_mensal={repr(verificacao[2])[:80] if verificacao[2] else 'NULL'}")
+
         if not c:
             cur.close()
             conn.close()
