@@ -1778,14 +1778,16 @@ async function salvarModalCliente() {
 
         // Lê os 12 campos de geração esperada (JAN-DEZ)
         let geracaoEsperada = null;
-        let todosPreenchidos = true;
         const valores = [];
         for (let i = 1; i <= 12; i++) {
-            const val = parseFloat(document.getElementById(`mc-ger-${i.toString().padStart(2,'0')}`).value);
-            if (val) valores.push(val);
-            else todosPreenchidos = false;
+            const val = document.getElementById(`mc-ger-${i.toString().padStart(2,'0')}`).value.trim();
+            if (val) {
+                const num = parseFloat(val);
+                if (!isNaN(num)) valores.push(num);
+            }
         }
-        if (todosPreenchidos && valores.length === 12) {
+        // Se tem 12 valores válidos, envia
+        if (valores.length === 12) {
             geracaoEsperada = JSON.stringify(valores);
         }
 
