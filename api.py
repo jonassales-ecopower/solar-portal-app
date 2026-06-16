@@ -1129,9 +1129,6 @@ def atualizar_cliente(cliente_id: int, dados: dict, integrador: dict = Depends(o
     conn = conectar_banco()
     cur = conn.cursor()
     try:
-        print(f"[CLIENTE] ID={cliente_id}, dados recebidos: {list(dados.keys())}")
-        print(f"[CLIENTE] geracao_esperada_mensal raw: {repr(dados.get('geracao_esperada_mensal'))[:100]}")
-
         cidade = dados.get("cidade", "").strip() if dados.get("cidade") else None
 
         # Parse geração esperada mensal (12 valores)
@@ -1139,38 +1136,23 @@ def atualizar_cliente(cliente_id: int, dados: dict, integrador: dict = Depends(o
         if dados.get("geracao_esperada_mensal"):
             try:
                 ger = dados.get("geracao_esperada_mensal")
-                print(f"[CLIENTE] Parseando: tipo={type(ger).__name__}, valor={repr(ger)[:100]}")
-
                 if isinstance(ger, str):
                     # Tenta parse como JSON array primeiro
                     try:
                         ger_list = json.loads(ger)
                         if isinstance(ger_list, list) and len(ger_list) == 12:
                             geracao_esperada_mensal = json.dumps([float(v) for v in ger_list])
-                            print(f"[CLIENTE] ✓ JSON parse OK: {geracao_esperada_mensal[:80]}...")
-                        else:
-                            print(f"[CLIENTE] ✗ JSON parse: lista invalida (len={len(ger_list) if isinstance(ger_list, list) else 'N/A'})")
-                    except json.JSONDecodeError as e:
-                        print(f"[CLIENTE] JSON decode falhou: {e}, tentando CSV...")
+                    except json.JSONDecodeError:
                         # Se não for JSON, tenta parse como CSV
                         valores = [v.strip() for v in ger.replace("\n", ",").split(",") if v.strip()]
                         valores = [float(v) for v in valores]
                         if len(valores) == 12:
                             geracao_esperada_mensal = json.dumps(valores)
-                            print(f"[CLIENTE] ✓ CSV parse OK: {geracao_esperada_mensal[:80]}...")
-                        else:
-                            print(f"[CLIENTE] ✗ CSV parse: got {len(valores)} valores, precisa 12")
                 elif isinstance(ger, list) and len(ger) == 12:
                     geracao_esperada_mensal = json.dumps([float(v) for v in ger])
-                    print(f"[CLIENTE] ✓ List parse OK: {geracao_esperada_mensal[:80]}...")
-                else:
-                    print(f"[CLIENTE] ✗ Tipo não reconhecido ou lista invalida")
-            except Exception as e:
-                print(f"[CLIENTE] ✗ Erro ao parsear geração: {e}")
-        else:
-            print(f"[CLIENTE] geracao_esperada_mensal não foi fornecido")
+            except Exception:
+                pass
 
-        print(f"[CLIENTE] UPDATE com geracao_esperada_mensal={repr(geracao_esperada_mensal)[:80] if geracao_esperada_mensal else 'None'}")
         cur.execute("""
             UPDATE clientes SET nome=%s, email=%s, telefone=%s, numero_uc=%s, distribuidora=%s, tipo_gd=%s, cidade=%s, geracao_esperada_mensal=%s
             WHERE id=%s AND integrador_id=%s RETURNING id, nome, cidade
@@ -1179,12 +1161,6 @@ def atualizar_cliente(cliente_id: int, dados: dict, integrador: dict = Depends(o
               cidade, geracao_esperada_mensal, cliente_id, integrador["id"]))
         c = cur.fetchone()
         conn.commit()
-        print(f"[CLIENTE] ✓ Commit realizado, cliente={c}")
-
-        # Verifica se foi realmente salvo no banco
-        cur.execute("SELECT id, nome, geracao_esperada_mensal FROM clientes WHERE id=%s", (cliente_id,))
-        verificacao = cur.fetchone()
-        print(f"[CLIENTE] VERIFICAÇÃO PÓS-SAVE: id={verificacao[0]}, nome={verificacao[1]}, geracao_esperada_mensal={repr(verificacao[2])[:80] if verificacao[2] else 'NULL'}")
 
         if not c:
             cur.close()
