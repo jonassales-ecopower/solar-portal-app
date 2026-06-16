@@ -1137,6 +1137,30 @@ def detalhes_cliente(cliente_id: int, integrador: dict = Depends(obter_integrado
         "consumo_medio_antes_kwh": float(c[17]) if c[17] else None
     }
 
+@app.post("/teste-save-direto/{cliente_id}")
+def teste_save_direto(cliente_id: int):
+    """Teste: salva geracao_esperada_mensal diretamente no banco"""
+    conn = conectar_banco()
+    cur = conn.cursor()
+    try:
+        test_value = '[709.84,669.13,647.88,590.49,506.45,456.23,488.94,623.64,621.77,712.54,707.8,782.58]'
+        print(f"[TESTE] Salvando direto: {test_value}")
+
+        cur.execute("UPDATE clientes SET geracao_esperada_mensal=%s WHERE id=%s", (test_value, cliente_id))
+        conn.commit()
+
+        # Verifica imediatamente
+        cur.execute("SELECT geracao_esperada_mensal FROM clientes WHERE id=%s", (cliente_id,))
+        resultado = cur.fetchone()
+        print(f"[TESTE] Resultado: {resultado[0] if resultado else 'NULL'}")
+
+        cur.close()
+        conn.close()
+        return {"status": "ok", "salvo": resultado[0] if resultado else None}
+    except Exception as e:
+        print(f"[TESTE] Erro: {e}")
+        raise
+
 @app.put("/clientes/{cliente_id}")
 def atualizar_cliente(cliente_id: int, dados: dict, integrador: dict = Depends(obter_integrador_atual)):
     conn = conectar_banco()
