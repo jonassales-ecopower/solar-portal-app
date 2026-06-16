@@ -112,9 +112,9 @@ def inicializar_banco():
 # ==================== IRRADIÂNCIA SOLAR (PVGIS + FALLBACK) ====================
 
 # Tabela de HSP por CIDADE específica (override de estado)
-# Valores de referência de projetos realizados
+# Valores em plano inclinado (ângulo = latitude), validados com integrador
 HSP_FALLBACK_CIDADE = {
-    "EXTREMA - MG": [4.9, 4.7, 4.6, 4.0, 3.71, 3.4, 3.6, 4.2, 4.7, 5.1, 5.4, 5.5],  # Validado: proposta 506,45 kWh/maio
+    "EXTREMA - MG": [4.96, 5.16, 4.94, 4.92, 4.64, 4.57, 4.77, 5.31, 4.93, 4.93, 5.06, 4.72],  # Jan-Dez, plano inclinado
 }
 
 # Tabela de HSP médio anual por região brasileira (fallback quando PVGIS indisponível)
