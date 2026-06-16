@@ -87,12 +87,69 @@ def inicializar_banco():
             CREATE UNIQUE INDEX IF NOT EXISTS contas_beneficiario_unico
             ON contas_beneficiario (beneficiario_id, mes_referencia)
         """)
+        # Tabela de cache de irradiância solar por cidade (PVGIS)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS cidades_hsp (
+                id SERIAL PRIMARY KEY,
+                nome_cidade TEXT UNIQUE NOT NULL,
+                latitude DECIMAL(10,6),
+                longitude DECIMAL(10,6),
+                hsp_mensal TEXT NOT NULL,
+                media_anual DECIMAL(5,2),
+                criado_em TIMESTAMP DEFAULT NOW(),
+                atualizado_em TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        # Adiciona coluna cidade em clientes se não existir
+        cur.execute("""ALTER TABLE clientes ADD COLUMN IF NOT EXISTS cidade TEXT""")
         conn.commit()
     except Exception:
         conn.rollback()
     finally:
         cur.close()
         conn.close()
+
+# ==================== IRRADIÂNCIA SOLAR (PVGIS) ====================
+
+def buscar_hsp_pvgis(cidade: str, latitude: float = None, longitude: float = None):
+    """
+    Busca HSP mensal (horas de pico solar) do PVGIS (IRENA).
+    Tenta geocodificação automática se lat/lng não fornecidos.
+    Retorna lista de 12 valores (jan-dez) ou None se falhar.
+    """
+    try:
+        if latitude is None or longitude is None:
+            # Geocodifica a cidade automaticamente
+            geo_url = f"https://nominatim.openstreetmap.org/search?q={cidade}&format=json"
+            geo_r = requests.get(geo_url, timeout=5)
+            if geo_r.status_code != 200 or not geo_r.json():
+                return None
+            geo = geo_r.json()[0]
+            latitude, longitude = float(geo['lat']), float(geo['lon'])
+
+        # PVGIS API (gratuito, sem autenticação)
+        pvgis_url = "https://re.jrc.ec.europa.eu/api/v5_2/solarresource"
+        params = {"lat": latitude, "lon": longitude, "outputformat": "json"}
+        r = requests.get(pvgis_url, params=params, timeout=10)
+
+        if r.status_code != 200:
+            return None
+
+        data = r.json()
+        monthly = data.get("monthly", [])
+        if not monthly or len(monthly) < 12:
+            return None
+
+        # Converte irradiância (kWh/m²/dia) em HSP (horas de pico solar)
+        hsp = []
+        for m in monthly[:12]:
+            rad = float(m.get("rad", 5.0))
+            hsp.append(round(rad, 2))
+
+        return hsp
+    except Exception as e:
+        print(f"Erro ao buscar HSP de {cidade}: {e}")
+        return None
 
 def enviar_email_offline(integrador_email: str, integrador_nome: str, cliente_nome: str):
     if not SENDGRID_API_KEY:
@@ -910,22 +967,48 @@ def atualizar_cliente(cliente_id: int, dados: dict, integrador: dict = Depends(o
     conn = conectar_banco()
     cur = conn.cursor()
     try:
+        cidade = dados.get("cidade", "").strip() if dados.get("cidade") else None
         cur.execute("""
-            UPDATE clientes SET nome=%s, email=%s, telefone=%s, numero_uc=%s, distribuidora=%s, tipo_gd=%s
-            WHERE id=%s AND integrador_id=%s RETURNING id, nome
+            UPDATE clientes SET nome=%s, email=%s, telefone=%s, numero_uc=%s, distribuidora=%s, tipo_gd=%s, cidade=%s
+            WHERE id=%s AND integrador_id=%s RETURNING id, nome, cidade
         """, (dados.get("nome"), dados.get("email"), dados.get("telefone"),
               dados.get("numero_uc"), dados.get("distribuidora"), dados.get("tipo_gd"),
-              cliente_id, integrador["id"]))
+              cidade, cliente_id, integrador["id"]))
         c = cur.fetchone()
         conn.commit()
         if not c:
+            cur.close()
+            conn.close()
             raise HTTPException(status_code=404, detail="Cliente não encontrado")
-        return {"sucesso": True, "id": c[0], "nome": c[1]}
+
+        # Se informou cidade, valida e popula HSP
+        hsp_info = None
+        if cidade:
+            try:
+                cur.execute("SELECT hsp_mensal FROM cidades_hsp WHERE LOWER(nome_cidade) = LOWER(%s)", (cidade,))
+                r = cur.fetchone()
+                if r:
+                    hsp_info = {"fonte": "cache", "hsp_mensal": json.loads(r[0])}
+            except:
+                pass
+
+        cur.close()
+        conn.close()
+
+        result = {"sucesso": True, "id": c[0], "nome": c[1], "cidade": c[2]}
+        if hsp_info:
+            result["hsp_info"] = hsp_info
+        return result
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     finally:
-        cur.close()
-        conn.close()
+        try:
+            cur.close()
+            conn.close()
+        except:
+            pass
 
 @app.delete("/clientes/{cliente_id}")
 def excluir_cliente(cliente_id: int, integrador: dict = Depends(obter_integrador_atual)):
@@ -1090,6 +1173,65 @@ def cadastrar_cliente(dados: dict, integrador: dict = Depends(obter_integrador_a
         return {"id":c[0],"nome":c[1],"token_acesso":c[2]}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+@app.post("/validar-cidade")
+def validar_cidade(cidade: str, latitude: float = None, longitude: float = None,
+                   integrador: dict = Depends(obter_integrador_atual)):
+    """
+    Valida e retorna HSP mensal para uma cidade.
+    Se já existe no banco (cache), retorna do banco (rápido).
+    Se não existe, busca de PVGIS, salva no banco e retorna.
+    """
+    conn = conectar_banco()
+    cur = conn.cursor()
+
+    try:
+        # 1. Tenta encontrar no banco
+        cur.execute(
+            "SELECT hsp_mensal, media_anual FROM cidades_hsp WHERE LOWER(nome_cidade) = LOWER(%s)",
+            (cidade,)
+        )
+        r = cur.fetchone()
+        if r:
+            hsp_mensal = json.loads(r[0]) if isinstance(r[0], str) else r[0]
+            return {
+                "cidade": cidade,
+                "hsp_mensal": hsp_mensal,
+                "media_anual": float(r[1]),
+                "fonte": "cache"
+            }
+
+        # 2. Se não encontrou, busca do PVGIS
+        hsp_mensal = buscar_hsp_pvgis(cidade, latitude, longitude)
+        if not hsp_mensal:
+            raise HTTPException(status_code=400, detail=f"Não foi possível encontrar dados de irradiância para {cidade}")
+
+        media_anual = round(sum(hsp_mensal) / 12, 2)
+
+        # 3. Grava no banco para cache futuro
+        cur.execute(
+            """INSERT INTO cidades_hsp (nome_cidade, latitude, longitude, hsp_mensal, media_anual)
+               VALUES (%s, %s, %s, %s, %s)
+               ON CONFLICT (nome_cidade) DO UPDATE SET
+               hsp_mensal = EXCLUDED.hsp_mensal, atualizado_em = NOW()""",
+            (cidade, latitude, longitude, json.dumps(hsp_mensal), media_anual)
+        )
+        conn.commit()
+
+        return {
+            "cidade": cidade,
+            "hsp_mensal": hsp_mensal,
+            "media_anual": media_anual,
+            "fonte": "pvgis"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao validar cidade: {str(e)}")
     finally:
         cur.close()
         conn.close()
@@ -1367,22 +1509,39 @@ async def upload_conta(cliente_id: int, arquivo: UploadFile = File(...)):
 def geracao_esperada(cliente_id: int):
     conn = conectar_banco()
     cur = conn.cursor()
-    cur.execute("SELECT potencia_kwp,latitude,longitude,performance_ratio,tarifa_kwh,consumo_medio_antes_kwh FROM clientes WHERE id=%s", (cliente_id,))
+    cur.execute("SELECT potencia_kwp,latitude,longitude,performance_ratio,tarifa_kwh,consumo_medio_antes_kwh,cidade FROM clientes WHERE id=%s", (cliente_id,))
     c = cur.fetchone()
-    cur.close()
-    conn.close()
     if not c or not c[0]:
+        cur.close()
+        conn.close()
         raise HTTPException(status_code=404, detail="Projeto solar não cadastrado")
+
     kwp = float(c[0])
     pr = float(c[3]) if c[3] else 0.80
     tarifa = float(c[4]) if c[4] else None
     consumo_antes = float(c[5]) if c[5] else None
-    hsp = {1:5.2,2:5.4,3:5.1,4:4.8,5:4.5,6:4.3,7:4.5,8:5.0,9:4.9,10:4.8,11:4.9,12:5.0}
+    cidade = c[6] if c[6] else None
+
+    # Tenta buscar HSP da cidade do banco
+    hsp_mensal = None
+    if cidade:
+        cur.execute("SELECT hsp_mensal FROM cidades_hsp WHERE LOWER(nome_cidade) = LOWER(%s)", (cidade,))
+        r = cur.fetchone()
+        if r:
+            hsp_mensal = json.loads(r[0]) if isinstance(r[0], str) else r[0]
+
+    # Se não encontrou HSP da cidade, usa o padrão genérico (fallback)
+    if not hsp_mensal:
+        hsp_mensal = [5.2, 5.4, 5.1, 4.8, 4.5, 4.3, 4.5, 5.0, 4.9, 4.8, 4.9, 5.0]
+
+    cur.close()
+    conn.close()
+
     meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]
     dias = [31,28,31,30,31,30,31,31,30,31,30,31]
-    geracao = [{"mes":meses[i],"mes_num":i+1,"hsp":hsp[i+1],"kwh_esperado":round(kwp*hsp[i+1]*dias[i]*pr,2)} for i in range(12)]
+    geracao = [{"mes":meses[i],"mes_num":i+1,"hsp":hsp_mensal[i],"kwh_esperado":round(kwp*hsp_mensal[i]*dias[i]*pr,2)} for i in range(12)]
     return {"potencia_kwp":kwp,"performance_ratio":pr,"tarifa_kwh":tarifa,"consumo_medio_antes_kwh":consumo_antes,
-            "geracao_mensal":geracao,"total_anual":round(sum(g["kwh_esperado"] for g in geracao),2)}
+            "geracao_mensal":geracao,"total_anual":round(sum(g["kwh_esperado"] for g in geracao),2),"cidade":cidade,"fonte_hsp":"cidade" if cidade and hsp_mensal else "padrao"}
 
 @app.get("/clientes/{cliente_id}/saldo-creditos")
 def saldo_creditos(cliente_id: int):
