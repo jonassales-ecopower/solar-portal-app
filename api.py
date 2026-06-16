@@ -119,12 +119,29 @@ def buscar_hsp_pvgis(cidade: str, latitude: float = None, longitude: float = Non
     """
     try:
         if latitude is None or longitude is None:
-            # Geocodifica a cidade automaticamente
-            geo_url = f"https://nominatim.openstreetmap.org/search?q={cidade}&format=json"
-            geo_r = requests.get(geo_url, timeout=5)
-            if geo_r.status_code != 200 or not geo_r.json():
+            # Tenta múltiplas variações de busca para melhor compatibilidade
+            variacoes = [
+                cidade,  # Original (ex: "EXTREMA - MG")
+                cidade.replace(" - ", ", "),  # Ex: "EXTREMA, MG"
+                cidade.replace(" - ", ", ") + ", Brasil",  # Ex: "EXTREMA, MG, Brasil"
+                cidade.split(" - ")[0].strip(),  # Só a cidade (ex: "EXTREMA")
+                cidade.split(" - ")[0].strip() + ", Brasil",  # Cidade + Brasil
+            ]
+
+            geo = None
+            for var in variacoes:
+                try:
+                    geo_url = f"https://nominatim.openstreetmap.org/search?q={var}&format=json&countrycodes=br"
+                    geo_r = requests.get(geo_url, timeout=5)
+                    if geo_r.status_code == 200 and geo_r.json():
+                        geo = geo_r.json()[0]
+                        break
+                except:
+                    continue
+
+            if not geo:
                 return None
-            geo = geo_r.json()[0]
+
             latitude, longitude = float(geo['lat']), float(geo['lon'])
 
         # PVGIS API (gratuito, sem autenticação)
