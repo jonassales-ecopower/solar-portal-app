@@ -1396,14 +1396,21 @@ def extrair_geracao_grafico(dados: dict, integrador: dict = Depends(obter_integr
                         },
                         {
                             "type": "text",
-                            "text": """Analise este gráfico de geração solar esperada mensal.
-                            Extraia EXATAMENTE os 12 valores mensais (jan-dez) em kWh.
+                            "text": """INSTRUÇÃO CRÍTICA: Leia este gráfico de geração solar esperada mensal com MÁXIMA precisão.
 
-                            Responda em JSON puro, sem markdown:
-                            {"valores": [700.5, 689.2, 648.1, ...]}
+PASSOS:
+1. Localize os 12 meses (Janeiro, Fevereiro, Março... Dezembro) no eixo X
+2. Para CADA mês, leia O NÚMERO EXATO em kWh mostrado DENTRO DA BARRA
+3. Os valores possuem decimais (ex: 709.84, 506.45, 456.23)
+4. PRECISÃO TOTAL OBRIGATÓRIA - valores aproximados quebram o sistema
 
-                            Se não conseguir ler com precisão, ainda assim responda com 12 números (mesmo que aproximados).
-                            """
+FORMATO DE RESPOSTA (JSON puro, sem markdown, sem texto):
+{"valores": [jan, fev, mar, abr, mai, jun, jul, ago, set, out, nov, dez]}
+
+Exemplo: {"valores": [700.5, 689.2, 648.1, 590.4, 506.5, 456.2, 488.9, 623.6, 621.8, 712.5, 707.8, 782.6]}
+
+Validação: 12 números? Ordem correta jan→dez? Valores entre 400-800 kWh?
+"""
                         }
                     ]
                 }
