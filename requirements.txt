@@ -3,6 +3,7 @@ uvicorn
 psycopg2-binary
 python-jose[cryptography]
 openai
+anthropic
 PyPDF2
 python-multipart
 requests
