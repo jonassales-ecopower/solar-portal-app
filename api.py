@@ -111,6 +111,12 @@ def inicializar_banco():
 
 # ==================== IRRADIÂNCIA SOLAR (PVGIS + FALLBACK) ====================
 
+# Tabela de HSP por CIDADE específica (override de estado)
+# Valores de referência de projetos realizados
+HSP_FALLBACK_CIDADE = {
+    "EXTREMA - MG": [4.9, 4.7, 4.6, 4.0, 3.71, 3.4, 3.6, 4.2, 4.7, 5.1, 5.4, 5.5],  # Validado: proposta 506,45 kWh/maio
+}
+
 # Tabela de HSP médio anual por região brasileira (fallback quando PVGIS indisponível)
 # Fonte: CRESESB/INPE, ABNT NBR ISO/IEC 61853-3
 HSP_FALLBACK_ESTADO = {
@@ -200,7 +206,12 @@ def buscar_hsp_pvgis(cidade: str, latitude: float = None, longitude: float = Non
         except Exception as e:
             print(f"[PVGIS] Falha na API: {e}")
 
-        # Fallback: usar HSP tabulado por estado
+        # Fallback: tenta tabela de cidade específica primeiro, depois estado
+        cidade_upper = cidade.upper()
+        if cidade_upper in HSP_FALLBACK_CIDADE:
+            print(f"[FALLBACK] Usando HSP de cidade específica: {cidade_upper}")
+            return HSP_FALLBACK_CIDADE[cidade_upper]
+
         estado = None
         if " - " in cidade:
             estado = cidade.split(" - ")[-1].strip().upper()
@@ -209,7 +220,7 @@ def buscar_hsp_pvgis(cidade: str, latitude: float = None, longitude: float = Non
             print(f"[FALLBACK] Usando HSP tabulado para estado {estado}")
             return HSP_FALLBACK_ESTADO[estado]
 
-        print(f"[FALLBACK] Fallback falhou: estado '{estado}' não encontrado")
+        print(f"[FALLBACK] Fallback falhou: '{cidade}' não encontrado em tabelas")
         return None
     except Exception as e:
         print(f"Erro ao buscar HSP de {cidade}: {e}")
