@@ -614,11 +614,10 @@
             </div>
             <div class="campo">
                 <label style="color:#7c3aed;font-weight:700;">📊 Geração Esperada Mensal (kWh)</label>
-                <p style="font-size:11px;color:#666;margin-bottom:8px;">⭐ Opção 1: Upload imagem/PDF → IA extrai. Opção 2: Digite manualmente.</p>
-                <div style="display:flex;gap:8px;margin-bottom:12px;">
-                    <input type="file" id="mc-ger-imagem" accept="image/*,.pdf" style="flex:1;">
-                    <button class="azul pequeno" onclick="mcExtrairGeracaoIA()" style="white-space:nowrap;">🤖 Extrair IA</button>
-                </div>
+                <p style="font-size:11px;color:#666;margin-bottom:8px;">Cole os 12 valores separados por ";" ou preencha manualmente abaixo</p>
+                <textarea id="mc-ger-texto" placeholder="Ex: 709,84; 669,13; 647,88; 590,49; 506,45; 456,23; 488,94; 623,64; 621,77; 712,54; 707,8; 782,58"
+                    style="width:100%;min-height:50px;padding:8px;border:1px solid #ccc;border-radius:4px;font-size:12px;font-family:monospace;margin-bottom:12px;"
+                    onchange="mcParsearGeracaoTextarea()"></textarea>
                 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
                     <div><label style="font-size:10px;color:#666;">Jan</label><input type="number" id="mc-ger-01" placeholder="kWh" step="0.01" style="width:100%;"></div>
                     <div><label style="font-size:10px;color:#666;">Fev</label><input type="number" id="mc-ger-02" placeholder="kWh" step="0.01" style="width:100%;"></div>
@@ -633,7 +632,7 @@
                     <div><label style="font-size:10px;color:#666;">Nov</label><input type="number" id="mc-ger-11" placeholder="kWh" step="0.01" style="width:100%;"></div>
                     <div><label style="font-size:10px;color:#666;">Dez</label><input type="number" id="mc-ger-12" placeholder="kWh" step="0.01" style="width:100%;"></div>
                 </div>
-                <p style="font-size:11px;color:#888;">Preencha os 12 meses conforme a proposta do integrador.</p>
+                <p style="font-size:11px;color:#888;">💡 Dica: Use Google Gemini para extrair valores do gráfico da proposta</p>
             </div>
             <div class="campo">
                 <label>Endereço da instalação</label>
@@ -1942,46 +1941,29 @@ async function mcValidarCidade() {
 }
 
 
-async function mcExtrairGeracaoIA() {
-    const fileInput = document.getElementById('mc-ger-imagem');
-    const file = fileInput.files[0];
-    if (!file) {
-        alert('Selecione uma imagem ou PDF');
-        return;
-    }
+function mcParsearGeracaoTextarea() {
+    const texto = document.getElementById('mc-ger-texto').value.trim();
+    if (!texto) return;
 
     try {
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            const base64 = e.target.result.split(',')[1];
+        // Parse: "709,84; 669,13; 647,88; ..." → [709.84, 669.13, 647.88, ...]
+        const valores = texto.split(';').map(v => {
+            const num = parseFloat(v.trim().replace(',', '.'));
+            return isNaN(num) ? null : num;
+        }).filter(v => v !== null);
 
-            const resp = await fetch(`${API}/extrair-geracao-ia`, {
-                method: 'POST',
-                headers: {"Content-Type": "application/json", "Authorization": `Bearer ${token}`},
-                body: JSON.stringify({imagem_base64: base64})
-            });
-            const data = await resp.json();
+        if (valores.length !== 12) {
+            alert(`Erro: encontrei ${valores.length} valores, preciso de 12`);
+            return;
+        }
 
-            if (!resp.ok) {
-                alert('Erro: ' + (data.detail || 'Tente com imagem mais clara'));
-                return;
-            }
-
-            // Parse formato: "Janeiro; 709.84 Fevereiro; 689.13 ..."
-            const valores = data.valores;
-            if (valores && valores.length === 12) {
-                // Preenche os 12 campos
-                for (let i = 0; i < 12; i++) {
-                    document.getElementById(`mc-ger-${(i+1).toString().padStart(2,'0')}`).value = valores[i];
-                }
-                alert('✓ Extraído com sucesso! Revise os valores.');
-            } else {
-                alert('Erro: Não consegui extrair 12 valores. Tente preencher manualmente.');
-            }
-        };
-        reader.readAsDataURL(file);
+        // Preenche os 12 campos
+        for (let i = 0; i < 12; i++) {
+            document.getElementById(`mc-ger-${(i+1).toString().padStart(2,'0')}`).value = valores[i];
+        }
+        alert('✓ Valores preenchidos! Revise e clique Salvar.');
     } catch(e) {
-        alert('Erro: ' + e.message);
+        alert('Erro ao parsear valores: ' + e.message);
     }
 }
 
