@@ -1166,46 +1166,14 @@ def atualizar_cliente(cliente_id: int, dados: dict, integrador: dict = Depends(o
             except Exception:
                 pass
 
-        # Log qual database estamos usando
-        cur.execute("SELECT current_database(), current_user, inet_client_addr()")
-        db_info = cur.fetchone()
-        print(f"[DEBUG] Conectado a: database={db_info[0]}, user={db_info[1]}, client_ip={db_info[2]}")
-
-        print(f"[DEBUG] Antes UPDATE: geracao_esperada_mensal={repr(geracao_esperada_mensal)[:60] if geracao_esperada_mensal else 'None'}")
-        print(f"[DEBUG] SQL params: cliente_id={cliente_id}, integrador_id={integrador['id']}, geracao_esperada_mensal type={type(geracao_esperada_mensal).__name__}")
-
-        sql_update = """
+        cur.execute("""
             UPDATE clientes SET nome=%s, email=%s, telefone=%s, numero_uc=%s, distribuidora=%s, tipo_gd=%s, cidade=%s, geracao_esperada_mensal=%s
-            WHERE id=%s AND integrador_id=%s RETURNING id, nome, geracao_esperada_mensal
-        """
-        params_update = (dados.get("nome"), dados.get("email"), dados.get("telefone"),
-                        dados.get("numero_uc"), dados.get("distribuidora"), dados.get("tipo_gd"),
-                        cidade, geracao_esperada_mensal, cliente_id, integrador["id"])
-
-        print(f"[DEBUG] Executando UPDATE com params: {params_update[-2:]}")
-        cur.execute(sql_update, params_update)
+            WHERE id=%s AND integrador_id=%s RETURNING id, nome, cidade
+        """, (dados.get("nome"), dados.get("email"), dados.get("telefone"),
+              dados.get("numero_uc"), dados.get("distribuidora"), dados.get("tipo_gd"),
+              cidade, geracao_esperada_mensal, cliente_id, integrador["id"]))
         c = cur.fetchone()
-        print(f"[DEBUG] RETURNING result: {c}")
-
-        # Verifica se alguma linha foi atualizada
-        linhas_afetadas = cur.rowcount
-        print(f"[DEBUG] Linhas afetadas pelo UPDATE: {linhas_afetadas}")
-
-        try:
-            conn.commit()
-            print(f"[DEBUG] ✓ Commit bem-sucedido")
-        except Exception as e:
-            print(f"[DEBUG] ✗ Erro no commit: {e}")
-            raise
-
-        # Query pós-save para verificar - usa um novo cursor para garantir leitura fresca
-        cur2 = conn.cursor()
-        try:
-            cur2.execute("SELECT geracao_esperada_mensal FROM clientes WHERE id=%s", (cliente_id,))
-            resultado = cur2.fetchone()
-            print(f"[DEBUG] PÓS-COMMIT: geracao_esperada_mensal no banco = {repr(resultado[0])[:60] if resultado and resultado[0] else 'NULL'}")
-        finally:
-            cur2.close()
+        conn.commit()
 
         if not c:
             cur.close()
