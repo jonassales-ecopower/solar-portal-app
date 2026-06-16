@@ -1169,13 +1169,18 @@ def atualizar_cliente(cliente_id: int, dados: dict, integrador: dict = Depends(o
         print(f"[DEBUG] Antes UPDATE: geracao_esperada_mensal={repr(geracao_esperada_mensal)[:60] if geracao_esperada_mensal else 'None'}")
         print(f"[DEBUG] SQL params: cliente_id={cliente_id}, integrador_id={integrador['id']}, geracao_esperada_mensal type={type(geracao_esperada_mensal).__name__}")
 
-        cur.execute("""
+        sql_update = """
             UPDATE clientes SET nome=%s, email=%s, telefone=%s, numero_uc=%s, distribuidora=%s, tipo_gd=%s, cidade=%s, geracao_esperada_mensal=%s
-            WHERE id=%s AND integrador_id=%s RETURNING id, nome, cidade
-        """, (dados.get("nome"), dados.get("email"), dados.get("telefone"),
-              dados.get("numero_uc"), dados.get("distribuidora"), dados.get("tipo_gd"),
-              cidade, geracao_esperada_mensal, cliente_id, integrador["id"]))
+            WHERE id=%s AND integrador_id=%s RETURNING id, nome, geracao_esperada_mensal
+        """
+        params_update = (dados.get("nome"), dados.get("email"), dados.get("telefone"),
+                        dados.get("numero_uc"), dados.get("distribuidora"), dados.get("tipo_gd"),
+                        cidade, geracao_esperada_mensal, cliente_id, integrador["id"])
+
+        print(f"[DEBUG] Executando UPDATE com params: {params_update[-2:]}")
+        cur.execute(sql_update, params_update)
         c = cur.fetchone()
+        print(f"[DEBUG] RETURNING result: {c}")
 
         # Verifica se alguma linha foi atualizada
         linhas_afetadas = cur.rowcount
