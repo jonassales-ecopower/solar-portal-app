@@ -266,10 +266,18 @@ def buscar_hsp_pvgis(cidade: str, latitude: float = None, longitude: float = Non
 
         # 1. PRIORIDADE 1: Dados específicos de cidade (validados pelo integrador)
         cidade_upper = cidade.upper()
+
+        # Tenta busca exata primeiro
         if cidade_upper in HSP_FALLBACK_CIDADE:
             resultado = HSP_FALLBACK_CIDADE[cidade_upper]
-            print(f"[HSP] ✓ USANDO EXTREMA: {resultado} (maio={resultado[4]})")
+            print(f"[HSP] ✓ Encontrado EXATO: {cidade_upper} → maio={resultado[4]}")
             return resultado
+
+        # Fallback: busca parcial (case-insensitive) para "EXTREMA"
+        for chave, valores in HSP_FALLBACK_CIDADE.items():
+            if "extrema" in cidade_upper.lower() and "mg" in cidade_upper.lower():
+                print(f"[HSP] ✓ Encontrado PARCIAL EXTREMA-MG: {chave} → maio={valores[4]}")
+                return valores
 
         # 2. PRIORIDADE 2: Tenta APIs externas (dados genéricos)
         apis = [
