@@ -264,7 +264,13 @@ def buscar_hsp_pvgis(cidade: str, latitude: float = None, longitude: float = Non
 
             latitude, longitude = float(geo['lat']), float(geo['lon'])
 
-        # Tenta APIs externas em sequência
+        # 1. PRIORIDADE 1: Dados específicos de cidade (validados pelo integrador)
+        cidade_upper = cidade.upper()
+        if cidade_upper in HSP_FALLBACK_CIDADE:
+            print(f"[HSP] Usando dados validados de cidade: {cidade_upper}")
+            return HSP_FALLBACK_CIDADE[cidade_upper]
+
+        # 2. PRIORIDADE 2: Tenta APIs externas (dados genéricos)
         apis = [
             ("Open-Meteo", lambda: buscar_hsp_openmeteo(latitude, longitude)),
             ("NASA POWER", lambda: buscar_hsp_nasapower(latitude, longitude)),
@@ -280,21 +286,16 @@ def buscar_hsp_pvgis(cidade: str, latitude: float = None, longitude: float = Non
             except Exception as e:
                 print(f"[HSP] {api_name} falhou: {e}")
 
-        # Fallback: tenta tabela de cidade específica primeiro, depois estado
-        cidade_upper = cidade.upper()
-        if cidade_upper in HSP_FALLBACK_CIDADE:
-            print(f"[FALLBACK] Usando HSP de cidade específica: {cidade_upper}")
-            return HSP_FALLBACK_CIDADE[cidade_upper]
-
+        # 3. PRIORIDADE 3: Fallback de estado
         estado = None
         if " - " in cidade:
             estado = cidade.split(" - ")[-1].strip().upper()
 
         if estado and len(estado) == 2 and estado in HSP_FALLBACK_ESTADO:
-            print(f"[FALLBACK] Usando HSP tabulado para estado {estado}")
+            print(f"[HSP] Fallback para estado {estado}")
             return HSP_FALLBACK_ESTADO[estado]
 
-        print(f"[FALLBACK] Fallback falhou: '{cidade}' não encontrado em tabelas")
+        print(f"[HSP] Todas as estratégias falharam para '{cidade}'")
         return None
     except Exception as e:
         print(f"Erro ao buscar HSP de {cidade}: {e}")
