@@ -149,10 +149,86 @@ HSP_FALLBACK_ESTADO = {
     "TO": [5.2, 4.8, 4.9, 4.5, 4.1, 3.8, 3.9, 4.4, 4.7, 5.1, 5.3, 5.4],  # Tocantins
 }
 
+def buscar_hsp_openmeteo(latitude: float, longitude: float):
+    """Busca HSP via Open-Meteo (irradiância média diária em MJ/m²)."""
+    try:
+        url = f"https://archive-api.open-meteo.com/v1/archive?latitude={latitude}&longitude={longitude}&start_date=2023-01-01&end_date=2023-12-31&monthly=shortwave_radiation_sum&timezone=auto"
+        r = requests.get(url, timeout=10)
+        if r.status_code != 200:
+            return None
+
+        data = r.json()
+        if "error" in data or "monthly" not in data:
+            return None
+
+        # Converte MJ/m²/mês para kWh/m²/dia (HSP)
+        monthly = data["monthly"].get("shortwave_radiation_sum", [])
+        if not monthly or len(monthly) < 12:
+            return None
+
+        hsp = []
+        dias_mes = [31, 28.25, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        for i, mj in enumerate(monthly[:12]):
+            if mj is None:
+                return None
+            kwh_m2_dia = (float(mj) / 3.6) / dias_mes[i]  # MJ → kWh, dividir por dias do mês
+            hsp.append(round(kwh_m2_dia, 2))
+
+        return hsp
+    except Exception as e:
+        print(f"[OpenMeteo] Erro: {e}")
+        return None
+
+def buscar_hsp_nasapower(latitude: float, longitude: float):
+    """Busca HSP via NASA POWER (ALLSKY_SFC_SW_DWN em kWh/m²/dia)."""
+    try:
+        url = f"https://power.larc.nasa.gov/api/v1/monthly?latitude={latitude}&longitude={longitude}&parameters=ALLSKY_SFC_SW_DWN&format=json&start=2023&end=2023&community=SB"
+        r = requests.get(url, timeout=10)
+        if r.status_code != 200:
+            return None
+
+        data = r.json()
+        if "properties" not in data or "ALLSKY_SFC_SW_DWN" not in data["properties"]:
+            return None
+
+        monthly_data = data["properties"]["ALLSKY_SFC_SW_DWN"]
+        if not monthly_data or len(monthly_data) < 12:
+            return None
+
+        # NASA POWER já retorna em kWh/m²/dia
+        hsp = [round(float(monthly_data[f"{m+1:02d}"]), 2) for m in range(12)]
+        return hsp
+    except Exception as e:
+        print(f"[NASA POWER] Erro: {e}")
+        return None
+
+def buscar_hsp_pvgis_raw(latitude: float, longitude: float):
+    """Busca HSP via PVGIS (backup, cobertura limitada)."""
+    try:
+        url = "https://re.jrc.ec.europa.eu/api/v5_2/solarresource"
+        params = {"lat": latitude, "lon": longitude, "outputformat": "json"}
+        r = requests.get(url, params=params, timeout=10)
+        if r.status_code != 200:
+            return None
+
+        data = r.json()
+        monthly = data.get("monthly", [])
+        if not monthly or len(monthly) < 12:
+            return None
+
+        hsp = []
+        for m in monthly[:12]:
+            rad = float(m.get("rad", 5.0))
+            hsp.append(round(rad, 2))
+        return hsp
+    except Exception as e:
+        print(f"[PVGIS] Erro: {e}")
+        return None
+
 def buscar_hsp_pvgis(cidade: str, latitude: float = None, longitude: float = None):
     """
-    Busca HSP mensal (horas de pico solar) do PVGIS (IRENA).
-    Tenta geocodificação automática se lat/lng não fornecidos.
+    Busca HSP mensal (horas de pico solar) com múltiplas estratégias.
+    Tenta: APIs externas → cache em BD → fallback de estado
     Retorna lista de 12 valores (jan-dez) ou None se falhar.
     """
     try:
@@ -188,23 +264,21 @@ def buscar_hsp_pvgis(cidade: str, latitude: float = None, longitude: float = Non
 
             latitude, longitude = float(geo['lat']), float(geo['lon'])
 
-        # Tenta PVGIS API
-        pvgis_url = "https://re.jrc.ec.europa.eu/api/v5_2/solarresource"
-        params = {"lat": latitude, "lon": longitude, "outputformat": "json"}
-        try:
-            r = requests.get(pvgis_url, params=params, timeout=10)
-            if r.status_code == 200:
-                data = r.json()
-                monthly = data.get("monthly", [])
-                if monthly and len(monthly) >= 12:
-                    hsp = []
-                    for m in monthly[:12]:
-                        rad = float(m.get("rad", 5.0))
-                        hsp.append(round(rad, 2))
-                    print(f"[PVGIS] Sucesso para ({latitude}, {longitude})")
+        # Tenta APIs externas em sequência
+        apis = [
+            ("Open-Meteo", lambda: buscar_hsp_openmeteo(latitude, longitude)),
+            ("NASA POWER", lambda: buscar_hsp_nasapower(latitude, longitude)),
+            ("PVGIS", lambda: buscar_hsp_pvgis_raw(latitude, longitude)),
+        ]
+
+        for api_name, api_func in apis:
+            try:
+                hsp = api_func()
+                if hsp and len(hsp) == 12:
+                    print(f"[HSP] Sucesso via {api_name} para ({latitude}, {longitude})")
                     return hsp
-        except Exception as e:
-            print(f"[PVGIS] Falha na API: {e}")
+            except Exception as e:
+                print(f"[HSP] {api_name} falhou: {e}")
 
         # Fallback: tenta tabela de cidade específica primeiro, depois estado
         cidade_upper = cidade.upper()
