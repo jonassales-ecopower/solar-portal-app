@@ -1459,9 +1459,15 @@ VERIFICAÇÃO FINAL:
         resposta = r.json()
         conteudo = resposta["choices"][0]["message"]["content"]
 
-        # Parse JSON da resposta
-        match = re.search(r'\{.*"valores"\s*:\s*\[([\d.,\s]+)\].*\}', conteudo, re.DOTALL)
-        if not match:
+        # Parse JSON da resposta - mais flexível para diferentes formatos
+        try:
+            # Tenta extrair o JSON diretamente
+            json_match = re.search(r'\{[\s\S]*"valores"\s*:\s*\[([\s\S]*?)\][\s\S]*\}', conteudo)
+            if json_match:
+                valores_str = json_match.group(1)
+            else:
+                raise HTTPException(status_code=400, detail="Formato de resposta inválido. Tente novamente.")
+        except:
             raise HTTPException(status_code=400, detail="Formato de resposta inválido. Tente novamente.")
 
         valores_str = match.group(1)
