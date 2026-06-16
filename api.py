@@ -405,8 +405,13 @@ security = HTTPBearer()
 
 def conectar_banco():
     if DATABASE_URL:
+        # Log do banco (masca a URL por segurança)
+        masked = DATABASE_URL.split("@")[1] if "@" in DATABASE_URL else "remote"
+        print(f"[DB] Conectando a: ...@{masked}")
         return psycopg2.connect(DATABASE_URL, sslmode="require")
-    return psycopg2.connect(host="localhost", port=5432, database="solar_portal", user="postgres", password="991Bog31**")
+    else:
+        print("[DB] Conectando a: localhost:5432")
+        return psycopg2.connect(host="localhost", port=5432, database="solar_portal", user="postgres", password="991Bog31**")
 
 def obter_integrador_atual(credentials: HTTPAuthorizationCredentials = Depends(security)):
     payload = verificar_token(credentials.credentials)
