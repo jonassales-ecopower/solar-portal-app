@@ -100,8 +100,9 @@ def inicializar_banco():
                 atualizado_em TIMESTAMP DEFAULT NOW()
             )
         """)
-        # Adiciona coluna cidade em clientes se não existir
+        # Adiciona colunas em clientes se não existirem
         cur.execute("""ALTER TABLE clientes ADD COLUMN IF NOT EXISTS cidade TEXT""")
+        cur.execute("""ALTER TABLE clientes ADD COLUMN IF NOT EXISTS geracao_esperada_mensal TEXT""")
         conn.commit()
     except Exception:
         conn.rollback()
@@ -1127,12 +1128,29 @@ def atualizar_cliente(cliente_id: int, dados: dict, integrador: dict = Depends(o
     cur = conn.cursor()
     try:
         cidade = dados.get("cidade", "").strip() if dados.get("cidade") else None
+
+        # Parse geração esperada mensal (12 valores)
+        geracao_esperada_mensal = None
+        if dados.get("geracao_esperada_mensal"):
+            try:
+                ger = dados.get("geracao_esperada_mensal")
+                if isinstance(ger, str):
+                    # Parse: "700, 650, 680..." ou "700\n650\n680..."
+                    valores = [v.strip() for v in ger.replace("\n", ",").split(",") if v.strip()]
+                    valores = [float(v) for v in valores]
+                    if len(valores) == 12:
+                        geracao_esperada_mensal = json.dumps(valores)
+                elif isinstance(ger, list) and len(ger) == 12:
+                    geracao_esperada_mensal = json.dumps([float(v) for v in ger])
+            except:
+                pass
+
         cur.execute("""
-            UPDATE clientes SET nome=%s, email=%s, telefone=%s, numero_uc=%s, distribuidora=%s, tipo_gd=%s, cidade=%s
+            UPDATE clientes SET nome=%s, email=%s, telefone=%s, numero_uc=%s, distribuidora=%s, tipo_gd=%s, cidade=%s, geracao_esperada_mensal=%s
             WHERE id=%s AND integrador_id=%s RETURNING id, nome, cidade
         """, (dados.get("nome"), dados.get("email"), dados.get("telefone"),
               dados.get("numero_uc"), dados.get("distribuidora"), dados.get("tipo_gd"),
-              cidade, cliente_id, integrador["id"]))
+              cidade, geracao_esperada_mensal, cliente_id, integrador["id"]))
         c = cur.fetchone()
         conn.commit()
         if not c:
@@ -1673,7 +1691,7 @@ async def upload_conta(cliente_id: int, arquivo: UploadFile = File(...)):
 def geracao_esperada(cliente_id: int):
     conn = conectar_banco()
     cur = conn.cursor()
-    cur.execute("SELECT potencia_kwp,latitude,longitude,performance_ratio,tarifa_kwh,consumo_medio_antes_kwh,cidade FROM clientes WHERE id=%s", (cliente_id,))
+    cur.execute("SELECT potencia_kwp,latitude,longitude,performance_ratio,tarifa_kwh,consumo_medio_antes_kwh,cidade,geracao_esperada_mensal FROM clientes WHERE id=%s", (cliente_id,))
     c = cur.fetchone()
     if not c or not c[0]:
         cur.close()
@@ -1685,8 +1703,23 @@ def geracao_esperada(cliente_id: int):
     tarifa = float(c[4]) if c[4] else None
     consumo_antes = float(c[5]) if c[5] else None
     cidade = c[6] if c[6] else None
+    geracao_esperada_json = c[7] if c[7] else None
 
-    # Tenta buscar HSP da cidade do banco
+    meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]
+    dias = [31,28,31,30,31,30,31,31,30,31,30,31]
+
+    # PRIORIDADE 1: Usar geração esperada manual se fornecida
+    if geracao_esperada_json:
+        try:
+            kwh_mensal = json.loads(geracao_esperada_json) if isinstance(geracao_esperada_json, str) else geracao_esperada_json
+            if len(kwh_mensal) == 12:
+                geracao = [{"mes":meses[i],"mes_num":i+1,"hsp":None,"kwh_esperado":round(float(kwh_mensal[i]),2)} for i in range(12)]
+                return {"potencia_kwp":kwp,"performance_ratio":pr,"tarifa_kwh":tarifa,"consumo_medio_antes_kwh":consumo_antes,
+                        "geracao_mensal":geracao,"total_anual":round(sum(g["kwh_esperado"] for g in geracao),2),"cidade":cidade,"fonte_hsp":"manual"}
+        except:
+            pass
+
+    # PRIORIDADE 2: Calcular via HSP
     hsp_mensal = None
     if cidade:
         cur.execute("SELECT hsp_mensal FROM cidades_hsp WHERE LOWER(nome_cidade) = LOWER(%s)", (cidade,))
@@ -1694,15 +1727,12 @@ def geracao_esperada(cliente_id: int):
         if r:
             hsp_mensal = json.loads(r[0]) if isinstance(r[0], str) else r[0]
 
-    # Se não encontrou HSP da cidade, usa o padrão genérico (fallback)
     if not hsp_mensal:
         hsp_mensal = [5.2, 5.4, 5.1, 4.8, 4.5, 4.3, 4.5, 5.0, 4.9, 4.8, 4.9, 5.0]
 
     cur.close()
     conn.close()
 
-    meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]
-    dias = [31,28,31,30,31,30,31,31,30,31,30,31]
     geracao = [{"mes":meses[i],"mes_num":i+1,"hsp":hsp_mensal[i],"kwh_esperado":round(kwp*hsp_mensal[i]*dias[i]*pr,2)} for i in range(12)]
     return {"potencia_kwp":kwp,"performance_ratio":pr,"tarifa_kwh":tarifa,"consumo_medio_antes_kwh":consumo_antes,
             "geracao_mensal":geracao,"total_anual":round(sum(g["kwh_esperado"] for g in geracao),2),"cidade":cidade,"fonte_hsp":"cidade" if cidade and hsp_mensal else "padrao"}
