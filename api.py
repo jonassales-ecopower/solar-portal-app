@@ -109,7 +109,39 @@ def inicializar_banco():
         cur.close()
         conn.close()
 
-# ==================== IRRADIÂNCIA SOLAR (PVGIS) ====================
+# ==================== IRRADIÂNCIA SOLAR (PVGIS + FALLBACK) ====================
+
+# Tabela de HSP médio anual por região brasileira (fallback quando PVGIS indisponível)
+# Fonte: CRESESB/INPE, ABNT NBR ISO/IEC 61853-3
+HSP_FALLBACK_ESTADO = {
+    "AC": [4.5, 4.3, 4.4, 4.3, 4.2, 3.8, 3.9, 4.3, 4.5, 4.8, 4.7, 4.6],  # Acre
+    "AL": [5.2, 4.8, 4.9, 4.6, 4.2, 3.9, 4.1, 4.5, 4.8, 5.1, 5.3, 5.4],  # Alagoas
+    "AP": [3.9, 3.8, 4.0, 4.0, 4.0, 3.8, 3.9, 4.2, 4.5, 4.5, 4.2, 4.0],  # Amapá
+    "AM": [3.8, 3.7, 3.8, 3.7, 3.8, 3.5, 3.6, 3.9, 4.2, 4.4, 4.1, 3.9],  # Amazonas
+    "BA": [5.5, 5.0, 5.1, 4.6, 4.2, 3.9, 4.1, 4.6, 5.0, 5.4, 5.6, 5.7],  # Bahia
+    "CE": [5.2, 4.8, 4.9, 4.5, 4.0, 3.7, 3.9, 4.4, 4.8, 5.2, 5.4, 5.5],  # Ceará
+    "DF": [5.5, 5.1, 5.0, 4.5, 4.0, 3.7, 3.9, 4.5, 4.9, 5.3, 5.6, 5.7],  # Distrito Federal
+    "ES": [5.2, 4.9, 4.9, 4.4, 3.9, 3.6, 3.8, 4.3, 4.8, 5.1, 5.4, 5.5],  # Espírito Santo
+    "GO": [5.4, 5.0, 5.0, 4.4, 3.9, 3.6, 3.8, 4.4, 4.9, 5.3, 5.5, 5.6],  # Goiás
+    "MA": [5.0, 4.7, 4.8, 4.5, 4.2, 3.9, 4.0, 4.4, 4.7, 5.0, 5.1, 5.2],  # Maranhão
+    "MT": [5.2, 4.9, 4.9, 4.3, 3.9, 3.6, 3.7, 4.3, 4.8, 5.2, 5.4, 5.5],  # Mato Grosso
+    "MS": [5.4, 5.1, 5.0, 4.4, 3.9, 3.5, 3.7, 4.4, 4.9, 5.3, 5.6, 5.7],  # Mato Grosso do Sul
+    "MG": [5.3, 5.0, 4.9, 4.3, 3.8, 3.5, 3.7, 4.3, 4.8, 5.2, 5.5, 5.6],  # Minas Gerais (Extrema está aqui)
+    "PA": [4.0, 3.9, 4.0, 4.0, 4.0, 3.8, 3.9, 4.2, 4.5, 4.6, 4.2, 4.0],  # Pará
+    "PB": [5.2, 4.8, 4.9, 4.5, 4.0, 3.7, 3.9, 4.4, 4.8, 5.2, 5.4, 5.5],  # Paraíba
+    "PR": [5.0, 4.7, 4.7, 4.1, 3.6, 3.2, 3.4, 4.0, 4.5, 4.9, 5.2, 5.3],  # Paraná
+    "PE": [5.1, 4.7, 4.9, 4.5, 4.1, 3.8, 4.0, 4.5, 4.8, 5.1, 5.2, 5.3],  # Pernambuco
+    "PI": [5.1, 4.8, 4.9, 4.5, 4.1, 3.8, 4.0, 4.4, 4.8, 5.1, 5.3, 5.4],  # Piauí
+    "RJ": [5.0, 4.8, 4.8, 4.3, 3.8, 3.5, 3.7, 4.2, 4.7, 5.0, 5.3, 5.4],  # Rio de Janeiro
+    "RN": [5.2, 4.8, 4.9, 4.5, 4.0, 3.7, 3.9, 4.4, 4.8, 5.2, 5.4, 5.5],  # Rio Grande do Norte
+    "RS": [4.6, 4.4, 4.4, 3.9, 3.4, 2.9, 3.1, 3.7, 4.3, 4.7, 4.9, 5.0],  # Rio Grande do Sul
+    "RO": [4.4, 4.2, 4.3, 4.2, 4.2, 3.8, 3.9, 4.3, 4.6, 4.9, 4.7, 4.6],  # Rondônia
+    "RR": [3.9, 3.8, 3.9, 3.9, 4.0, 3.8, 3.9, 4.2, 4.5, 4.6, 4.3, 4.0],  # Roraima
+    "SC": [4.8, 4.6, 4.6, 4.0, 3.5, 3.0, 3.2, 3.8, 4.4, 4.8, 5.0, 5.1],  # Santa Catarina
+    "SP": [5.1, 4.8, 4.8, 4.2, 3.8, 3.4, 3.6, 4.2, 4.7, 5.0, 5.3, 5.4],  # São Paulo
+    "SE": [5.2, 4.8, 4.9, 4.6, 4.2, 3.9, 4.1, 4.5, 4.8, 5.1, 5.3, 5.4],  # Sergipe
+    "TO": [5.2, 4.8, 4.9, 4.5, 4.1, 3.8, 3.9, 4.4, 4.7, 5.1, 5.3, 5.4],  # Tocantins
+}
 
 def buscar_hsp_pvgis(cidade: str, latitude: float = None, longitude: float = None):
     """
@@ -150,28 +182,35 @@ def buscar_hsp_pvgis(cidade: str, latitude: float = None, longitude: float = Non
 
             latitude, longitude = float(geo['lat']), float(geo['lon'])
 
-        # PVGIS API (gratuito, sem autenticação)
+        # Tenta PVGIS API
         pvgis_url = "https://re.jrc.ec.europa.eu/api/v5_2/solarresource"
         params = {"lat": latitude, "lon": longitude, "outputformat": "json"}
-        r = requests.get(pvgis_url, params=params, timeout=10)
+        try:
+            r = requests.get(pvgis_url, params=params, timeout=10)
+            if r.status_code == 200:
+                data = r.json()
+                monthly = data.get("monthly", [])
+                if monthly and len(monthly) >= 12:
+                    hsp = []
+                    for m in monthly[:12]:
+                        rad = float(m.get("rad", 5.0))
+                        hsp.append(round(rad, 2))
+                    print(f"[PVGIS] Sucesso para ({latitude}, {longitude})")
+                    return hsp
+        except Exception as e:
+            print(f"[PVGIS] Falha na API: {e}")
 
-        if r.status_code != 200:
-            print(f"[PVGIS] PVGIS API falhou: status {r.status_code} para ({latitude}, {longitude})")
-            return None
+        # Fallback: usar HSP tabulado por estado
+        estado = None
+        if " - " in cidade:
+            estado = cidade.split(" - ")[-1].strip().upper()
 
-        data = r.json()
-        monthly = data.get("monthly", [])
-        if not monthly or len(monthly) < 12:
-            print(f"[PVGIS] Dados mensais inválidos: {len(monthly) if monthly else 0} meses")
-            return None
+        if estado and len(estado) == 2 and estado in HSP_FALLBACK_ESTADO:
+            print(f"[FALLBACK] Usando HSP tabulado para estado {estado}")
+            return HSP_FALLBACK_ESTADO[estado]
 
-        # Converte irradiância (kWh/m²/dia) em HSP (horas de pico solar)
-        hsp = []
-        for m in monthly[:12]:
-            rad = float(m.get("rad", 5.0))
-            hsp.append(round(rad, 2))
-
-        return hsp
+        print(f"[FALLBACK] Fallback falhou: estado '{estado}' não encontrado")
+        return None
     except Exception as e:
         print(f"Erro ao buscar HSP de {cidade}: {e}")
         return None
