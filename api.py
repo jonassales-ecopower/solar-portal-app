@@ -1181,12 +1181,21 @@ def atualizar_cliente(cliente_id: int, dados: dict, integrador: dict = Depends(o
         linhas_afetadas = cur.rowcount
         print(f"[DEBUG] Linhas afetadas pelo UPDATE: {linhas_afetadas}")
 
-        conn.commit()
+        try:
+            conn.commit()
+            print(f"[DEBUG] ✓ Commit bem-sucedido")
+        except Exception as e:
+            print(f"[DEBUG] ✗ Erro no commit: {e}")
+            raise
 
-        # Query pós-save para verificar
-        cur.execute("SELECT geracao_esperada_mensal FROM clientes WHERE id=%s", (cliente_id,))
-        resultado = cur.fetchone()
-        print(f"[DEBUG] PÓS-COMMIT: geracao_esperada_mensal no banco = {repr(resultado[0])[:60] if resultado and resultado[0] else 'NULL'}")
+        # Query pós-save para verificar - usa um novo cursor para garantir leitura fresca
+        cur2 = conn.cursor()
+        try:
+            cur2.execute("SELECT geracao_esperada_mensal FROM clientes WHERE id=%s", (cliente_id,))
+            resultado = cur2.fetchone()
+            print(f"[DEBUG] PÓS-COMMIT: geracao_esperada_mensal no banco = {repr(resultado[0])[:60] if resultado and resultado[0] else 'NULL'}")
+        finally:
+            cur2.close()
 
         if not c:
             cur.close()
