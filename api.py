@@ -1467,10 +1467,10 @@ VERIFICAÇÃO FINAL:
                 valores_str = json_match.group(1)
             else:
                 raise HTTPException(status_code=400, detail="Formato de resposta inválido. Tente novamente.")
-        except:
+        except Exception as e:
+            print(f"Erro ao parsear JSON: {e}, conteudo: {conteudo[:200]}")
             raise HTTPException(status_code=400, detail="Formato de resposta inválido. Tente novamente.")
 
-        valores_str = match.group(1)
         valores = [float(v.strip().replace(',', '.')) for v in valores_str.split(",")]
 
         if len(valores) != 12:
