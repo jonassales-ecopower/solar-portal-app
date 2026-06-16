@@ -1457,10 +1457,10 @@ VALIDAÇÃO: 12 números? Ordem jan→dez? Valores entre 300-900 kWh?
         if len(valores) != 12:
             raise HTTPException(status_code=400, detail=f"Extraído {len(valores)} valores, esperava 12")
 
-        # Valida range
+        # Valida range (flexível para sistemas de diferentes tamanhos)
         for v in valores:
-            if not (400 <= v <= 850):
-                raise HTTPException(status_code=400, detail=f"Valor {v} fora do range esperado (400-850 kWh)")
+            if not (200 <= v <= 1500):
+                raise HTTPException(status_code=400, detail=f"Valor {v} fora do range esperado (200-1500 kWh)")
 
         return {"valores": valores}
 
