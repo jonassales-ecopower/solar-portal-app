@@ -1366,6 +1366,78 @@ def limpar_cache_cidade(cidade: str, integrador: dict = Depends(obter_integrador
     conn.close()
     return {"cidade": cidade, "deletados": deletados}
 
+@app.post("/extrair-geracao-grafico")
+def extrair_geracao_grafico(dados: dict, integrador: dict = Depends(obter_integrador_atual)):
+    """
+    Extrai os 12 valores mensais de geração de um gráfico (imagem).
+    Usa OpenRouter vision para análise automática.
+    """
+    try:
+        imagem_base64 = dados.get("imagem_base64")
+        if not imagem_base64:
+            raise HTTPException(status_code=400, detail="Imagem não fornecida")
+
+        # Chama OpenRouter com vision
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "HTTP-Referer": "https://solar-portal.com",
+            "X-Title": "Solar Portal",
+        }
+
+        payload = {
+            "model": "openrouter/auto",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "image": imagem_base64,
+                        },
+                        {
+                            "type": "text",
+                            "text": """Analise este gráfico de geração solar esperada mensal.
+                            Extraia EXATAMENTE os 12 valores mensais (jan-dez) em kWh.
+
+                            Responda em JSON puro, sem markdown:
+                            {"valores": [700.5, 689.2, 648.1, ...]}
+
+                            Se não conseguir ler com precisão, ainda assim responda com 12 números (mesmo que aproximados).
+                            """
+                        }
+                    ]
+                }
+            ]
+        }
+
+        r = requests.post("https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers, timeout=30)
+
+        if r.status_code != 200:
+            raise HTTPException(status_code=400, detail=f"Erro na IA: {r.status_code}")
+
+        resposta = r.json()
+        conteudo = resposta["choices"][0]["message"]["content"]
+
+        # Parse JSON da resposta
+        import re
+        match = re.search(r'\{.*"valores"\s*:\s*\[([\d.,\s]+)\].*\}', conteudo, re.DOTALL)
+        if not match:
+            raise HTTPException(status_code=400, detail="Não consegui extrair os valores do gráfico. Tente com uma imagem mais clara.")
+
+        valores_str = match.group(1)
+        valores = [float(v.strip()) for v in valores_str.split(",")]
+
+        if len(valores) != 12:
+            raise HTTPException(status_code=400, detail=f"Extraído {len(valores)} valores, esperava 12")
+
+        return {"valores": valores, "fonte": "ia"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Erro ao extrair geração: {e}")
+        raise HTTPException(status_code=400, detail=f"Erro ao processar imagem: {str(e)}")
+
 @app.post("/validar-cidade")
 def validar_cidade(cidade: str, latitude: float = None, longitude: float = None,
                    integrador: dict = Depends(obter_integrador_atual)):
