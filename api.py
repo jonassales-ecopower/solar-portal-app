@@ -1387,19 +1387,40 @@ def extrair_geracao_pdf(file: UploadFile = File(...), integrador: dict = Depends
         for page in pdf_reader.pages:
             texto_completo += page.extract_text() + "\n"
 
-        # Busca padrões de números que parecem ser geração mensal (400-800 kWh)
-        # Procura por sequências de 12 números separados por vírgula, espaço ou quebra de linha
-        numeros = re.findall(r'(\d{2,3}[.,]\d{1,2}|\d{3,4})', texto_completo)
+        # Procura especificamente pela seção de "Produção estimada" ou "média mensal"
+        # Esta seção contém o gráfico com os 12 valores mensais
+        match_secao = re.search(
+            r'[Pp]rodução\s+estimada.*?[Mm]édia\s+[Mm]ensal.*?(?:Janeiro|Jan).*?(?:Dezembro|Dez)',
+            texto_completo,
+            re.DOTALL
+        )
 
-        # Filtra números na faixa esperada (400-800 kWh) e pega os primeiros 12
+        if match_secao:
+            secao_grafico = match_secao.group(0)
+        else:
+            # Se não encontrar, tenta procurar na seção "Detalhes do seu projeto"
+            match_secao = re.search(
+                r'[Dd]etalhes.*?seu\s+projeto.*?(?:Janeiro|Jan).*?(?:Dezembro|Dez)',
+                texto_completo,
+                re.DOTALL
+            )
+            if match_secao:
+                secao_grafico = match_secao.group(0)
+            else:
+                secao_grafico = texto_completo
+
+        # Busca números na seção do gráfico (650-850 kWh é range mais realista para gráfico)
+        numeros = re.findall(r'(\d{2,3}[.,]\d{1,2}|\d{3,4})', secao_grafico)
+
+        # Filtra números na faixa esperada (450-850 kWh) e pega os primeiros 12
         valores = []
         for num_str in numeros:
             num = float(num_str.replace(',', '.'))
-            if 400 <= num <= 800 and len(valores) < 12:
+            if 450 <= num <= 850 and len(valores) < 12:
                 valores.append(round(num, 2))
 
         if len(valores) < 12:
-            raise HTTPException(status_code=400, detail=f"Encontrei apenas {len(valores)} valores, esperava 12. Talvez o PDF não tenha os dados estruturados.")
+            raise HTTPException(status_code=400, detail=f"Encontrei apenas {len(valores)} valores no gráfico, esperava 12. Tente copiar manualmente os valores.")
 
         return {
             "valores": valores[:12],
