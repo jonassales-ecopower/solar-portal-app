@@ -1153,6 +1153,9 @@ def atualizar_cliente(cliente_id: int, dados: dict, integrador: dict = Depends(o
             except Exception:
                 pass
 
+        print(f"[DEBUG] Antes UPDATE: geracao_esperada_mensal={repr(geracao_esperada_mensal)[:60] if geracao_esperada_mensal else 'None'}")
+        print(f"[DEBUG] SQL params: cliente_id={cliente_id}, integrador_id={integrador['id']}, geracao_esperada_mensal type={type(geracao_esperada_mensal).__name__}")
+
         cur.execute("""
             UPDATE clientes SET nome=%s, email=%s, telefone=%s, numero_uc=%s, distribuidora=%s, tipo_gd=%s, cidade=%s, geracao_esperada_mensal=%s
             WHERE id=%s AND integrador_id=%s RETURNING id, nome, cidade
@@ -1160,7 +1163,17 @@ def atualizar_cliente(cliente_id: int, dados: dict, integrador: dict = Depends(o
               dados.get("numero_uc"), dados.get("distribuidora"), dados.get("tipo_gd"),
               cidade, geracao_esperada_mensal, cliente_id, integrador["id"]))
         c = cur.fetchone()
+
+        # Verifica se alguma linha foi atualizada
+        linhas_afetadas = cur.rowcount
+        print(f"[DEBUG] Linhas afetadas pelo UPDATE: {linhas_afetadas}")
+
         conn.commit()
+
+        # Query pós-save para verificar
+        cur.execute("SELECT geracao_esperada_mensal FROM clientes WHERE id=%s", (cliente_id,))
+        resultado = cur.fetchone()
+        print(f"[DEBUG] PÓS-COMMIT: geracao_esperada_mensal no banco = {repr(resultado[0])[:60] if resultado and resultado[0] else 'NULL'}")
 
         if not c:
             cur.close()
