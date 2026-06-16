@@ -1326,6 +1326,18 @@ def cadastrar_cliente(dados: dict, integrador: dict = Depends(obter_integrador_a
         cur.close()
         conn.close()
 
+@app.delete("/cache-cidade/{cidade}")
+def limpar_cache_cidade(cidade: str, integrador: dict = Depends(obter_integrador_atual)):
+    """Limpa cache HSP de uma cidade (força recalculação na próxima validação)."""
+    conn = conectar_banco()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM cidades_hsp WHERE LOWER(nome_cidade) = LOWER(%s)", (cidade,))
+    conn.commit()
+    deletados = cur.rowcount
+    cur.close()
+    conn.close()
+    return {"cidade": cidade, "deletados": deletados}
+
 @app.post("/validar-cidade")
 def validar_cidade(cidade: str, latitude: float = None, longitude: float = None,
                    integrador: dict = Depends(obter_integrador_atual)):
