@@ -1857,6 +1857,7 @@ async function mcValidarCidade() {
 
     try {
         const resp = await fetch(`${API}/validar-cidade?cidade=${encodeURIComponent(cidade)}`, {
+            method: 'POST',
             headers: {"Authorization": `Bearer ${token}`}
         });
         const data = await resp.json();
