@@ -1419,18 +1419,31 @@ def extrair_geracao_ia(dados: dict, integrador: dict = Depends(obter_integrador_
                         },
                         {
                             "type": "text",
-                            "text": """Leia este gráfico de geração solar esperada mensal.
+                            "text": """TAREFA: Extrair 12 valores de geração solar esperada mensal de um gráfico de barras.
 
-EXTRAIA os 12 valores mensais (JAN-DEZ) com MÁXIMA PRECISÃO dos dados VISÍVEIS na imagem.
+INSTRUÇÕES CRÍTICAS:
+1. Identifique os 12 meses no eixo horizontal (janeiro a dezembro)
+2. Leia EXATAMENTE o valor numérico de cada barra - observe o número escrito, não estime
+3. NÃO aproxime, arredonde ou modifique os valores - use EXATAMENTE o que está escrito
+4. Se o valor tem decimais (ex: 736.66), mantenha TODOS os decimais
+5. Se há apenas inteiros (ex: 700), use inteiros
+6. Verifique a escala do eixo Y para garantir leitura correta
 
-RESPONDA APENAS em JSON puro, sem markdown, sem explicações, sem prefixo/sufixo:
+ORDEM OBRIGATÓRIA (esquerda para direita):
+janeiro, fevereiro, março, abril, maio, junho, julho, agosto, setembro, outubro, novembro, dezembro
+
+RESPOSTA (JSON PURO, sem texto adicional):
 {"valores": [jan, fev, mar, abr, mai, jun, jul, ago, set, out, nov, dez]}
 
-Onde jan/fev/etc são os valores numéricos lidos do gráfico.
+EXEMPLOS DE RESPOSTA CORRETA:
+{"valores": [736.66, 693.46, 671.44, 611.96, 524.87, 472.82, 506.72, 646.32, 643.38, 738.45, 733.54, 811.04]}
+ou
+{"valores": [500, 450, 600, 750, 850, 800, 880, 850, 700, 650, 550, 480]}
 
-Ordem obrigatória: [Janeiro, Fevereiro, Março, Abril, Maio, Junho, Julho, Agosto, Setembro, Outubro, Novembro, Dezembro]
-
-VALIDAÇÃO: 12 números? Ordem jan→dez? Valores entre 300-900 kWh?
+VERIFICAÇÃO FINAL:
+- Exatamente 12 números ✓
+- Ordem jan→dez ✓
+- Valores entre 100-3000 kWh ✓
 """
                         }
                     ]
