@@ -129,17 +129,23 @@ def buscar_hsp_pvgis(cidade: str, latitude: float = None, longitude: float = Non
             ]
 
             geo = None
+            headers = {"User-Agent": "SolarPortal/1.0"}
             for var in variacoes:
                 try:
-                    geo_url = f"https://nominatim.openstreetmap.org/search?q={var}&format=json&countrycodes=br"
-                    geo_r = requests.get(geo_url, timeout=5)
+                    geo_url = f"https://nominatim.openstreetmap.org/search?q={var}&format=json&countrycodes=br&limit=1"
+                    geo_r = requests.get(geo_url, headers=headers, timeout=5)
                     if geo_r.status_code == 200 and geo_r.json():
                         geo = geo_r.json()[0]
+                        print(f"[PVGIS] Geocodificação bem-sucedida para '{var}' (lat={geo['lat']}, lon={geo['lon']})")
                         break
-                except:
+                    else:
+                        print(f"[PVGIS] Falha geocodificando '{var}': status {geo_r.status_code}")
+                except Exception as e:
+                    print(f"[PVGIS] Erro ao tentar '{var}': {e}")
                     continue
 
             if not geo:
+                print(f"[PVGIS] Nenhuma variação funcionou para '{cidade}'")
                 return None
 
             latitude, longitude = float(geo['lat']), float(geo['lon'])
@@ -150,11 +156,13 @@ def buscar_hsp_pvgis(cidade: str, latitude: float = None, longitude: float = Non
         r = requests.get(pvgis_url, params=params, timeout=10)
 
         if r.status_code != 200:
+            print(f"[PVGIS] PVGIS API falhou: status {r.status_code} para ({latitude}, {longitude})")
             return None
 
         data = r.json()
         monthly = data.get("monthly", [])
         if not monthly or len(monthly) < 12:
+            print(f"[PVGIS] Dados mensais inválidos: {len(monthly) if monthly else 0} meses")
             return None
 
         # Converte irradiância (kWh/m²/dia) em HSP (horas de pico solar)
