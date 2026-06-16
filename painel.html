@@ -614,13 +614,9 @@
             </div>
             <div class="campo">
                 <label style="color:#7c3aed;font-weight:700;">📊 Geração Esperada Mensal (kWh) — MÉTODO 1 (Preferencial)</label>
-                <p style="font-size:11px;color:#666;margin-bottom:8px;">⭐ Se preenchido, substitui o cálculo por HSP e garante 100% alinhamento com proposta.</p>
-                <div style="display:flex;gap:8px;margin-bottom:8px;">
-                    <input type="file" id="mc-geracao-imagem" accept="image/*" style="flex:1;width:auto;">
-                    <button class="azul pequeno" onclick="mcExtrairGeracaoDoGrafico()" style="white-space:nowrap;">📊 Extrair</button>
-                </div>
-                <textarea id="mc-geracao-esperada" placeholder="Cole os 12 valores mensais (jan-dez):&#10;700,689,648,590,506,456,489,624,622,713,708,783&#10;&#10;ou cada um em uma linha:&#10;700&#10;689&#10;648&#10;...&#10;&#10;Ou use o botão acima para extrair de uma imagem do gráfico" style="font-family:monospace;font-size:12px;height:100px;"></textarea>
-                <p style="font-size:11px;color:#888;margin-top:4px;">Aceita: vírgula-separado, linha-separado, espaço-separado, ou extração automática de imagem.</p>
+                <p style="font-size:11px;color:#666;margin-bottom:8px;">⭐ Cole os 12 valores de JANEIRO a DEZEMBRO da proposta. Se preenchido, substitui o cálculo por HSP e garante 100% alinhamento.</p>
+                <textarea id="mc-geracao-esperada" placeholder="Cola os 12 valores (jan-dez), separados por vírgula, linha ou espaço:&#10;&#10;709.84,689.13,647.88,590.49,506.45,456.23,488.94,623.64,621.77,712.54,707.8,782.58&#10;&#10;ou linha por linha:&#10;709.84&#10;689.13&#10;647.88&#10;..." style="font-family:monospace;font-size:12px;height:100px;"></textarea>
+                <p style="font-size:11px;color:#888;margin-top:4px;">✓ Aceita: 709.84,689,13,... ou 709.84 689.13 648... ou um valor por linha.</p>
             </div>
             <div class="campo">
                 <label>Endereço da instalação</label>
@@ -1893,41 +1889,6 @@ async function mcValidarCidade() {
     }
 }
 
-async function mcExtrairGeracaoDoGrafico() {
-    const fileInput = document.getElementById('mc-geracao-imagem');
-    const file = fileInput.files[0];
-    if (!file) {
-        alert('Selecione uma imagem do gráfico');
-        return;
-    }
-
-    // Converte para Base64
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-        const base64 = e.target.result.split(',')[1];
-
-        try {
-            const resp = await fetch(`${API}/extrair-geracao-grafico`, {
-                method: 'POST',
-                headers: {"Content-Type": "application/json", "Authorization": `Bearer ${token}`},
-                body: JSON.stringify({imagem_base64: base64})
-            });
-            const data = await resp.json();
-
-            if (!resp.ok) {
-                alert('Erro ao extrair: ' + (data.detail || 'Tente com uma imagem mais clara'));
-                return;
-            }
-
-            // Preenche o textarea com os valores extraídos
-            document.getElementById('mc-geracao-esperada').value = data.valores.join(',');
-            alert('✓ Extraído com sucesso: ' + data.valores.join(', '));
-        } catch(e) {
-            alert('Erro: ' + e.message);
-        }
-    };
-    reader.readAsDataURL(file);
-}
 
 function mcAtualizarInstrucoes() {
     const marca = document.getElementById('mc-marca').value;
