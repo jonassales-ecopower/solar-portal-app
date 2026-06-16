@@ -1344,36 +1344,24 @@ def validar_cidade(cidade: str, latitude: float = None, longitude: float = None,
                    integrador: dict = Depends(obter_integrador_atual)):
     """
     Valida e retorna HSP mensal para uma cidade.
-    Se já existe no banco (cache), retorna do banco (rápido).
-    Se não existe, busca de PVGIS, salva no banco e retorna.
+    SEMPRE recalcula (não usa cache, para garantir dados atualizados).
     """
     conn = conectar_banco()
     cur = conn.cursor()
 
     try:
-        # 1. Tenta encontrar no banco
-        cur.execute(
-            "SELECT hsp_mensal, media_anual FROM cidades_hsp WHERE LOWER(nome_cidade) = LOWER(%s)",
-            (cidade,)
-        )
-        r = cur.fetchone()
-        if r:
-            hsp_mensal = json.loads(r[0]) if isinstance(r[0], str) else r[0]
-            return {
-                "cidade": cidade,
-                "hsp_mensal": hsp_mensal,
-                "media_anual": float(r[1]),
-                "fonte": "cache"
-            }
+        # 1. Remove cache antigo (força recalculação com dados atualizados)
+        cur.execute("DELETE FROM cidades_hsp WHERE LOWER(nome_cidade) = LOWER(%s)", (cidade,))
+        conn.commit()
 
-        # 2. Se não encontrou, busca do PVGIS
+        # 2. Busca HSP (prioridade: cidade específica > APIs > estado)
         hsp_mensal = buscar_hsp_pvgis(cidade, latitude, longitude)
         if not hsp_mensal:
             raise HTTPException(status_code=400, detail=f"Não foi possível encontrar dados de irradiância para {cidade}")
 
         media_anual = round(sum(hsp_mensal) / 12, 2)
 
-        # 3. Grava no banco para cache futuro
+        # 3. Salva no banco para próximas requisições
         cur.execute(
             """INSERT INTO cidades_hsp (nome_cidade, latitude, longitude, hsp_mensal, media_anual)
                VALUES (%s, %s, %s, %s, %s)
@@ -1387,7 +1375,7 @@ def validar_cidade(cidade: str, latitude: float = None, longitude: float = None,
             "cidade": cidade,
             "hsp_mensal": hsp_mensal,
             "media_anual": media_anual,
-            "fonte": "pvgis"
+            "fonte": "validado"
         }
 
     except HTTPException:

@@ -1856,13 +1856,7 @@ async function mcValidarCidade() {
     }
 
     try {
-        // 1. Limpa cache antigo (força recalculação)
-        await fetch(`${API}/cache-cidade/${encodeURIComponent(cidade)}`, {
-            method: 'DELETE',
-            headers: {"Authorization": `Bearer ${token}`}
-        }).catch(() => {}); // Ignora erro se não existir no cache
-
-        // 2. Valida e recalcula com novos dados
+        // Backend sempre recalcula (deleta cache antigo automaticamente)
         const resp = await fetch(`${API}/validar-cidade?cidade=${encodeURIComponent(cidade)}`, {
             method: 'POST',
             headers: {"Authorization": `Bearer ${token}`}
