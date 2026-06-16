@@ -1166,6 +1166,11 @@ def atualizar_cliente(cliente_id: int, dados: dict, integrador: dict = Depends(o
             except Exception:
                 pass
 
+        # Log qual database estamos usando
+        cur.execute("SELECT current_database(), current_user, inet_client_addr()")
+        db_info = cur.fetchone()
+        print(f"[DEBUG] Conectado a: database={db_info[0]}, user={db_info[1]}, client_ip={db_info[2]}")
+
         print(f"[DEBUG] Antes UPDATE: geracao_esperada_mensal={repr(geracao_esperada_mensal)[:60] if geracao_esperada_mensal else 'None'}")
         print(f"[DEBUG] SQL params: cliente_id={cliente_id}, integrador_id={integrador['id']}, geracao_esperada_mensal type={type(geracao_esperada_mensal).__name__}")
 
