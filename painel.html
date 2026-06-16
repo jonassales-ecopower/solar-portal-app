@@ -578,9 +578,14 @@
 
         <!-- Tab: Projeto -->
         <div class="mc-panel" id="mcpanel-projeto">
+            <div class="dica-roxo" style="margin-bottom:15px;">
+                <strong>📊 Dois métodos para geração esperada:</strong><br>
+                <strong style="color:#7c3aed;">Método 1:</strong> Importar imagem do gráfico (recomendado, mais preciso)<br>
+                <strong style="color:#7c3aed;">Método 2:</strong> Informar cidade → Sistema calcula via HSP
+            </div>
             <div class="grid-2">
                 <div class="campo"><label>Potência do sistema (kWp) *</label><input type="number" id="mc-potencia" placeholder="Ex: 5.5" step="0.1"></div>
-                <div class="campo"><label>Cidade (para irradiância solar)</label>
+                <div class="campo"><label>Cidade (para irradiância solar) — Opcional se importar gráfico</label>
                     <div style="display:flex;gap:6px;">
                         <input type="text" id="mc-cidade" placeholder="Ex: EXTREMA - MG" style="flex:1;">
                         <button class="amarelo pequeno" onclick="mcValidarCidade()" style="white-space:nowrap;">✓ Validar</button>
@@ -608,13 +613,14 @@
                 <p style="font-size:11px;color:#888;margin-top:4px;">Entre 0,75 e 0,85 para sistemas residenciais.</p>
             </div>
             <div class="campo">
-                <label>Geração Esperada Mensal (kWh) — Proposta do Integrador</label>
+                <label style="color:#7c3aed;font-weight:700;">📊 Geração Esperada Mensal (kWh) — MÉTODO 1 (Preferencial)</label>
+                <p style="font-size:11px;color:#666;margin-bottom:8px;">⭐ Se preenchido, substitui o cálculo por HSP e garante 100% alinhamento com proposta.</p>
                 <div style="display:flex;gap:8px;margin-bottom:8px;">
                     <input type="file" id="mc-geracao-imagem" accept="image/*" style="flex:1;width:auto;">
                     <button class="azul pequeno" onclick="mcExtrairGeracaoDoGrafico()" style="white-space:nowrap;">📊 Extrair</button>
                 </div>
                 <textarea id="mc-geracao-esperada" placeholder="Cole os 12 valores mensais (jan-dez):&#10;700,689,648,590,506,456,489,624,622,713,708,783&#10;&#10;ou cada um em uma linha:&#10;700&#10;689&#10;648&#10;...&#10;&#10;Ou use o botão acima para extrair de uma imagem do gráfico" style="font-family:monospace;font-size:12px;height:100px;"></textarea>
-                <p style="font-size:11px;color:#888;margin-top:4px;">Opcional. Se preenchido, esses valores substituem o cálculo por HSP. Aceita: separado por vírgula, quebra de linha, espaço, ou extração automática de imagem.</p>
+                <p style="font-size:11px;color:#888;margin-top:4px;">Aceita: vírgula-separado, linha-separado, espaço-separado, ou extração automática de imagem.</p>
             </div>
             <div class="campo">
                 <label>Endereço da instalação</label>

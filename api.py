@@ -1379,7 +1379,7 @@ def extrair_geracao_grafico(dados: dict, integrador: dict = Depends(obter_integr
 
         # Chama OpenRouter com vision
         headers = {
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Authorization": f"Bearer {OPENROUTER_KEY}",
             "HTTP-Referer": "https://solar-portal.com",
             "X-Title": "Solar Portal",
         }
