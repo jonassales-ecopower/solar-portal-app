@@ -1634,15 +1634,21 @@ def atualizar_projeto(cliente_id: int, dados: dict, integrador: dict = Depends(o
             try:
                 ger = dados.get("geracao_esperada_mensal")
                 if isinstance(ger, str):
-                    # Parse: "700, 650, 680..." ou "700\n650\n680..."
-                    valores = [v.strip() for v in ger.replace("\n", ",").split(",") if v.strip()]
-                    valores = [float(v) for v in valores]
-                    if len(valores) == 12:
-                        geracao_esperada_mensal = json.dumps(valores)
+                    # Tenta parse como JSON array primeiro
+                    try:
+                        ger_list = json.loads(ger)
+                        if isinstance(ger_list, list) and len(ger_list) == 12:
+                            geracao_esperada_mensal = json.dumps([float(v) for v in ger_list])
+                    except json.JSONDecodeError:
+                        # Se não for JSON, tenta parse como CSV
+                        valores = [v.strip() for v in ger.replace("\n", ",").split(",") if v.strip()]
+                        valores = [float(v) for v in valores]
+                        if len(valores) == 12:
+                            geracao_esperada_mensal = json.dumps(valores)
                 elif isinstance(ger, list) and len(ger) == 12:
                     geracao_esperada_mensal = json.dumps([float(v) for v in ger])
-            except:
-                pass
+            except Exception as e:
+                print(f"[PROJETO] Erro ao parsear: {e}")
 
         # Só atualiza geracao_esperada_mensal se foi fornecido no request
         ger_recebido = dados.get("geracao_esperada_mensal")
