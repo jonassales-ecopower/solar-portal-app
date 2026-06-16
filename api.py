@@ -17,7 +17,6 @@ from fastapi import Depends, FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from openai import OpenAI
-from anthropic import Anthropic
 from auth import criptografar_senha, verificar_senha, criar_token, verificar_token
 from extracao import (extrair_medicoes_medidor, normalizar_mes_referencia,
                       extrair_mes_referencia, extrair_datas_leitura, somar_geracao_periodo)
@@ -1401,46 +1400,45 @@ def extrair_geracao_ia(dados: dict, integrador: dict = Depends(obter_integrador_
         if not imagem_base64:
             raise HTTPException(status_code=400, detail="Imagem não fornecida")
 
-        # Chama Claude Vision (Anthropic) - melhor para leitura de gráficos
-        client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+        # Chama OpenRouter com vision
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_KEY}",
+            "HTTP-Referer": "https://solar-portal.com",
+            "X-Title": "Solar Portal",
+        }
 
-        message = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=1024,
-            messages=[
+        payload = {
+            "model": "openrouter/auto",
+            "messages": [
                 {
                     "role": "user",
                     "content": [
                         {
                             "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "image/jpeg",
-                                "data": imagem_base64,
-                            },
+                            "image": imagem_base64,
                         },
                         {
                             "type": "text",
-                            "text": """Você está analisando um gráfico de geração solar esperada mensal.
+                            "text": """Extraia os 12 valores mensais de um gráfico de geração solar.
+Leia os números visíveis: janeiro a dezembro, da esquerda para direita.
+Mantenha decimais se houver.
 
-TAREFA: Leia os 12 números/valores mostrados no gráfico, um para cada mês (janeiro a dezembro, da esquerda para direita).
-
-INSTRUÇÕES:
-1. Procure por números visíveis no gráfico (podem estar em rótulos, sobre as barras, no eixo Y, etc)
-2. Leia os valores EXATAMENTE como aparecem
-3. Se houver decimais, mantenha os decimais
-4. Ordem obrigatória: janeiro, fevereiro, março, abril, maio, junho, julho, agosto, setembro, outubro, novembro, dezembro
-
-RESPONDA APENAS em JSON (sem explicação):
+Responda APENAS JSON:
 {"valores": [jan, fev, mar, abr, mai, jun, jul, ago, set, out, nov, dez]}
 """
                         }
-                    ],
+                    ]
                 }
-            ],
-        )
+            ]
+        }
 
-        conteudo = message.content[0].text
+        r = requests.post("https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers, timeout=30)
+
+        if r.status_code != 200:
+            raise HTTPException(status_code=400, detail=f"Erro na IA: {r.status_code}")
+
+        resposta = r.json()
+        conteudo = resposta["choices"][0]["message"]["content"]
 
         # Parse JSON da resposta - mais flexível para diferentes formatos
         try:
