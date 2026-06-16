@@ -1400,22 +1400,25 @@ def extrair_geracao_ia(dados: dict, integrador: dict = Depends(obter_integrador_
         if not imagem_base64:
             raise HTTPException(status_code=400, detail="Imagem não fornecida")
 
-        # Chama OpenRouter com vision
-        headers = {
-            "Authorization": f"Bearer {OPENROUTER_KEY}",
-            "HTTP-Referer": "https://solar-portal.com",
-            "X-Title": "Solar Portal",
-        }
+        # Chama Claude Vision (Anthropic) - melhor para leitura de gráficos
+        from anthropic import Anthropic
 
-        payload = {
-            "model": "openrouter/auto",
-            "messages": [
+        client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+
+        message = client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=1024,
+            messages=[
                 {
                     "role": "user",
                     "content": [
                         {
                             "type": "image",
-                            "image": imagem_base64,
+                            "source": {
+                                "type": "base64",
+                                "media_type": "image/jpeg",
+                                "data": imagem_base64,
+                            },
                         },
                         {
                             "type": "text",
@@ -1425,18 +1428,12 @@ Responda APENAS em JSON:
 {"valores": [jan, fev, mar, abr, mai, jun, jul, ago, set, out, nov, dez]}
 """
                         }
-                    ]
+                    ],
                 }
-            ]
-        }
+            ],
+        )
 
-        r = requests.post("https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers, timeout=30)
-
-        if r.status_code != 200:
-            raise HTTPException(status_code=400, detail=f"Erro na IA: {r.status_code}")
-
-        resposta = r.json()
-        conteudo = resposta["choices"][0]["message"]["content"]
+        conteudo = message.content[0].text
 
         # Parse JSON da resposta - mais flexível para diferentes formatos
         try:
