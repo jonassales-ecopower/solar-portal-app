@@ -355,6 +355,7 @@ def verificar_clientes_offline():
     # Inversor não gera à noite — só alertar entre 7h e 18h (horário de Brasília, UTC-3)
     hora_brt = (datetime.utcnow() - timedelta(hours=3)).hour
     if hora_brt < 7 or hora_brt >= 18:
+        print(f"[ALERTA_OFFLINE] Fora da janela de horário (BRT: {hora_brt}h)")
         return
 
     conn = conectar_banco()
@@ -371,12 +372,14 @@ def verificar_clientes_offline():
               AND (c.alerta_offline_em IS NULL OR c.alerta_offline_em < NOW() - INTERVAL '24 hours')
         """)
         clientes_offline = cur.fetchall()
+        print(f"[ALERTA_OFFLINE] {len(clientes_offline)} cliente(s) offline detectado(s)")
         for cliente_id, cliente_nome, int_email, int_nome in clientes_offline:
+            print(f"[ALERTA_OFFLINE] Enviando para {cliente_nome} ({int_email})")
             enviar_email_offline(int_email, int_nome, cliente_nome)
             cur.execute("UPDATE clientes SET alerta_offline_em = NOW() WHERE id = %s", (cliente_id,))
         conn.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[ALERTA_OFFLINE] Erro na query: {e}")
     finally:
         cur.close()
         conn.close()
@@ -386,8 +389,8 @@ async def verificar_offline_loop():
         await asyncio.sleep(300)  # a cada 5 minutos
         try:
             verificar_clientes_offline()
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[ALERTA_OFFLINE] Erro: {e}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -1670,16 +1673,32 @@ def atualizar_inversor(cliente_id: int, dados: dict, integrador: dict = Depends(
     conn = conectar_banco()
     cur = conn.cursor()
     try:
-        cur.execute("""
-            UPDATE clientes SET
-                marca_inversor=%s, serial_inversor=%s, api_key_inversor=%s,
-                inversor_usuario=%s, inversor_senha=%s
-            WHERE id=%s AND integrador_id=%s RETURNING id,nome
-        """, (
-            dados.get("marca_inversor"), dados.get("serial_inversor"), dados.get("api_key_inversor"),
-            dados.get("inversor_usuario"), dados.get("inversor_senha"),
-            cliente_id, integrador["id"]
-        ))
+        campos_atualizacao = []
+        valores = []
+
+        if "marca_inversor" in dados:
+            campos_atualizacao.append("marca_inversor=%s")
+            valores.append(dados.get("marca_inversor"))
+        if "serial_inversor" in dados:
+            campos_atualizacao.append("serial_inversor=%s")
+            valores.append(dados.get("serial_inversor"))
+        if "api_key_inversor" in dados:
+            campos_atualizacao.append("api_key_inversor=%s")
+            valores.append(dados.get("api_key_inversor"))
+        if "inversor_usuario" in dados:
+            campos_atualizacao.append("inversor_usuario=%s")
+            valores.append(dados.get("inversor_usuario"))
+        if "inversor_senha" in dados:
+            campos_atualizacao.append("inversor_senha=%s")
+            valores.append(dados.get("inversor_senha"))
+
+        if not campos_atualizacao:
+            raise HTTPException(status_code=400, detail="Nenhum campo para atualizar")
+
+        query = f"UPDATE clientes SET {', '.join(campos_atualizacao)} WHERE id=%s AND integrador_id=%s RETURNING id,nome"
+        valores.extend([cliente_id, integrador["id"]])
+
+        cur.execute(query, valores)
         c = cur.fetchone()
         conn.commit()
         if not c:
