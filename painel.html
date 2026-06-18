@@ -30,12 +30,11 @@
         .header-logo { font-size: 15px; font-weight: 700; color: #f1f5f9; white-space: nowrap; }
         @media (min-width: 641px) { .header-logo { font-size: 17px; } }
         .header-logo span { color: #f59e0b; }
-        .nav-tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; width: 100%; }
-        .nav-tabs::-webkit-scrollbar { display: none; }
+        .nav-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; width: 100%; }
         .nav-tab {
-            padding: 10px 10px; border-radius: 4px; font-size: 11px; font-weight: 600;
+            padding: 8px 6px; border-radius: 4px; font-size: 10px; font-weight: 600;
             cursor: pointer; color: #64748b; border: none; background: none;
-            font-family: 'Segoe UI', sans-serif; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;
+            font-family: 'Segoe UI', sans-serif; transition: all 0.2s; white-space: nowrap; text-align: center;
         }
         @media (min-width: 641px) { .nav-tab { padding: 7px 14px; font-size: 13px; } }
         .nav-tab:hover { color: #e2e8f0; background: rgba(255,255,255,0.07); }
