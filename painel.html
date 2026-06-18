@@ -23,7 +23,9 @@
             top: 0;
             z-index: 50;
             box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+            margin-top: 8px;
         }
+        @media (min-width: 641px) { header { margin-top: 0; } }
         @media (min-width: 641px) { header { flex-direction: row; align-items: center; justify-content: space-between; padding: 0 24px; } }
         .header-top-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 8px; }
         @media (min-width: 641px) { .header-top-row { padding-bottom: 0; gap: 20px; } }
@@ -69,8 +71,10 @@
         button.ghost:hover { background: rgba(255,255,255,0.15); color: #f1f5f9; }
 
         /* ===== AUTH ===== */
-        #tela-auth { max-width: 100%; margin: 0; padding: 20px; background: #f0f4f8; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        #tela-auth { max-width: 100%; margin: 0; padding: 0; background: #f0f4f8; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
         @media (min-width: 641px) { #tela-auth { max-width: 420px; margin: 60px auto; padding: 0 20px; } }
+        #tela-auth .card { margin: 20px; }
+        @media (min-width: 641px) { #tela-auth .card { margin: 0; } }
         .card { background: white; border-radius: 12px; padding: 25px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
         .campo { margin-bottom: 12px; }
         .campo label { display: block; font-size: 11px; color: #666; margin-bottom: 4px; font-weight: 600; }
@@ -119,9 +123,8 @@
             padding: 12px;
             width: 100%;
             overflow-x: hidden;
-            margin-top: 8px;
         }
-        @media (min-width: 641px) { #secao-dashboard, #secao-detalhe { padding: 20px 24px; margin-top: 0; } }
+        @media (min-width: 641px) { #secao-dashboard, #secao-detalhe { padding: 20px 24px; } }
 
         /* KPI summary bar */
         .kpi-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; width: 100%; overflow-x: hidden; }
