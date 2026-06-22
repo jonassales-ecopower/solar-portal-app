@@ -967,20 +967,92 @@ def solarman_get_mensal(app_id: str, app_secret: str, serial: str, ano: int, mes
 
 # ==================== HUAWEI FUSIONSOLAR ====================
 
-def huawei_login(cred1: str, cred2: str) -> dict:
-    """Placeholder para autenticação Huawei
+def huawei_login(usuario_api: str, system_code: str, dominio: str = "eu5.fusionsolar.huawei.com") -> dict:
+    """Autentica na API Huawei FusionSolar (Northbound API)
 
-    Quando documentação da API estiver disponível, implementaremos a autenticação real.
+    Parâmetros:
+    - usuario_api: userName da conta OpenAPI (não é o email do portal)
+    - system_code: systemCode da aplicação Northbound criada
+    - dominio: domínio FusionSolar (default: eu5.fusionsolar.huawei.com)
     """
-    return {"errno": 0, "token": ""}
+    try:
+        resp = requests.post(
+            f"https://{dominio}/thirdData/login",
+            json={"userName": usuario_api, "systemCode": system_code},
+            timeout=30
+        )
+        data = resp.json()
 
-def huawei_get_realtime(cred1: str, cred2: str, serial: str) -> dict:
-    """Obtém dados em tempo real do inversor Huawei (placeholder)
+        if data.get("success"):
+            # Token vem no header XSRF-TOKEN
+            token = resp.headers.get("XSRF-TOKEN") or resp.headers.get("xsrf-token")
+            return {"errno": 0, "token": token, "dominio": dominio}
 
-    NOTA: Requer documentação oficial da API Huawei FusionSolar para implementação completa.
-    Por enquanto, retorna dados offline (0 kW) para não quebrar o sistema.
-    """
-    return {"errno": 0, "pac_kw": 0.0}
+        return {"errno": 1, "msg": data.get("message", "Falha na autenticação Huawei")}
+    except Exception as e:
+        return {"errno": 1, "msg": f"Erro ao conectar: {str(e)}"}
+
+def huawei_get_realtime(usuario_api: str, system_code: str, serial: str, dominio: str = "eu5.fusionsolar.huawei.com") -> dict:
+    """Obtém dados em tempo real do inversor Huawei pelo serial"""
+    try:
+        # 1. Autenticar
+        auth = huawei_login(usuario_api, system_code, dominio)
+        if auth.get("errno") != 0:
+            return {"errno": 1, "msg": auth.get("msg", "Erro de autenticação")}
+
+        token = auth.get("token")
+        headers = {"XSRF-TOKEN": token, "Content-Type": "application/json"}
+
+        # 2. Listar plantas
+        plants_resp = requests.post(
+            f"https://{dominio}/thirdData/getStationList",
+            json={"pageNo": 1},
+            headers=headers,
+            timeout=30
+        )
+        plants_data = plants_resp.json()
+
+        if not plants_data.get("success"):
+            return {"errno": 1, "msg": "Erro ao listar plantas"}
+
+        # 3. Para cada planta, listar dispositivos
+        for station in plants_data.get("data", {}).get("list", []):
+            station_id = station.get("id")
+
+            devices_resp = requests.post(
+                f"https://{dominio}/thirdData/getDevList",
+                json={"stationCode": station_id},
+                headers=headers,
+                timeout=30
+            )
+            devices_data = devices_resp.json()
+
+            # 4. Procurar inversor (devTypeId=1) pelo serial
+            for device in devices_data.get("data", []):
+                if device.get("esnCode") == serial and device.get("devTypeId") == 1:
+                    dev_id = device.get("devId")
+
+                    # 5. Buscar dados em tempo real
+                    realtime_resp = requests.post(
+                        f"https://{dominio}/thirdData/getDevRealKpi",
+                        json={"devIds": dev_id, "devTypeId": 1},
+                        headers=headers,
+                        timeout=30
+                    )
+                    realtime_data = realtime_resp.json()
+
+                    if realtime_data.get("success"):
+                        for dev in realtime_data.get("data", []):
+                            kpi_map = dev.get("dataItemMap", {})
+                            # active_power está em Watts
+                            pac_w = kpi_map.get("active_power", kpi_map.get("pac", 0))
+                            pac_kw = float(pac_w or 0) / 1000
+                            return {"errno": 0, "pac_kw": round(pac_kw, 3)}
+
+        return {"errno": 1, "msg": f"Inversor com serial {serial} não encontrado"}
+
+    except Exception as e:
+        return {"errno": 1, "msg": f"Erro: {str(e)}"}
 
 def huawei_get_mensal(email: str, senha: str, serial: str, ano: int, mes: int) -> float:
     """Obtém geração mensal do inversor Huawei"""
