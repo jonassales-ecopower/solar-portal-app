@@ -1872,10 +1872,8 @@ async function salvarModalCliente() {
             } else if (marca === 'huawei') {
                 const huaweiEmail = document.getElementById('mc-huawei-email').value.trim();
                 const huaweiSenha = document.getElementById('mc-huawei-senha').value.trim();
-                if (huaweiEmail && huaweiSenha) {
-                    payload.inversor_usuario = huaweiEmail;
-                    payload.inversor_senha = huaweiSenha;
-                }
+                payload.inversor_usuario = huaweiEmail;
+                payload.inversor_senha = huaweiSenha;
             } else {
                 apiKey = document.getElementById('mc-apikey').value.trim();
                 payload.api_key_inversor = apiKey;
