@@ -1992,8 +1992,51 @@ def previsao_geracao(cliente_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+def obter_monitoramento_offline(cliente_id: int, marca: str, serial: str):
+    """Retorna últimos dados conhecidos do banco (modo offline fora do horário de geração)"""
+    conn = conectar_banco()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT ultima_leitura_em FROM clientes WHERE id=%s
+        """, (cliente_id,))
+        ultima_leitura = cur.fetchone()
+        if ultima_leitura and ultima_leitura[0]:
+            return {
+                "marca": marca,
+                "serial": serial,
+                "status": "offline",
+                "geracao_atual_kw": 0.0,
+                "injetado_rede_kw": 0.0,
+                "consumo_rede_kw": 0.0,
+                "consumo_casa_kw": 0.0,
+                "potencia_total_kw": 0.0,
+                "timestamp": ultima_leitura[0].isoformat(),
+                "nota": "Dados offline (fora do horário de geração)"
+            }
+        else:
+            return {
+                "marca": marca,
+                "serial": serial,
+                "status": "offline",
+                "geracao_atual_kw": 0.0,
+                "injetado_rede_kw": 0.0,
+                "consumo_rede_kw": 0.0,
+                "consumo_casa_kw": 0.0,
+                "potencia_total_kw": 0.0,
+                "timestamp": datetime.utcnow().isoformat(),
+                "nota": "Sem dados anteriores (fora do horário de geração)"
+            }
+    finally:
+        cur.close()
+        conn.close()
+
 @app.get("/clientes/{cliente_id}/monitoramento")
 def monitoramento(cliente_id: int):
+    # Verificar horário de geração (7h-18h BRT)
+    hora_brt = (datetime.utcnow() - timedelta(hours=3)).hour
+    fora_horario = hora_brt < 7 or hora_brt >= 18
+
     conn = conectar_banco()
     cur = conn.cursor()
     cur.execute("SELECT marca_inversor,serial_inversor,api_key_inversor,inversor_usuario,inversor_senha FROM clientes WHERE id=%s", (cliente_id,))
@@ -2004,6 +2047,10 @@ def monitoramento(cliente_id: int):
         raise HTTPException(status_code=404, detail="Inversor não configurado")
     marca, serial, api_key, inv_usuario, inv_senha = c
     marca_lower = marca.lower()
+
+    # Se for fora do horário de geração, retornar dados offline (últimas leituras)
+    if fora_horario:
+        return obter_monitoramento_offline(cliente_id, marca, serial)
 
     geracao_kw = injetado_kw = consumo_rede_kw = consumo_casa_kw = potencia_kw = 0.0
     seriais = obter_seriais(serial)
