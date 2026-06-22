@@ -722,6 +722,11 @@
                 <div class="campo"><label>App ID *</label><input type="text" id="mc-deye-app-id" placeholder="App ID do portal Solarman"></div>
                 <div class="campo"><label>App Secret *</label><input type="text" id="mc-deye-app-secret" placeholder="App Secret do portal Solarman"></div>
             </div>
+            <div id="mc-campos-huawei" style="display:none;">
+                <div class="dica-roxo">⚡ <strong>Huawei FusionSolar:</strong> Use suas credenciais do <a href="https://la5.fusionsolar.huawei.com" target="_blank" style="color:#7c3aed;">portal FusionSolar</a></div>
+                <div class="campo"><label>E-mail do FusionSolar *</label><input type="email" id="mc-huawei-email" placeholder="Seu e-mail cadastrado no FusionSolar"></div>
+                <div class="campo"><label>Senha do FusionSolar *</label><input type="password" id="mc-huawei-senha" placeholder="Sua senha do FusionSolar"></div>
+            </div>
             <div id="mc-instrucoes-api"></div>
         </div>
 
@@ -1702,7 +1707,7 @@ function mcLimpar() {
     ['mc-nome','mc-email','mc-telefone','mc-uc','mc-distribuidora','mc-tipo-gd',
      'mc-potencia','mc-data-inst','mc-tarifa','mc-consumo-antes','mc-endereco','mc-lat','mc-lng',
      'mc-cidade','mc-serial','mc-apikey','mc-foxess-apikey','mc-deye-app-id','mc-deye-app-secret',
-     'mc-senha','mc-senha2','mc-ger-texto',
+     'mc-huawei-email','mc-huawei-senha','mc-senha','mc-senha2','mc-ger-texto',
      'mc-ger-01','mc-ger-02','mc-ger-03','mc-ger-04','mc-ger-05','mc-ger-06',
      'mc-ger-07','mc-ger-08','mc-ger-09','mc-ger-10','mc-ger-11','mc-ger-12'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
     document.getElementById('mc-pr').value = '0.80';
@@ -1857,15 +1862,26 @@ async function salvarModalCliente() {
         const serial = document.getElementById('mc-serial').value.trim();
         if (marca && serial) {
             let apiKey = '';
+            let payload = {marca_inversor: marca, serial_inversor: serial};
+
             if (marca === 'deye') {
                 const appId = document.getElementById('mc-deye-app-id').value.trim();
                 const appSecret = document.getElementById('mc-deye-app-secret').value.trim();
                 if (appId && appSecret) apiKey = JSON.stringify({app_id: appId, app_secret: appSecret});
+                payload.api_key_inversor = apiKey;
+            } else if (marca === 'huawei') {
+                const huaweiEmail = document.getElementById('mc-huawei-email').value.trim();
+                const huaweiSenha = document.getElementById('mc-huawei-senha').value.trim();
+                if (huaweiEmail && huaweiSenha) {
+                    payload.inversor_usuario = huaweiEmail;
+                    payload.inversor_senha = huaweiSenha;
+                }
             } else {
                 apiKey = document.getElementById('mc-apikey').value.trim();
+                payload.api_key_inversor = apiKey;
             }
-            if (apiKey || marca === 'foxess') {
-                const payload = {marca_inversor: marca, serial_inversor: serial, api_key_inversor: apiKey};
+
+            if (payload.api_key_inversor || payload.inversor_usuario || marca === 'foxess') {
                 const respInv = await fetch(`${API}/clientes/${clienteId}/inversor`, {
                     method:'PUT', headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},
                     body: JSON.stringify(payload)
@@ -2001,8 +2017,9 @@ function mcParsearGeracaoTextarea() {
 function mcAtualizarInstrucoes() {
     const marca = document.getElementById('mc-marca').value;
     document.getElementById('mc-foxess-busca').style.display = marca === 'foxess' ? 'block' : 'none';
-    document.getElementById('mc-campo-apikey').style.display = marca === 'deye' ? 'none' : 'block';
+    document.getElementById('mc-campo-apikey').style.display = (marca === 'deye' || marca === 'huawei') ? 'none' : 'block';
     document.getElementById('mc-campos-deye').style.display = marca === 'deye' ? 'block' : 'none';
+    document.getElementById('mc-campos-huawei').style.display = marca === 'huawei' ? 'block' : 'none';
     const instrucoes = {
         growatt: `<div class="dica-roxo">📋 <a href="https://openapi.growatt.com" target="_blank" style="color:#7c3aed;">openapi.growatt.com</a> → Account → API Token</div>`,
         weg: `<div class="dica-roxo">📋 <a href="https://solarportal.weg.net" target="_blank" style="color:#7c3aed;">solarportal.weg.net</a> → Gestão de API</div>`,
