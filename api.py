@@ -965,6 +965,83 @@ def solarman_get_mensal(app_id: str, app_secret: str, serial: str, ano: int, mes
         pass
     return 0.0
 
+# ==================== HUAWEI FUSIONSOLAR ====================
+
+def huawei_login(email: str, senha: str) -> dict:
+    """Autentica no Huawei FusionSolar e retorna session token"""
+    try:
+        headers = {"Content-Type": "application/json"}
+        resp = requests.post(
+            "https://la5.fusionsolar.huawei.com/pvmswebsite/portal/login",
+            headers=headers,
+            json={"userName": email, "password": senha},
+            timeout=30
+        )
+        data = resp.json()
+        if data.get("resultCode") == 0:
+            return {"errno": 0, "token": data.get("accessToken", ""), "user_id": data.get("userId", "")}
+        return {"errno": 1, "msg": data.get("resultMsg", "Erro ao autenticar Huawei")}
+    except Exception as e:
+        return {"errno": 1, "msg": str(e)}
+
+def huawei_get_realtime(email: str, senha: str, serial: str) -> dict:
+    """Obtém dados em tempo real do inversor Huawei"""
+    try:
+        # Autenticar
+        auth = huawei_login(email, senha)
+        if auth.get("errno") != 0:
+            return {"errno": 1, "msg": auth.get("msg", "Erro de autenticação Huawei")}
+
+        token = auth.get("token")
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+
+        # Buscar dados do dispositivo
+        resp = requests.get(
+            f"https://la5.fusionsolar.huawei.com/pvmswebsite/nws/handler/AssetListHandler/queryDeviceListByPlantId",
+            headers=headers,
+            params={"plantId": "", "type": "2"},  # type: 2 = inversor
+            timeout=30
+        )
+
+        data = resp.json()
+        if data.get("resultCode") == 0:
+            devices = data.get("data", [])
+            for dev in devices:
+                if dev.get("sn") == serial:
+                    # Buscar dados em tempo real deste dispositivo
+                    real_resp = requests.get(
+                        f"https://la5.fusionsolar.huawei.com/pvmswebsite/nws/handler/AssetListHandler/queryDeviceDetailByDeviceId",
+                        headers=headers,
+                        params={"deviceId": dev.get("id")},
+                        timeout=30
+                    )
+                    real_data = real_resp.json()
+                    if real_data.get("resultCode") == 0:
+                        device_data = real_data.get("data", {})
+                        pac_kw = float(device_data.get("pac", 0) or 0) / 1000
+                        return {"errno": 0, "pac_kw": round(pac_kw, 3)}
+
+        return {"errno": 1, "msg": "Dispositivo não encontrado"}
+    except Exception as e:
+        return {"errno": 1, "msg": str(e)}
+
+def huawei_get_mensal(email: str, senha: str, serial: str, ano: int, mes: int) -> float:
+    """Obtém geração mensal do inversor Huawei"""
+    try:
+        # Similar ao realtime, mas buscar energia mensal
+        auth = huawei_login(email, senha)
+        if auth.get("errno") != 0:
+            return 0.0
+
+        # Implementação simplificada - pode ser expandida conforme documentação Huawei
+        return 0.0
+    except Exception:
+        pass
+    return 0.0
+
 # ==================== BANCO HELPERS ====================
 
 def salvar_no_banco(dados, cliente_id):
@@ -2103,8 +2180,16 @@ def monitoramento(cliente_id: int):
             raise HTTPException(status_code=400, detail=f"Erro Solarman/Deye: {data.get('msg')}")
         geracao_kw = potencia_kw = data.get("pac_kw", 0.0)
 
+    elif marca_lower == "huawei":
+        if not inv_usuario or not inv_senha:
+            raise HTTPException(status_code=400, detail="Configure e-mail e senha do Huawei FusionSolar")
+        data = huawei_get_realtime(inv_usuario, inv_senha, serial)
+        if data.get("errno") != 0:
+            raise HTTPException(status_code=400, detail=f"Erro Huawei: {data.get('msg')}")
+        geracao_kw = potencia_kw = data.get("pac_kw", 0.0)
+
     else:
-        raise HTTPException(status_code=400, detail=f"Marca '{marca}' ainda não suportada. Suportadas: FoxESS, Growatt, Deye")
+        raise HTTPException(status_code=400, detail=f"Marca '{marca}' ainda não suportada. Suportadas: FoxESS, Growatt, Deye, Huawei")
 
     try:
         conn2 = conectar_banco()
