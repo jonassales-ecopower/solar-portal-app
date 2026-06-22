@@ -1771,6 +1771,10 @@ async function editarCliente(clienteId) {
         if (d.marca_inversor === 'deye' && d.api_key_inversor) {
             try { const cr = JSON.parse(d.api_key_inversor); document.getElementById('mc-deye-app-id').value = cr.app_id||''; document.getElementById('mc-deye-app-secret').value = cr.app_secret||''; } catch(e) {}
         }
+        if (d.marca_inversor === 'huawei') {
+            if (d.inversor_usuario) document.getElementById('mc-huawei-email').value = d.inversor_usuario;
+            if (d.inversor_senha) document.getElementById('mc-huawei-senha').value = d.inversor_senha;
+        }
         if (d.token_acesso) {
             const base = window.location.href.replace('painel.html','');
             const email = document.getElementById('mc-email').value;
