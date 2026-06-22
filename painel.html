@@ -724,14 +724,19 @@
             </div>
             <div id="mc-campos-huawei" style="display:none;">
                 <div class="dica-roxo" style="background-color:#fff5e6;border-color:#f59e0b;">
-                    ⚡ <strong>Huawei FusionSolar (Northbound API):</strong><br>
-                    1. Acesse <a href="https://la5.fusionsolar.huawei.com" target="_blank" style="color:#7c3aed;">FusionSolar</a><br>
-                    2. Vá em: Configurações → Gerenciamento de Aplicação → Northbound<br>
-                    3. Crie uma nova aplicação Northbound<br>
-                    4. Copie o <strong>userName</strong> e <strong>systemCode</strong> (NÃO use email/senha do portal)
+                    ⚡ <strong>Huawei FusionSolar - Gestão de API:</strong><br>
+                    <strong style="color:#d97706;">Somente o instalador (usuário master) pode fazer isso:</strong><br>
+                    1. Acesse <a href="https://la5.fusionsolar.huawei.com" target="_blank" style="color:#7c3aed;">FusionSolar</a> (portal do instalador)<br>
+                    2. Clique em <strong>"Mais"</strong> → <strong>"Gerenciamento de empresa"</strong><br>
+                    3. Va na aba <strong>"Gestão de API"</strong><br>
+                    4. Clique em <strong>"Adicionar"</strong><br>
+                    5. Preencha: Nome de usuário, data de vencimento, crie uma senha forte<br>
+                    6. Selecione <strong>"API básica"</strong> e escolha as plantas<br>
+                    7. Confirme e copie o <strong>userName</strong> e <strong>systemCode</strong> gerados<br>
+                    8. Repasse ao integrador
                 </div>
-                <div class="campo"><label>userName (Usuário API) *</label><input type="text" id="mc-huawei-email" placeholder="userName da aplicação Northbound"></div>
-                <div class="campo"><label>systemCode *</label><input type="password" id="mc-huawei-senha" placeholder="systemCode da aplicação Northbound"></div>
+                <div class="campo"><label>userName (Usuário API) *</label><input type="text" id="mc-huawei-email" placeholder="Fornecido pelo instalador"></div>
+                <div class="campo"><label>systemCode *</label><input type="password" id="mc-huawei-senha" placeholder="Fornecido pelo instalador"></div>
             </div>
             <div id="mc-instrucoes-api"></div>
         </div>
