@@ -723,9 +723,15 @@
                 <div class="campo"><label>App Secret *</label><input type="text" id="mc-deye-app-secret" placeholder="App Secret do portal Solarman"></div>
             </div>
             <div id="mc-campos-huawei" style="display:none;">
-                <div class="dica-roxo">⚡ <strong>Huawei FusionSolar:</strong> Use suas credenciais do <a href="https://la5.fusionsolar.huawei.com" target="_blank" style="color:#7c3aed;">portal FusionSolar</a></div>
-                <div class="campo"><label>E-mail do FusionSolar *</label><input type="email" id="mc-huawei-email" placeholder="Seu e-mail cadastrado no FusionSolar"></div>
-                <div class="campo"><label>Senha do FusionSolar *</label><input type="password" id="mc-huawei-senha" placeholder="Sua senha do FusionSolar"></div>
+                <div class="dica-roxo" style="background-color:#fff5e6;border-color:#f59e0b;">
+                    ⚡ <strong>Huawei FusionSolar (OAuth 2.0):</strong><br>
+                    1. Acesse <a href="https://la5.fusionsolar.huawei.com" target="_blank" style="color:#7c3aed;">FusionSolar</a><br>
+                    2. Vá em: Configurações → API → Gerenciamento de Aplicação<br>
+                    3. Crie uma "Aplicação Northbound" (não use email/senha do portal)<br>
+                    4. Copie o <strong>Client ID</strong> e <strong>Client Secret</strong>
+                </div>
+                <div class="campo"><label>Client ID *</label><input type="text" id="mc-huawei-email" placeholder="Client ID da aplicação Northbound"></div>
+                <div class="campo"><label>Client Secret *</label><input type="password" id="mc-huawei-senha" placeholder="Client Secret da aplicação Northbound"></div>
             </div>
             <div id="mc-instrucoes-api"></div>
         </div>

@@ -968,39 +968,102 @@ def solarman_get_mensal(app_id: str, app_secret: str, serial: str, ano: int, mes
 # ==================== HUAWEI FUSIONSOLAR ====================
 
 def huawei_login(email: str, senha: str) -> dict:
-    """Autentica no Huawei FusionSolar e retorna session token"""
+    """Autentica no Huawei FusionSolar via OAuth 2.0
+
+    IMPORTANTE: A API FusionSolar requer uma "Conta Northbound (API)" criada no portal.
+    Email/senha de portal NÃO funcionam com a API RESTful.
+
+    Para usar a API:
+    1. Acesse https://la5.fusionsolar.huawei.com
+    2. Vá em Configurações → API → Gerenciamento de Aplicação
+    3. Crie uma "Aplicação Northbound" e obtenha Client ID e Client Secret
+    4. Use esses credenciais em vez de email/senha
+    """
     try:
-        headers = {"Content-Type": "application/json"}
-        resp = requests.post(
-            "https://la5.fusionsolar.huawei.com/pvmswebsite/portal/login",
-            headers=headers,
-            json={"userName": email, "password": senha},
-            timeout=30
-        )
-        data = resp.json()
-        if data.get("resultCode") == 0:
-            return {"errno": 0, "token": data.get("accessToken", ""), "user_id": data.get("userId", "")}
-        return {"errno": 1, "msg": data.get("resultMsg", "Erro ao autenticar Huawei")}
+        # Nota: A implementação completa de OAuth 2.0 requer Client ID e Client Secret
+        # Por enquanto, retornamos erro informativo para o usuário
+        return {
+            "errno": 1,
+            "msg": "API FusionSolar requer Conta Northbound com Client ID/Secret. Email/senha não funcionam com a API RESTful. Configure no portal FusionSolar primeiro."
+        }
     except Exception as e:
         return {"errno": 1, "msg": str(e)}
 
-def huawei_get_realtime(email: str, senha: str, serial: str) -> dict:
-    """Obtém dados em tempo real do inversor Huawei"""
+def huawei_get_realtime(client_id: str, client_secret: str, serial: str) -> dict:
+    """Obtém dados em tempo real do inversor Huawei via OAuth 2.0
+
+    Requer Client ID e Client Secret da aplicação Northbound criada no FusionSolar.
+    """
     try:
-        # Autenticar primeiro
-        auth = huawei_login(email, senha)
-        if auth.get("errno") != 0:
-            return {"errno": 1, "msg": f"Falha na autenticação Huawei: {auth.get('msg', 'Erro desconhecido')}"}
+        # Obter token OAuth 2.0
+        token_resp = requests.post(
+            "https://la5.fusionsolar.huawei.com/thirdparty/auth/apply/token",
+            json={
+                "client_id": client_id,
+                "client_secret": client_secret
+            },
+            timeout=30
+        )
 
-        # Se autenticado, retornar dados (placeholder até ter documentação real da API)
-        # TODO: Implementar integração real com API Huawei FusionSolar quando documentação estiver disponível
-        # Endpoints investigados em: https://la5.fusionsolar.huawei.com/pvmswebsite/
+        token_data = token_resp.json()
+        if not token_data.get("success"):
+            msg = token_data.get("message", "Falha ao obter token OAuth 2.0")
+            return {"errno": 1, "msg": f"Erro de autenticação Huawei: {msg}"}
 
-        # Por enquanto, retorna valores zerados para não quebrar o sistema
-        return {"errno": 0, "pac_kw": 0.0}
+        access_token = token_data.get("data", {}).get("access_token")
+        if not access_token:
+            return {"errno": 1, "msg": "Client ID ou Client Secret inválidos"}
+
+        # Usar token para buscar dados da estação
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+
+        # Buscar estações (plantas)
+        stations_resp = requests.get(
+            "https://la5.fusionsolar.huawei.com/thirdparty/v1/station",
+            headers=headers,
+            timeout=30
+        )
+
+        stations_data = stations_resp.json()
+        if not stations_data.get("success"):
+            return {"errno": 1, "msg": "Erro ao buscar estações FusionSolar"}
+
+        # Procurar inversor pelo serial
+        for station in stations_data.get("data", []):
+            station_id = station.get("stationId")
+
+            # Buscar dispositivos da estação
+            devices_resp = requests.get(
+                f"https://la5.fusionsolar.huawei.com/thirdparty/v1/station/{station_id}/device",
+                headers=headers,
+                timeout=30
+            )
+
+            devices_data = devices_resp.json()
+            for device in devices_data.get("data", []):
+                if device.get("sn") == serial:
+                    # Buscar dados em tempo real do dispositivo
+                    device_id = device.get("id")
+                    realtime_resp = requests.get(
+                        f"https://la5.fusionsolar.huawei.com/thirdparty/v1/device/{device_id}/realtime",
+                        headers=headers,
+                        timeout=30
+                    )
+
+                    realtime_data = realtime_resp.json()
+                    if realtime_data.get("success"):
+                        # PAC = Potência CA em W, converter para kW
+                        pac_w = realtime_data.get("data", {}).get("pac", 0)
+                        pac_kw = float(pac_w or 0) / 1000
+                        return {"errno": 0, "pac_kw": round(pac_kw, 3)}
+
+        return {"errno": 1, "msg": f"Inversor com serial {serial} não encontrado"}
 
     except Exception as e:
-        return {"errno": 1, "msg": f"Erro ao conectar com Huawei: {str(e)}"}
+        return {"errno": 1, "msg": f"Erro ao conectar com API Huawei: {str(e)}"}
 
 def huawei_get_mensal(email: str, senha: str, serial: str, ano: int, mes: int) -> float:
     """Obtém geração mensal do inversor Huawei"""
