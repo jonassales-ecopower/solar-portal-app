@@ -1058,7 +1058,22 @@ function navegar(secao) {
 // ===== DASHBOARD =====
 function iniciarDashboard() {
     clearInterval(intervaloDash); clearInterval(countdownTimer);
-    carregarDashboard();
+    // Tentar carregar com retry se falhar na primeira vez
+    let retryCount = 0;
+    const tentarCarregar = async () => {
+        try {
+            await carregarDashboard();
+            retryCount = 0; // Reset após sucesso
+        } catch(e) {
+            if (retryCount < 2) {
+                retryCount++;
+                console.log(`Tentando novamente... (${retryCount}/2)`);
+                setTimeout(tentarCarregar, 2000);
+            }
+        }
+    };
+    tentarCarregar();
+
     countdownVal = 60;
     countdownTimer = setInterval(() => {
         countdownVal--;
@@ -1070,21 +1085,47 @@ function iniciarDashboard() {
 
 async function carregarDashboard() {
     try {
-        const resp = await fetch(`${API}/clientes`, { headers: {"Authorization": `Bearer ${token}`} });
+        const resp = await fetch(`${API}/clientes`, {
+            headers: {"Authorization": `Bearer ${token}`},
+            timeout: 15000
+        });
+        if (!resp.ok) {
+            console.error(`Erro ao buscar clientes: ${resp.status}`);
+            document.getElementById('plant-grid').innerHTML = `<div class="empty-state" style="grid-column:1/-1; color:#ef4444;"><p>Erro ao carregar dados (${resp.status}). Recarregue a página.</p></div>`;
+            return;
+        }
+
         const clientes = await resp.json();
+        if (!Array.isArray(clientes)) {
+            console.error("Resposta de clientes não é um array");
+            document.getElementById('plant-grid').innerHTML = `<div class="empty-state" style="grid-column:1/-1; color:#ef4444;"><p>Erro ao processar dados dos clientes.</p></div>`;
+            return;
+        }
 
         const monitData = await Promise.all(clientes.map(async c => {
             if (!c.marca_inversor) return { ...c, mon: null };
             try {
-                const r = await fetch(`${API}/clientes/${c.id}/monitoramento`, { headers: {"Authorization": `Bearer ${token}`} });
-                return { ...c, mon: r.ok ? await r.json() : null };
-            } catch { return { ...c, mon: null }; }
+                const r = await fetch(`${API}/clientes/${c.id}/monitoramento`, {
+                    headers: {"Authorization": `Bearer ${token}`},
+                    timeout: 10000
+                });
+                if (!r.ok) {
+                    console.warn(`Erro ao buscar monitoramento do cliente ${c.id}: ${r.status}`);
+                    return { ...c, mon: null };
+                }
+                const data = await r.json();
+                return { ...c, mon: data };
+            } catch(err) {
+                console.warn(`Erro ao buscar monitoramento de ${c.nome}:`, err);
+                return { ...c, mon: null };
+            }
         }));
 
         renderKPIBar(monitData);
         renderPlantGrid(monitData);
     } catch(e) {
-        document.getElementById('plant-grid').innerHTML = `<div class="empty-state" style="grid-column:1/-1; color:#ef4444;"><p>Erro ao carregar dados. Verifique a conexão.</p></div>`;
+        console.error("Erro ao carregar dashboard:", e);
+        document.getElementById('plant-grid').innerHTML = `<div class="empty-state" style="grid-column:1/-1; color:#ef4444;"><p>Erro ao carregar dados. Verifique a conexão ou recarregue a página.</p></div>`;
     }
 }
 
