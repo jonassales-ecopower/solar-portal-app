@@ -866,6 +866,58 @@ def foxess_get_mppt_data(api_key: str, serial: str) -> dict:
 
     return response
 
+def foxess_diagnostico_strings_oldapi(email: str, senha: str, serial: str) -> dict:
+    """Diagnóstico usando API antiga (v0) - mais confiável"""
+    hora_brt = (datetime.utcnow() - timedelta(hours=3)).hour
+    if hora_brt < 7 or hora_brt >= 18:
+        return {
+            "errno": 1,
+            "msg": f"Diagnóstico não disponível fora do horário de geração. Horário atual (BRT): {hora_brt}h. Tente entre 7h-18h."
+        }
+
+    try:
+        data = foxess_old_get_realtime(email, senha, serial)
+        if data.get("errno") != 0:
+            return {"errno": 1, "msg": "Erro ao buscar dados do inversor: " + data.get("msg", "Desconhecido")}
+
+        variaveis = data.get("variaveis", {})
+
+        # A API v0 retorna dados de forma diferente - procura por qualquer padrão de potência
+        mppts_detectadas = {}
+        for chave, valor in variaveis.items():
+            chave_lower = chave.lower()
+            # Procura por qualquer padrão que indique MPPT/string/PV
+            if any(x in chave_lower for x in ["mppt", "pv", "string", "phase"]) and "power" in chave_lower:
+                import re
+                match = re.search(r'(\d+)', chave)
+                if match:
+                    num = match.group(1)
+                    potencia = float(valor or 0)
+                    mppts_detectadas[f"String{num}"] = {
+                        "potencia_w": potencia,
+                        "ativa": potencia > 10
+                    }
+
+        if not mppts_detectadas:
+            return {"errno": 1, "msg": "Nenhuma string/MPPT encontrada nos dados retornados"}
+
+        total_mpptos = len(mppts_detectadas)
+        mpptos_ativas = sum(1 for m in mppts_detectadas.values() if m["ativa"])
+
+        return {
+            "errno": 0,
+            "serial": serial,
+            "total_mpptos": total_mpptos,
+            "mpptos_ativas": mpptos_ativas,
+            "mpptos": mppts_detectadas,
+            "diagnostico": {
+                "ok": mpptos_ativas == total_mpptos if total_mpptos > 0 else True,
+                "mensagem": f"Todas as {mpptos_ativas} strings estão ativas!" if mpptos_ativas == total_mpptos and total_mpptos > 0 else f"Problema detectado: {total_mpptos - mpptos_ativas} string(s) inativa(s)" if total_mpptos > 0 else "Sistema operacional."
+            }
+        }
+    except Exception as e:
+        return {"errno": 1, "msg": f"Erro ao diagnosticar: {str(e)}"}
+
 def foxess_diagnostico_strings(api_key: str, serial: str) -> dict:
     """Verifica quantas strings estão ativas no inversor FoxESS"""
     # Verificar se está dentro do horário de geração
@@ -2517,7 +2569,7 @@ def diagnostico_strings_cliente(cliente_id: int, integrador: dict = Depends(obte
     conn = conectar_banco()
     cur = conn.cursor()
     cur.execute("""
-        SELECT marca_inversor, serial_inversor, api_key_inversor, potencia_kwp
+        SELECT marca_inversor, serial_inversor, api_key_inversor, potencia_kwp, inversor_usuario, inversor_senha
         FROM clientes WHERE id=%s AND integrador_id=%s
     """, (cliente_id, integrador["id"]))
     c = cur.fetchone()
@@ -2527,21 +2579,28 @@ def diagnostico_strings_cliente(cliente_id: int, integrador: dict = Depends(obte
     if not c:
         raise HTTPException(status_code=404, detail="Cliente não encontrado")
 
-    marca, serial, api_key, potencia_kwp = c
+    marca, serial, api_key, potencia_kwp, inv_usuario, inv_senha = c
 
     if not marca or marca.lower() != "foxess":
         raise HTTPException(status_code=400, detail="Diagnóstico disponível apenas para FoxESS")
 
-    if not serial or not api_key:
-        raise HTTPException(status_code=400, detail="Inversor não configurado com API Key")
+    if not serial:
+        raise HTTPException(status_code=400, detail="Inversor não configurado")
 
     # Se tem múltiplos seriais, usar o primeiro
     serial = serial.split(",")[0].strip()
 
-    resultado = foxess_diagnostico_strings(api_key, serial)
+    # Tentar com API key primeiro
+    resultado = None
+    if api_key:
+        resultado = foxess_diagnostico_strings(api_key, serial)
 
-    if resultado.get("errno") != 0:
-        raise HTTPException(status_code=400, detail=resultado.get("msg", "Erro ao diagnosticar"))
+    # Se falhou ou não tem API key, tenta com credenciais de email
+    if (not resultado or resultado.get("errno") != 0) and inv_usuario and inv_senha:
+        resultado = foxess_diagnostico_strings_oldapi(inv_usuario, inv_senha, serial)
+
+    if not resultado or resultado.get("errno") != 0:
+        raise HTTPException(status_code=400, detail=resultado.get("msg", "Erro ao diagnosticar - configure API Key ou credenciais de email"))
 
     # Adicionar informação sobre potência esperada
     if potencia_kwp:
