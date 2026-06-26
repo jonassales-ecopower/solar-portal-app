@@ -1217,19 +1217,32 @@ def portal_me(credentials: HTTPAuthorizationCredentials = Depends(security)):
 def detalhes_cliente(cliente_id: int, integrador: dict = Depends(obter_integrador_atual)):
     conn = conectar_banco()
     cur = conn.cursor()
-    cur.execute("""
-        SELECT id, nome, email, telefone, numero_uc, distribuidora, tipo_gd,
-               marca_inversor, serial_inversor, api_key_inversor,
-               potencia_kwp, latitude, longitude, data_instalacao, performance_ratio, token_acesso,
-               tarifa_kwh, consumo_medio_antes_kwh, endereco, cidade, inversor_usuario, inversor_senha
-        FROM clientes WHERE id=%s AND integrador_id=%s
-    """, (cliente_id, integrador["id"]))
+    try:
+        cur.execute("""
+            SELECT id, nome, email, telefone, numero_uc, distribuidora, tipo_gd,
+                   marca_inversor, serial_inversor, api_key_inversor,
+                   potencia_kwp, latitude, longitude, data_instalacao, performance_ratio, token_acesso,
+                   tarifa_kwh, consumo_medio_antes_kwh, endereco, cidade, inversor_usuario, inversor_senha
+            FROM clientes WHERE id=%s AND integrador_id=%s
+        """, (cliente_id, integrador["id"]))
+    except Exception:
+        # Se a query falhar (colunas não existem), usa query alternativa
+        cur.execute("""
+            SELECT id, nome, email, telefone, numero_uc, distribuidora, tipo_gd,
+                   marca_inversor, serial_inversor, api_key_inversor,
+                   potencia_kwp, latitude, longitude, data_instalacao, performance_ratio, token_acesso,
+                   tarifa_kwh, consumo_medio_antes_kwh
+            FROM clientes WHERE id=%s AND integrador_id=%s
+        """, (cliente_id, integrador["id"]))
+
     c = cur.fetchone()
     cur.close()
     conn.close()
     if not c:
         raise HTTPException(status_code=404, detail="Cliente não encontrado")
-    return {
+
+    # Montar resposta com dados disponíveis
+    response = {
         "id": c[0], "nome": c[1], "email": c[2], "telefone": c[3],
         "numero_uc": c[4], "distribuidora": c[5], "tipo_gd": c[6],
         "marca_inversor": c[7], "serial_inversor": c[8], "api_key_inversor": c[9],
@@ -1240,12 +1253,20 @@ def detalhes_cliente(cliente_id: int, integrador: dict = Depends(obter_integrado
         "performance_ratio": float(c[14]) if c[14] else 0.80,
         "token_acesso": c[15],
         "tarifa_kwh": float(c[16]) if c[16] else None,
-        "consumo_medio_antes_kwh": float(c[17]) if c[17] else None,
-        "endereco": c[18],
-        "cidade": c[19],
-        "inversor_usuario": c[20],
-        "inversor_senha": c[21]
+        "consumo_medio_antes_kwh": float(c[17]) if c[17] else None
     }
+
+    # Adicionar campos opcionais se disponíveis
+    if len(c) > 18:
+        response["endereco"] = c[18]
+    if len(c) > 19:
+        response["cidade"] = c[19]
+    if len(c) > 20:
+        response["inversor_usuario"] = c[20]
+    if len(c) > 21:
+        response["inversor_senha"] = c[21]
+
+    return response
 
 @app.put("/clientes/{cliente_id}")
 def atualizar_cliente(cliente_id: int, dados: dict, integrador: dict = Depends(obter_integrador_atual)):
