@@ -1221,7 +1221,7 @@ def detalhes_cliente(cliente_id: int, integrador: dict = Depends(obter_integrado
         SELECT id, nome, email, telefone, numero_uc, distribuidora, tipo_gd,
                marca_inversor, serial_inversor, api_key_inversor,
                potencia_kwp, latitude, longitude, data_instalacao, performance_ratio, token_acesso,
-               tarifa_kwh, consumo_medio_antes_kwh
+               tarifa_kwh, consumo_medio_antes_kwh, endereco, cidade, inversor_usuario, inversor_senha
         FROM clientes WHERE id=%s AND integrador_id=%s
     """, (cliente_id, integrador["id"]))
     c = cur.fetchone()
@@ -1240,7 +1240,11 @@ def detalhes_cliente(cliente_id: int, integrador: dict = Depends(obter_integrado
         "performance_ratio": float(c[14]) if c[14] else 0.80,
         "token_acesso": c[15],
         "tarifa_kwh": float(c[16]) if c[16] else None,
-        "consumo_medio_antes_kwh": float(c[17]) if c[17] else None
+        "consumo_medio_antes_kwh": float(c[17]) if c[17] else None,
+        "endereco": c[18],
+        "cidade": c[19],
+        "inversor_usuario": c[20],
+        "inversor_senha": c[21]
     }
 
 @app.put("/clientes/{cliente_id}")
