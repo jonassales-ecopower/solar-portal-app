@@ -719,6 +719,12 @@
                 <input type="text" id="mc-serial" placeholder="Ex: J0MF502043LK010 (separe por vírgula para múltiplos inversores)">
                 <span class="info" style="font-size:11px; color:#64748b;">2 inversores no mesmo local? Informe os seriais separados por vírgula: <code>SN1, SN2</code></span>
             </div>
+            <div style="display:flex;gap:8px;margin-bottom:12px;" id="mc-diagnostico-container" style="display:none;">
+                <button class="azul pequeno" id="mc-btn-diagnostico" onclick="mcDiagnosticarStrings()" style="flex:1;">🔍 Diagnosticar Strings</button>
+            </div>
+            <div id="mc-diagnostico-resultado" style="background-color:#f0f9ff;border-left:4px solid #0ea5e9;padding:12px;margin-bottom:12px;border-radius:4px;display:none;">
+                <p id="mc-diagnostico-texto" style="margin:0;font-size:12px;color:#0c4a6e;"></p>
+            </div>
             <div class="campo" id="mc-campo-apikey">
                 <label>Chave de API *</label>
                 <input type="text" id="mc-apikey" placeholder="Cole aqui a chave de API">
@@ -2103,6 +2109,8 @@ function mcAtualizarInstrucoes() {
     document.getElementById('mc-campo-apikey').style.display = (marca === 'deye' || marca === 'huawei') ? 'none' : 'block';
     document.getElementById('mc-campos-deye').style.display = marca === 'deye' ? 'block' : 'none';
     document.getElementById('mc-campos-huawei').style.display = marca === 'huawei' ? 'block' : 'none';
+    document.getElementById('mc-diagnostico-container').style.display = (marca === 'foxess' && mcClienteId) ? 'flex' : 'none';
+    document.getElementById('mc-diagnostico-resultado').style.display = 'none';
     const instrucoes = {
         growatt: `<div class="dica-roxo">📋 <a href="https://openapi.growatt.com" target="_blank" style="color:#7c3aed;">openapi.growatt.com</a> → Account → API Token</div>`,
         weg: `<div class="dica-roxo">📋 <a href="https://solarportal.weg.net" target="_blank" style="color:#7c3aed;">solarportal.weg.net</a> → Gestão de API</div>`,
@@ -2138,6 +2146,63 @@ async function mcFoxessBuscar() {
 function mcFoxessSelecionar() {
     const sn = document.getElementById('mc-foxess-select').value;
     if (sn) document.getElementById('mc-serial').value = sn;
+}
+
+async function mcDiagnosticarStrings() {
+    if (!mcClienteId) {
+        alert('Salve o cliente primeiro');
+        return;
+    }
+
+    const btnDiag = document.getElementById('mc-btn-diagnostico');
+    const resultDiv = document.getElementById('mc-diagnostico-resultado');
+    const resultText = document.getElementById('mc-diagnostico-texto');
+
+    btnDiag.disabled = true;
+    btnDiag.textContent = '⏳ Diagnosticando...';
+    resultDiv.style.display = 'none';
+
+    try {
+        const resp = await fetch(`${API}/clientes/${mcClienteId}/diagnostico-strings`, {
+            headers: {"Authorization": `Bearer ${token}`}
+        });
+
+        if (!resp.ok) {
+            const erro = await resp.json();
+            resultText.innerHTML = `<strong>❌ Erro:</strong> ${erro.detail || 'Erro ao diagnosticar'}`;
+            resultDiv.style.display = 'block';
+            return;
+        }
+
+        const data = await resp.json();
+
+        if (data.mpptos_ativas === data.total_mpptos) {
+            resultText.innerHTML = `<strong>✅ Todas as ${data.total_mpptos} strings estão ativas!</strong><br>Sistema operacional.`;
+            resultDiv.style.backgroundColor = '#f0fdf4';
+            resultDiv.style.borderColor = '#10b981';
+        } else {
+            resultText.innerHTML = `<strong>⚠️ Problema detectado:</strong> ${data.mpptos_ativas}/${data.total_mpptos} strings ativas<br>`;
+            resultDiv.style.backgroundColor = '#fef3c7';
+            resultDiv.style.borderColor = '#f59e0b';
+
+            // Detalhar cada MPPT
+            let detalhes = '<div style="margin-top:8px;font-size:11px;">';
+            for (const [mppt, info] of Object.entries(data.mpptos)) {
+                const status = info.ativa ? '🟢' : '🔴';
+                detalhes += `${status} ${mppt}: ${info.potencia_w}W<br>`;
+            }
+            detalhes += '</div>';
+            resultText.innerHTML += detalhes;
+        }
+
+        resultDiv.style.display = 'block';
+    } catch(e) {
+        resultText.innerHTML = `<strong>❌ Erro de conexão:</strong> ${e.message}`;
+        resultDiv.style.display = 'block';
+    } finally {
+        btnDiag.disabled = false;
+        btnDiag.textContent = '🔍 Diagnosticar Strings';
+    }
 }
 
 // ===== SENHA CLIENTE =====
