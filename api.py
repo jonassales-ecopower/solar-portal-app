@@ -819,6 +819,38 @@ def foxess_chamar_api(api_key: str, path: str, body: dict):
 def foxess_get_realtime(api_key: str, serial: str) -> dict:
     return foxess_chamar_api(api_key, "op/v0/device/real/query", {"sn": serial, "variables": []})
 
+def foxess_get_mppt_data(api_key: str, serial: str) -> dict:
+    """Busca especificamente dados de MPPT/strings do FoxESS"""
+    variables = [
+        "mppt1Power", "mppt2Power", "mppt3Power", "mppt4Power",
+        "mppt5Power", "mppt6Power", "mppt7Power", "mppt8Power",
+        "pvPower", "outputPower", "generationPower"
+    ]
+    response = foxess_chamar_api(api_key, "op/v0/device/real/query", {"sn": serial, "variables": variables})
+
+    if response.get("errno") == 0:
+        variaveis = {}
+        data_obj = response.get("data", response.get("result", {}))
+
+        # Se é array, pega primeiro elemento
+        if isinstance(data_obj, list) and len(data_obj) > 0:
+            data_obj = data_obj[0]
+
+        # Se tem field "datas" (array de variáveis), processa
+        if isinstance(data_obj, dict) and "datas" in data_obj:
+            for item in data_obj.get("datas", []):
+                var_name = item.get("variable", "")
+                var_value = item.get("value")
+                if var_name and var_value is not None:
+                    variaveis[var_name] = var_value
+        else:
+            # Se retorna objeto direto com valores
+            variaveis = data_obj if isinstance(data_obj, dict) else {}
+
+        return {"errno": 0, "variaveis": variaveis}
+
+    return response
+
 def foxess_diagnostico_strings(api_key: str, serial: str) -> dict:
     """Verifica quantas strings estão ativas no inversor FoxESS"""
     # Verificar se está dentro do horário de geração
@@ -830,19 +862,22 @@ def foxess_diagnostico_strings(api_key: str, serial: str) -> dict:
         }
 
     try:
-        data = foxess_get_realtime(api_key, serial)
+        # Usar função dedicada para buscar dados de MPPT
+        data = foxess_get_mppt_data(api_key, serial)
         if data.get("errno") != 0:
-            return {"errno": 1, "msg": "Erro ao buscar dados do inversor"}
+            return {"errno": 1, "msg": "Erro ao buscar dados do inversor: " + data.get("msg", "Desconhecido")}
 
         variaveis = data.get("variaveis", {})
 
-        # Procurar por dados de MPPT/strings
+        # Procurar por dados de MPPT/strings (agora em camelCase: mppt1Power, mppt2Power, etc)
         mppts_detectadas = {}
         for chave, valor in variaveis.items():
             if "mppt" in chave.lower() and "power" in chave.lower():
-                # Ex: mppt1_power, mppt2_power, etc
-                mppt_num = ''.join(filter(str.isdigit, chave.split("_")[0]))
-                if mppt_num:
+                # Extrai número (ex: mppt1Power → 1, mppt2Power → 2)
+                import re
+                match = re.search(r'mppt(\d+)', chave.lower())
+                if match:
+                    mppt_num = match.group(1)
                     potencia = float(valor or 0)
                     mppts_detectadas[f"MPPT{mppt_num}"] = {
                         "potencia_w": potencia,
