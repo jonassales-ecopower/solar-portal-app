@@ -696,24 +696,6 @@
                     <option value="outro">Outro</option>
                 </select>
             </div>
-            <div id="mc-foxess-busca" style="display:none;">
-                <div class="dica-roxo">⚡ <strong>FoxESS:</strong> Acesse <a href="https://www.foxesscloud.com" target="_blank" style="color:#7c3aed;">foxesscloud.com</a> → Perfil → API Management → Generate API Key</div>
-                <div class="campo">
-                    <label>API Key FoxESS *</label>
-                    <input type="text" id="mc-foxess-apikey" placeholder="Cole aqui a API Key do portal FoxESS">
-                </div>
-                <button class="azul pequeno" id="mc-btn-foxess" onclick="mcFoxessBuscar()">🔍 Buscar Inversores</button>
-                <p class="info" id="mc-foxess-buscando" style="display:none;">🔄 Buscando...</p>
-                <p class="erro" id="mc-foxess-erro"></p>
-                <div id="mc-foxess-dispositivos" style="display:none;" class="campo">
-                    <label>Inversor encontrado</label>
-                    <select id="mc-foxess-select" onchange="mcFoxessSelecionar()">
-                        <option value="">Selecione o inversor...</option>
-                    </select>
-                </div>
-                <hr class="separador">
-                <p style="font-size:11px;color:#888;margin-bottom:8px;">Ou preencha manualmente:</p>
-            </div>
             <div class="campo">
                 <label>Número de Série do Inversor *</label>
                 <input type="text" id="mc-serial" placeholder="Ex: J0MF502043LK010 (separe por vírgula para múltiplos inversores)">
@@ -2105,7 +2087,6 @@ function mcParsearGeracaoTextarea() {
 
 function mcAtualizarInstrucoes() {
     const marca = document.getElementById('mc-marca').value;
-    document.getElementById('mc-foxess-busca').style.display = marca === 'foxess' ? 'block' : 'none';
     document.getElementById('mc-campo-apikey').style.display = (marca === 'deye' || marca === 'huawei') ? 'none' : 'block';
     document.getElementById('mc-campos-deye').style.display = marca === 'deye' ? 'block' : 'none';
     document.getElementById('mc-campos-huawei').style.display = marca === 'huawei' ? 'block' : 'none';
@@ -2118,34 +2099,6 @@ function mcAtualizarInstrucoes() {
         solis: `<div class="dica-roxo">📋 <a href="https://www.soliscloud.com" target="_blank" style="color:#7c3aed;">soliscloud.com</a> → Conta → Gestão de API</div>`,
     };
     document.getElementById('mc-instrucoes-api').innerHTML = instrucoes[marca] || '';
-}
-
-async function mcFoxessBuscar() {
-    const apiKey = document.getElementById('mc-foxess-apikey').value.trim();
-    if (!apiKey) { document.getElementById('mc-foxess-erro').textContent = 'Cole a API Key'; return; }
-    document.getElementById('mc-foxess-buscando').style.display = 'block';
-    document.getElementById('mc-btn-foxess').disabled = true;
-    document.getElementById('mc-foxess-erro').textContent = '';
-    document.getElementById('mc-foxess-dispositivos').style.display = 'none';
-    try {
-        const tmpId = mcClienteId || 0;
-        const resp = await fetch(`${API}/clientes/${tmpId}/foxess/buscar`, {method:'POST', headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`}, body: JSON.stringify({api_key: apiKey})});
-        const data = await resp.json();
-        if (resp.ok) {
-            document.getElementById('mc-apikey').value = apiKey;
-            const sel = document.getElementById('mc-foxess-select');
-            sel.innerHTML = '<option value="">Selecione o inversor...</option>';
-            data.dispositivos.forEach(d => { const opt = document.createElement('option'); opt.value = d.sn; opt.textContent = `${d.sn} — ${d.modelo||'Inversor'} ${d.status===1?'🟢':'⚫'}`; sel.appendChild(opt); });
-            document.getElementById('mc-foxess-dispositivos').style.display = 'block';
-            if (data.dispositivos.length === 1) { sel.selectedIndex = 1; mcFoxessSelecionar(); }
-        } else { document.getElementById('mc-foxess-erro').textContent = data.detail || 'Erro ao buscar inversores'; }
-    } catch(e) { document.getElementById('mc-foxess-erro').textContent = 'Erro de conexão'; }
-    finally { document.getElementById('mc-foxess-buscando').style.display = 'none'; document.getElementById('mc-btn-foxess').disabled = false; }
-}
-
-function mcFoxessSelecionar() {
-    const sn = document.getElementById('mc-foxess-select').value;
-    if (sn) document.getElementById('mc-serial').value = sn;
 }
 
 async function mcDiagnosticarStrings() {
