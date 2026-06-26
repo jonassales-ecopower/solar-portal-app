@@ -1846,19 +1846,18 @@ async function salvarModalCliente() {
             if (!resp.ok) { const d = await resp.json(); document.getElementById('mc-erro').textContent = d.detail||'Erro ao criar cliente'; return; }
             const d = await resp.json(); clienteId = d.id;
         } else {
-            // Lê os 12 campos de geração esperada (JAN-DEZ) ANTES de fazer o primeiro PUT
+            // Atualizar cliente existente com geração esperada
             let geracaoEsperada = null;
-            const valores = [];
+            const valoresGen = [];
             for (let i = 1; i <= 12; i++) {
                 const val = document.getElementById(`mc-ger-${i.toString().padStart(2,'0')}`).value.trim();
                 if (val) {
                     const num = parseFloat(val);
-                    if (!isNaN(num)) valores.push(num);
+                    if (!isNaN(num)) valoresGen.push(num);
                 }
             }
-            // Se tem 12 valores válidos, envia
-            if (valores.length === 12) {
-                geracaoEsperada = JSON.stringify(valores);
+            if (valoresGen.length === 12) {
+                geracaoEsperada = JSON.stringify(valoresGen);
             }
 
             const clienteData = {nome, email: document.getElementById('mc-email').value, telefone: document.getElementById('mc-telefone').value, numero_uc: document.getElementById('mc-uc').value, distribuidora: document.getElementById('mc-distribuidora').value, tipo_gd: document.getElementById('mc-tipo-gd').value, cidade: document.getElementById('mc-cidade').value.trim()};
@@ -1869,6 +1868,34 @@ async function salvarModalCliente() {
                 body: JSON.stringify(clienteData)
             });
             if (!resp.ok) { const d = await resp.json(); document.getElementById('mc-erro').textContent = d.detail||'Erro ao atualizar cliente'; return; }
+        }
+
+        // Para NOVOS clientes, também salvar cidade + geração no PUT
+        if (!mcClienteId) {
+            let geracaoEsperada = null;
+            const valoresGen = [];
+            for (let i = 1; i <= 12; i++) {
+                const val = document.getElementById(`mc-ger-${i.toString().padStart(2,'0')}`).value.trim();
+                if (val) {
+                    const num = parseFloat(val);
+                    if (!isNaN(num)) valoresGen.push(num);
+                }
+            }
+            if (valoresGen.length === 12) {
+                geracaoEsperada = JSON.stringify(valoresGen);
+            }
+
+            const cidade = document.getElementById('mc-cidade').value.trim();
+            if (geracaoEsperada || cidade) {
+                const clienteDataNovo = {cidade};
+                if (geracaoEsperada) clienteDataNovo.geracao_esperada_mensal = geracaoEsperada;
+
+                const respNovo = await fetch(`${API}/clientes/${clienteId}`, {
+                    method:'PUT', headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},
+                    body: JSON.stringify(clienteDataNovo)
+                });
+                if (!respNovo.ok) { const d = await respNovo.json(); document.getElementById('mc-erro').textContent = d.detail||'Erro ao salvar dados do cliente'; return; }
+            }
         }
 
         // 2. Projeto (se preenchido)
