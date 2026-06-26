@@ -819,6 +819,45 @@ def foxess_chamar_api(api_key: str, path: str, body: dict):
 def foxess_get_realtime(api_key: str, serial: str) -> dict:
     return foxess_chamar_api(api_key, "op/v0/device/real/query", {"sn": serial, "variables": []})
 
+def foxess_diagnostico_strings(api_key: str, serial: str) -> dict:
+    """Verifica quantas strings estão ativas no inversor FoxESS"""
+    try:
+        data = foxess_get_realtime(api_key, serial)
+        if data.get("errno") != 0:
+            return {"errno": 1, "msg": "Erro ao buscar dados do inversor"}
+
+        variaveis = data.get("variaveis", {})
+
+        # Procurar por dados de MPPT/strings
+        mppts_detectadas = {}
+        for chave, valor in variaveis.items():
+            if "mppt" in chave.lower() and "power" in chave.lower():
+                # Ex: mppt1_power, mppt2_power, etc
+                mppt_num = ''.join(filter(str.isdigit, chave.split("_")[0]))
+                if mppt_num:
+                    potencia = float(valor or 0)
+                    mppts_detectadas[f"MPPT{mppt_num}"] = {
+                        "potencia_w": potencia,
+                        "ativa": potencia > 10  # Considera ativa se > 10W
+                    }
+
+        total_mpptos = len(mppts_detectadas)
+        mpptos_ativas = sum(1 for m in mppts_detectadas.values() if m["ativa"])
+
+        return {
+            "errno": 0,
+            "serial": serial,
+            "total_mpptos": total_mpptos,
+            "mpptos_ativas": mpptos_ativas,
+            "mpptos": mppts_detectadas,
+            "diagnostico": {
+                "ok": mpptos_ativas == total_mpptos if total_mpptos > 0 else True,
+                "mensagem": f"{mpptos_ativas}/{total_mpptos} strings ativas" if total_mpptos > 0 else "Sem dados de MPPT"
+            }
+        }
+    except Exception as e:
+        return {"errno": 1, "msg": str(e)}
+
 def foxess_get_mensal(api_key: str, serial: str, ano: int, mes: int) -> float:
     body = {"sn": serial, "year": ano, "month": mes, "dimension": "month", "variables": ["generation"]}
     try:
@@ -2386,6 +2425,46 @@ def verificar_anomalias(cliente_id: int):
     return {"cliente_id":cliente_id,"cliente_nome":nome,"data_analise":hoje.isoformat(),
             "geracao_ontem_kwh":round(g_ontem,1),"media_7_dias_kwh":round(media7,1),
             "media_diaria_esperada_kwh":round(media_diaria_esperada,1),"alertas":alertas}
+
+@app.get("/clientes/{cliente_id}/diagnostico-strings")
+def diagnostico_strings_cliente(cliente_id: int, integrador: dict = Depends(obter_integrador_atual)):
+    """Diagnostica quantas strings estão ativas no inversor"""
+    conn = conectar_banco()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT marca_inversor, serial_inversor, api_key_inversor, potencia_kwp
+        FROM clientes WHERE id=%s AND integrador_id=%s
+    """, (cliente_id, integrador["id"]))
+    c = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if not c:
+        raise HTTPException(status_code=404, detail="Cliente não encontrado")
+
+    marca, serial, api_key, potencia_kwp = c
+
+    if not marca or marca.lower() != "foxess":
+        raise HTTPException(status_code=400, detail="Diagnóstico disponível apenas para FoxESS")
+
+    if not serial or not api_key:
+        raise HTTPException(status_code=400, detail="Inversor não configurado com API Key")
+
+    # Se tem múltiplos seriais, usar o primeiro
+    serial = serial.split(",")[0].strip()
+
+    resultado = foxess_diagnostico_strings(api_key, serial)
+
+    if resultado.get("errno") != 0:
+        raise HTTPException(status_code=400, detail=resultado.get("msg", "Erro ao diagnosticar"))
+
+    # Adicionar informação sobre potência esperada
+    if potencia_kwp:
+        resultado["potencia_kwp"] = float(potencia_kwp)
+        # Estimar potência por string
+        resultado["potencia_por_mppt_kwp"] = float(potencia_kwp) / resultado["total_mpptos"] if resultado["total_mpptos"] > 0 else 0
+
+    return resultado
 
 @app.get("/clientes/{cliente_id}/geracao/diaria")
 def geracao_diaria(cliente_id: int, dias: int = 30):
