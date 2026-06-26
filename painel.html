@@ -601,6 +601,22 @@
 
         <!-- Tab: Projeto -->
         <div class="mc-panel" id="mcpanel-projeto">
+            <!-- Endereço no topo -->
+            <div class="campo">
+                <label>Endereço da instalação</label>
+                <div style="display:flex;gap:8px;margin-bottom:8px;">
+                    <input type="text" id="mc-endereco" placeholder="Ex: Rua das Flores, 123, Extrema, MG" style="flex:1;">
+                    <button class="amarelo pequeno" onclick="mcBuscarCoordenadas()">🔍 Buscar</button>
+                </div>
+                <p class="info" id="mc-endereco-ok" style="display:none;"></p>
+                <p class="erro" id="mc-endereco-erro"></p>
+            </div>
+            <div class="grid-2">
+                <div class="campo"><label>Latitude</label><input type="number" id="mc-lat" placeholder="-22.876100" step="0.000001"></div>
+                <div class="campo"><label>Longitude</label><input type="number" id="mc-lng" placeholder="-46.316700" step="0.000001"></div>
+            </div>
+            <hr class="separador">
+
             <div class="grid-2">
                 <div class="campo"><label>Potência do sistema (kWp) *</label><input type="number" id="mc-potencia" placeholder="Ex: 5.5" step="0.1"></div>
                 <div class="campo"><label>Cidade (para irradiância solar) — Opcional se importar gráfico</label>
@@ -632,46 +648,35 @@
             </div>
             <div class="campo">
                 <label style="color:#7c3aed;font-weight:700;">📊 Geração Esperada Mensal (kWh)</label>
-                <p style="font-size:11px;color:#666;margin-bottom:12px;"><strong>Cole os 12 valores separados por ";"</strong> ou preencha manualmente abaixo:</p>
-                <textarea id="mc-ger-texto" placeholder="Ex: 709,84; 669,13; 647,88; 590,49; 506,45; 456,23; 488,94; 623,64; 621,77; 712,54; 707,8; 782,58"
-                    style="width:100%;min-height:50px;padding:8px;border:1px solid #ccc;border-radius:4px;font-size:12px;font-family:monospace;margin-bottom:16px;"
-                    onchange="mcParsearGeracaoTextarea()"></textarea>
-                <div style="background-color:#f5f5f5;border-left:4px solid #7c3aed;padding:12px;margin-bottom:16px;border-radius:4px;">
-                    <p style="font-size:11px;color:#333;margin:0 0 8px 0;"><strong>📋 Como extrair valores do gráfico da proposta:</strong></p>
-                    <ol style="font-size:11px;color:#555;margin:0;padding-left:20px;line-height:1.6;">
-                        <li>Faça screenshot/print do <strong>gráfico de geração mensal</strong> da proposta</li>
-                        <li>Abra <strong>Google Gemini</strong> ou outro assistente IA</li>
-                        <li>Cole a imagem e envie este prompt: <code style="background:#e8e8e8;padding:2px 4px;border-radius:2px;">"Extraia os valores do gráfico, separados por ";" (Ex: 709,84; 669,13; ...)"</code></li>
-                        <li>Copie a resposta e cole no campo acima</li>
+                <p style="font-size:11px;color:#666;margin-bottom:8px;"><strong>Cole os 12 valores separados por ";"</strong></p>
+                <div style="display:flex;gap:8px;margin-bottom:12px;">
+                    <textarea id="mc-ger-texto" placeholder="Ex: 709,84; 669,13; 647,88; 590,49; 506,45; 456,23; 488,94; 623,64; 621,77; 712,54; 707,8; 782,58"
+                        style="flex:1;height:40px;padding:8px;border:1px solid #ccc;border-radius:4px;font-size:12px;font-family:monospace;"></textarea>
+                    <button class="verde pequeno" onclick="mcInserirValoresGeracao()" style="white-space:nowrap;">Inserir</button>
+                </div>
+                <div style="background-color:#f5f5f5;border-left:4px solid #7c3aed;padding:12px;margin-bottom:12px;border-radius:4px;">
+                    <p style="font-size:11px;color:#333;margin:0 0 8px 0;"><strong>📋 Extraia do gráfico:</strong></p>
+                    <ol style="font-size:10px;color:#555;margin:0;padding-left:18px;line-height:1.5;">
+                        <li>Print do gráfico da proposta</li>
+                        <li>Abra <strong>Google Gemini</strong> ou IA</li>
+                        <li>Prompt: <code style="background:#e8e8e8;padding:2px 4px;border-radius:2px;">"Extraia os valores do gráfico, separados por ';'"</code></li>
+                        <li>Cole acima e clique <strong>Inserir</strong></li>
                     </ol>
                 </div>
-                <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px;">
-                    <div><label style="font-size:10px;color:#666;">Jan</label><input type="number" id="mc-ger-01" placeholder="kWh" step="0.01" style="width:100%;"></div>
-                    <div><label style="font-size:10px;color:#666;">Fev</label><input type="number" id="mc-ger-02" placeholder="kWh" step="0.01" style="width:100%;"></div>
-                    <div><label style="font-size:10px;color:#666;">Mar</label><input type="number" id="mc-ger-03" placeholder="kWh" step="0.01" style="width:100%;"></div>
-                    <div><label style="font-size:10px;color:#666;">Abr</label><input type="number" id="mc-ger-04" placeholder="kWh" step="0.01" style="width:100%;"></div>
-                    <div><label style="font-size:10px;color:#666;">Mai</label><input type="number" id="mc-ger-05" placeholder="kWh" step="0.01" style="width:100%;"></div>
-                    <div><label style="font-size:10px;color:#666;">Jun</label><input type="number" id="mc-ger-06" placeholder="kWh" step="0.01" style="width:100%;"></div>
-                    <div><label style="font-size:10px;color:#666;">Jul</label><input type="number" id="mc-ger-07" placeholder="kWh" step="0.01" style="width:100%;"></div>
-                    <div><label style="font-size:10px;color:#666;">Ago</label><input type="number" id="mc-ger-08" placeholder="kWh" step="0.01" style="width:100%;"></div>
-                    <div><label style="font-size:10px;color:#666;">Set</label><input type="number" id="mc-ger-09" placeholder="kWh" step="0.01" style="width:100%;"></div>
-                    <div><label style="font-size:10px;color:#666;">Out</label><input type="number" id="mc-ger-10" placeholder="kWh" step="0.01" style="width:100%;"></div>
-                    <div><label style="font-size:10px;color:#666;">Nov</label><input type="number" id="mc-ger-11" placeholder="kWh" step="0.01" style="width:100%;"></div>
-                    <div><label style="font-size:10px;color:#666;">Dez</label><input type="number" id="mc-ger-12" placeholder="kWh" step="0.01" style="width:100%;"></div>
+                <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:12px;">
+                    <div><label style="font-size:10px;color:#666;">Jan</label><input type="number" id="mc-ger-01" placeholder="kWh" step="0.01" style="width:100%;font-size:11px;"></div>
+                    <div><label style="font-size:10px;color:#666;">Fev</label><input type="number" id="mc-ger-02" placeholder="kWh" step="0.01" style="width:100%;font-size:11px;"></div>
+                    <div><label style="font-size:10px;color:#666;">Mar</label><input type="number" id="mc-ger-03" placeholder="kWh" step="0.01" style="width:100%;font-size:11px;"></div>
+                    <div><label style="font-size:10px;color:#666;">Abr</label><input type="number" id="mc-ger-04" placeholder="kWh" step="0.01" style="width:100%;font-size:11px;"></div>
+                    <div><label style="font-size:10px;color:#666;">Mai</label><input type="number" id="mc-ger-05" placeholder="kWh" step="0.01" style="width:100%;font-size:11px;"></div>
+                    <div><label style="font-size:10px;color:#666;">Jun</label><input type="number" id="mc-ger-06" placeholder="kWh" step="0.01" style="width:100%;font-size:11px;"></div>
+                    <div><label style="font-size:10px;color:#666;">Jul</label><input type="number" id="mc-ger-07" placeholder="kWh" step="0.01" style="width:100%;font-size:11px;"></div>
+                    <div><label style="font-size:10px;color:#666;">Ago</label><input type="number" id="mc-ger-08" placeholder="kWh" step="0.01" style="width:100%;font-size:11px;"></div>
+                    <div><label style="font-size:10px;color:#666;">Set</label><input type="number" id="mc-ger-09" placeholder="kWh" step="0.01" style="width:100%;font-size:11px;"></div>
+                    <div><label style="font-size:10px;color:#666;">Out</label><input type="number" id="mc-ger-10" placeholder="kWh" step="0.01" style="width:100%;font-size:11px;"></div>
+                    <div><label style="font-size:10px;color:#666;">Nov</label><input type="number" id="mc-ger-11" placeholder="kWh" step="0.01" style="width:100%;font-size:11px;"></div>
+                    <div><label style="font-size:10px;color:#666;">Dez</label><input type="number" id="mc-ger-12" placeholder="kWh" step="0.01" style="width:100%;font-size:11px;"></div>
                 </div>
-            </div>
-            <div class="campo">
-                <label>Endereço da instalação</label>
-                <div style="display:flex;gap:8px;">
-                    <input type="text" id="mc-endereco" placeholder="Ex: Rua das Flores, 123, Extrema, MG" style="flex:1;">
-                    <button class="amarelo pequeno" onclick="mcBuscarCoordenadas()">🔍 Buscar</button>
-                </div>
-                <p class="info" id="mc-endereco-ok" style="display:none;"></p>
-                <p class="erro" id="mc-endereco-erro"></p>
-            </div>
-            <div class="grid-2">
-                <div class="campo"><label>Latitude</label><input type="number" id="mc-lat" placeholder="-22.876100" step="0.000001"></div>
-                <div class="campo"><label>Longitude</label><input type="number" id="mc-lng" placeholder="-46.316700" step="0.000001"></div>
             </div>
         </div>
 
@@ -2042,12 +2047,14 @@ async function mcValidarCidade() {
 }
 
 
-function mcParsearGeracaoTextarea() {
+function mcInserirValoresGeracao() {
     const texto = document.getElementById('mc-ger-texto').value.trim();
-    if (!texto) return;
+    if (!texto) {
+        alert('Cole os valores separados por ";" no campo acima');
+        return;
+    }
 
     try {
-        // Parse: "709,84; 669,13; 647,88; ..." → [709.84, 669.13, 647.88, ...]
         const valores = texto.split(';').map(v => {
             const num = parseFloat(v.trim().replace(',', '.'));
             return isNaN(num) ? null : num;
@@ -2058,7 +2065,29 @@ function mcParsearGeracaoTextarea() {
             return;
         }
 
-        // Preenche os 12 campos
+        for (let i = 0; i < 12; i++) {
+            document.getElementById(`mc-ger-${(i+1).toString().padStart(2,'0')}`).value = valores[i];
+        }
+        alert('✓ Valores inseridos com sucesso!');
+    } catch(e) {
+        alert('Erro ao processar valores: ' + e.message);
+    }
+}
+
+function mcParsearGeracaoTextarea() {
+    const texto = document.getElementById('mc-ger-texto').value.trim();
+    if (!texto) return;
+
+    try {
+        const valores = texto.split(';').map(v => {
+            const num = parseFloat(v.trim().replace(',', '.'));
+            return isNaN(num) ? null : num;
+        }).filter(v => v !== null);
+
+        if (valores.length !== 12) {
+            return;
+        }
+
         for (let i = 0; i < 12; i++) {
             document.getElementById(`mc-ger-${(i+1).toString().padStart(2,'0')}`).value = valores[i];
         }
