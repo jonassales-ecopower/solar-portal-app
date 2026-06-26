@@ -1751,23 +1751,22 @@ function mcTab(aba) {
 function mcLimpar() {
     ['mc-nome','mc-email','mc-telefone','mc-uc','mc-distribuidora','mc-tipo-gd',
      'mc-potencia','mc-data-inst','mc-tarifa','mc-consumo-antes','mc-endereco','mc-lat','mc-lng',
-     'mc-cidade','mc-serial','mc-apikey','mc-foxess-apikey','mc-deye-app-id','mc-deye-app-secret',
+     'mc-cidade','mc-serial','mc-apikey','mc-deye-app-id','mc-deye-app-secret',
      'mc-huawei-email','mc-huawei-senha','mc-senha','mc-senha2','mc-ger-texto',
      'mc-ger-01','mc-ger-02','mc-ger-03','mc-ger-04','mc-ger-05','mc-ger-06',
      'mc-ger-07','mc-ger-08','mc-ger-09','mc-ger-10','mc-ger-11','mc-ger-12'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
     document.getElementById('mc-pr').value = '0.80';
     document.getElementById('mc-marca').value = '';
-    document.getElementById('mc-foxess-busca').style.display = 'none';
     document.getElementById('mc-campo-apikey').style.display = 'block';
     document.getElementById('mc-campos-deye').style.display = 'none';
-    document.getElementById('mc-foxess-dispositivos').style.display = 'none';
+    document.getElementById('mc-campos-huawei').style.display = 'none';
     document.getElementById('mc-instrucoes-api').innerHTML = '';
     document.getElementById('mc-endereco-ok').style.display = 'none';
     document.getElementById('mc-endereco-erro').textContent = '';
     document.getElementById('mc-cidade-erro').textContent = '';
     document.getElementById('mc-hsp-info').style.display = 'none';
-    document.getElementById('mc-foxess-erro').textContent = '';
     document.getElementById('mc-link-box').style.display = 'none';
+    document.getElementById('mc-diagnostico-resultado').style.display = 'none';
     document.getElementById('mc-sucesso').style.display = 'none';
     document.getElementById('mc-erro').textContent = '';
     mcTab('info');
