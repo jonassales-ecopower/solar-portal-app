@@ -2169,7 +2169,18 @@ async function mcDiagnosticarStrings() {
 
         if (!resp.ok) {
             const erro = await resp.json();
-            resultText.innerHTML = `<strong>❌ Erro:</strong> ${erro.detail || 'Erro ao diagnosticar'}`;
+            const mensagem = erro.detail || 'Erro ao diagnosticar';
+            const isForaHorario = mensagem.includes('horário de geração') || mensagem.includes('7h-18h');
+
+            if (isForaHorario) {
+                resultText.innerHTML = `<strong>⏰ Fora do horário de geração:</strong><br>${mensagem}`;
+                resultDiv.style.backgroundColor = '#fef3c7';
+                resultDiv.style.borderColor = '#f59e0b';
+            } else {
+                resultText.innerHTML = `<strong>❌ Erro:</strong> ${mensagem}`;
+                resultDiv.style.backgroundColor = '#fee2e2';
+                resultDiv.style.borderColor = '#ef4444';
+            }
             resultDiv.style.display = 'block';
             return;
         }

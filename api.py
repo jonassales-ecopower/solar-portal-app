@@ -821,6 +821,14 @@ def foxess_get_realtime(api_key: str, serial: str) -> dict:
 
 def foxess_diagnostico_strings(api_key: str, serial: str) -> dict:
     """Verifica quantas strings estão ativas no inversor FoxESS"""
+    # Verificar se está dentro do horário de geração
+    hora_brt = (datetime.utcnow() - timedelta(hours=3)).hour
+    if hora_brt < 7 or hora_brt >= 18:
+        return {
+            "errno": 1,
+            "msg": f"Diagnóstico não disponível fora do horário de geração. Horário atual (BRT): {hora_brt}h. Tente entre 7h-18h."
+        }
+
     try:
         data = foxess_get_realtime(api_key, serial)
         if data.get("errno") != 0:
