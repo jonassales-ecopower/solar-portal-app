@@ -821,6 +821,7 @@ def foxess_get_realtime(api_key: str, serial: str) -> dict:
 
 def foxess_get_mppt_data(api_key: str, serial: str) -> dict:
     """Busca especificamente dados de MPPT/strings do FoxESS"""
+    # Tentar com lista específica de MPPT variables
     variables = [
         "mppt1Power", "mppt2Power", "mppt3Power", "mppt4Power",
         "mppt5Power", "mppt6Power", "mppt7Power", "mppt8Power",
@@ -847,6 +848,20 @@ def foxess_get_mppt_data(api_key: str, serial: str) -> dict:
             # Se retorna objeto direto com valores
             variaveis = data_obj if isinstance(data_obj, dict) else {}
 
+        # Se não achou nada, tenta requisição sem variáveis especificadas
+        if not variaveis:
+            response2 = foxess_chamar_api(api_key, "op/v0/device/real/query", {"sn": serial, "variables": []})
+            if response2.get("errno") == 0:
+                data_obj2 = response2.get("data", response2.get("result", {}))
+                if isinstance(data_obj2, list) and len(data_obj2) > 0:
+                    data_obj2 = data_obj2[0]
+                if isinstance(data_obj2, dict) and "datas" in data_obj2:
+                    for item in data_obj2.get("datas", []):
+                        var_name = item.get("variable", "")
+                        var_value = item.get("value")
+                        if var_name and var_value is not None:
+                            variaveis[var_name] = var_value
+
         return {"errno": 0, "variaveis": variaveis}
 
     return response
@@ -869,6 +884,15 @@ def foxess_diagnostico_strings(api_key: str, serial: str) -> dict:
 
         variaveis = data.get("variaveis", {})
 
+        # Debug: se variaveis vazio, retornar o que foi recebido
+        if not variaveis:
+            all_vars_str = ", ".join(list(variaveis.keys())[:20]) if variaveis else "nenhum"
+            return {
+                "errno": 1,
+                "msg": f"Sem dados de MPPT. Variáveis recebidas: {all_vars_str}",
+                "debug_variaveis": list(variaveis.keys()) if variaveis else []
+            }
+
         # Procurar por dados de MPPT/strings (agora em camelCase: mppt1Power, mppt2Power, etc)
         mppts_detectadas = {}
         for chave, valor in variaveis.items():
@@ -883,6 +907,24 @@ def foxess_diagnostico_strings(api_key: str, serial: str) -> dict:
                         "potencia_w": potencia,
                         "ativa": potencia > 10  # Considera ativa se > 10W
                     }
+
+        # Se não encontrou MPPT, procurar por padrões alternativos
+        if not mppts_detectadas:
+            # Tenta pv1Power, pv2Power, string1Power, etc
+            for chave, valor in variaveis.items():
+                chave_lower = chave.lower()
+                # Padrões alternativos para strings/MPPT
+                if ("pv" in chave_lower or "string" in chave_lower or "phase" in chave_lower) and "power" in chave_lower:
+                    import re
+                    # Tenta extrair número de qualquer padrão
+                    match = re.search(r'(\d+)', chave)
+                    if match:
+                        num = match.group(1)
+                        potencia = float(valor or 0)
+                        mppts_detectadas[f"String{num}"] = {
+                            "potencia_w": potencia,
+                            "ativa": potencia > 10
+                        }
 
         total_mpptos = len(mppts_detectadas)
         mpptos_ativas = sum(1 for m in mppts_detectadas.values() if m["ativa"])
