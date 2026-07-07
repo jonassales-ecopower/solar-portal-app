@@ -1400,7 +1400,8 @@ def detalhes_cliente(cliente_id: int, integrador: dict = Depends(obter_integrado
         SELECT id, nome, email, telefone, numero_uc, distribuidora, tipo_gd,
                marca_inversor, serial_inversor, api_key_inversor,
                potencia_kwp, latitude, longitude, data_instalacao, performance_ratio, token_acesso,
-               tarifa_kwh, consumo_medio_antes_kwh
+               tarifa_kwh, consumo_medio_antes_kwh, cidade, geracao_esperada_mensal,
+               inversor_usuario, inversor_senha, portal_link, portal_email, portal_senha
         FROM clientes WHERE id=%s AND integrador_id=%s
     """, (cliente_id, integrador["id"]))
     c = cur.fetchone()
@@ -1408,6 +1409,15 @@ def detalhes_cliente(cliente_id: int, integrador: dict = Depends(obter_integrado
     conn.close()
     if not c:
         raise HTTPException(status_code=404, detail="Cliente não encontrado")
+
+    # Parse geração esperada mensal se for JSON
+    geracao_mensal = None
+    if c[19]:
+        try:
+            geracao_mensal = json.loads(c[19]) if isinstance(c[19], str) else c[19]
+        except:
+            geracao_mensal = None
+
     return {
         "id": c[0], "nome": c[1], "email": c[2], "telefone": c[3],
         "numero_uc": c[4], "distribuidora": c[5], "tipo_gd": c[6],
@@ -1419,7 +1429,14 @@ def detalhes_cliente(cliente_id: int, integrador: dict = Depends(obter_integrado
         "performance_ratio": float(c[14]) if c[14] else 0.80,
         "token_acesso": c[15],
         "tarifa_kwh": float(c[16]) if c[16] else None,
-        "consumo_medio_antes_kwh": float(c[17]) if c[17] else None
+        "consumo_medio_antes_kwh": float(c[17]) if c[17] else None,
+        "cidade": c[18],
+        "geracao_esperada_mensal": geracao_mensal,
+        "inversor_usuario": c[20],
+        "inversor_senha": c[21],
+        "portal_link": c[22],
+        "portal_email": c[23],
+        "portal_senha": c[24]
     }
 
 @app.put("/clientes/{cliente_id}")

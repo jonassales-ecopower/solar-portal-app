@@ -1830,6 +1830,14 @@ async function editarCliente(clienteId) {
         if (d.portal_link) document.getElementById('mc-portal-link').value = d.portal_link;
         if (d.portal_email) document.getElementById('mc-portal-email').value = d.portal_email;
         if (d.portal_senha) document.getElementById('mc-portal-senha').value = d.portal_senha;
+        // Carregar geração esperada mensal
+        if (d.geracao_esperada_mensal && Array.isArray(d.geracao_esperada_mensal)) {
+            d.geracao_esperada_mensal.forEach((valor, idx) => {
+                const mes = (idx + 1).toString().padStart(2, '0');
+                const el = document.getElementById(`mc-ger-${mes}`);
+                if (el && valor) el.value = valor;
+            });
+        }
         if (d.token_acesso) {
             const base = window.location.href.replace('painel.html','');
             const email = document.getElementById('mc-email').value;
