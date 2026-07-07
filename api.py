@@ -43,6 +43,8 @@ def inicializar_banco():
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS alerta_offline_em TIMESTAMP")
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS inversor_usuario TEXT")
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS inversor_senha TEXT")
+        cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS portal_email TEXT")
+        cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS portal_senha TEXT")
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS senha_hash TEXT")
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS reset_token TEXT")
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS reset_token_exp TIMESTAMP")
@@ -1970,6 +1972,12 @@ def atualizar_inversor(cliente_id: int, dados: dict, integrador: dict = Depends(
         if "inversor_senha" in dados:
             campos_atualizacao.append("inversor_senha=%s")
             valores.append(dados.get("inversor_senha"))
+        if "portal_email" in dados:
+            campos_atualizacao.append("portal_email=%s")
+            valores.append(dados.get("portal_email"))
+        if "portal_senha" in dados:
+            campos_atualizacao.append("portal_senha=%s")
+            valores.append(dados.get("portal_senha"))
 
         if not campos_atualizacao:
             raise HTTPException(status_code=400, detail="Nenhum campo para atualizar")

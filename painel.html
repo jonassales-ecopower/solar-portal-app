@@ -701,6 +701,12 @@
                 <input type="text" id="mc-serial" placeholder="Ex: J0MF502043LK010 (separe por vírgula para múltiplos inversores)">
                 <span class="info" style="font-size:11px; color:#64748b;">2 inversores no mesmo local? Informe os seriais separados por vírgula: <code>SN1, SN2</code></span>
             </div>
+            <div class="campo">
+                <label style="color:#7c3aed;font-weight:700;">🔐 Credenciais do Portal do Inversor</label>
+                <p style="font-size:11px;color:#666;margin-bottom:8px;">Login e senha para acessar o portal online do inversor (ex: FoxESS Cloud, Growatt, etc)</p>
+                <div class="campo"><label>Email/Usuário</label><input type="email" id="mc-portal-email" placeholder="Email ou usuário do portal do inversor"></div>
+                <div class="campo"><label>Senha</label><input type="password" id="mc-portal-senha" placeholder="Senha do portal do inversor"></div>
+            </div>
             <div style="display:flex;gap:8px;margin-bottom:12px;" id="mc-diagnostico-container" style="display:none;">
                 <button class="azul pequeno" id="mc-btn-diagnostico" onclick="mcDiagnosticarStrings()" style="flex:1;">🔍 Diagnosticar Strings</button>
             </div>
@@ -1752,7 +1758,7 @@ function mcLimpar() {
     ['mc-nome','mc-email','mc-telefone','mc-uc','mc-distribuidora','mc-tipo-gd',
      'mc-potencia','mc-data-inst','mc-tarifa','mc-consumo-antes','mc-endereco','mc-lat','mc-lng',
      'mc-cidade','mc-serial','mc-apikey','mc-deye-app-id','mc-deye-app-secret',
-     'mc-huawei-email','mc-huawei-senha','mc-senha','mc-senha2','mc-ger-texto',
+     'mc-huawei-email','mc-huawei-senha','mc-portal-email','mc-portal-senha','mc-senha','mc-senha2','mc-ger-texto',
      'mc-ger-01','mc-ger-02','mc-ger-03','mc-ger-04','mc-ger-05','mc-ger-06',
      'mc-ger-07','mc-ger-08','mc-ger-09','mc-ger-10','mc-ger-11','mc-ger-12'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
     document.getElementById('mc-pr').value = '0.80';
@@ -1819,6 +1825,9 @@ async function editarCliente(clienteId) {
             if (d.inversor_usuario) document.getElementById('mc-huawei-email').value = d.inversor_usuario;
             if (d.inversor_senha) document.getElementById('mc-huawei-senha').value = d.inversor_senha;
         }
+        // Carregar credenciais genéricas do portal
+        if (d.portal_email) document.getElementById('mc-portal-email').value = d.portal_email;
+        if (d.portal_senha) document.getElementById('mc-portal-senha').value = d.portal_senha;
         if (d.token_acesso) {
             const base = window.location.href.replace('painel.html','');
             const email = document.getElementById('mc-email').value;
@@ -1935,9 +1944,16 @@ async function salvarModalCliente() {
         // 3. Inversor (se preenchido)
         const marca = document.getElementById('mc-marca').value;
         const serial = document.getElementById('mc-serial').value.trim();
+        const portalEmail = document.getElementById('mc-portal-email').value.trim();
+        const portalSenha = document.getElementById('mc-portal-senha').value.trim();
+
         if (marca && serial) {
             let apiKey = '';
             let payload = {marca_inversor: marca, serial_inversor: serial};
+
+            // Adicionar credenciais do portal se preenchidas
+            if (portalEmail) payload.portal_email = portalEmail;
+            if (portalSenha) payload.portal_senha = portalSenha;
 
             if (marca === 'deye') {
                 const appId = document.getElementById('mc-deye-app-id').value.trim();
@@ -1954,7 +1970,7 @@ async function salvarModalCliente() {
                 payload.api_key_inversor = apiKey;
             }
 
-            if (payload.api_key_inversor || payload.inversor_usuario || marca === 'foxess') {
+            if (payload.api_key_inversor || payload.inversor_usuario || payload.portal_email || marca === 'foxess') {
                 const respInv = await fetch(`${API}/clientes/${clienteId}/inversor`, {
                     method:'PUT', headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},
                     body: JSON.stringify(payload)
