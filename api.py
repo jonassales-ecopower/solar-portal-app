@@ -43,6 +43,7 @@ def inicializar_banco():
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS alerta_offline_em TIMESTAMP")
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS inversor_usuario TEXT")
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS inversor_senha TEXT")
+        cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS portal_link TEXT")
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS portal_email TEXT")
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS portal_senha TEXT")
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS senha_hash TEXT")
@@ -1972,6 +1973,9 @@ def atualizar_inversor(cliente_id: int, dados: dict, integrador: dict = Depends(
         if "inversor_senha" in dados:
             campos_atualizacao.append("inversor_senha=%s")
             valores.append(dados.get("inversor_senha"))
+        if "portal_link" in dados:
+            campos_atualizacao.append("portal_link=%s")
+            valores.append(dados.get("portal_link"))
         if "portal_email" in dados:
             campos_atualizacao.append("portal_email=%s")
             valores.append(dados.get("portal_email"))
