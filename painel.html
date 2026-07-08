@@ -6,15 +6,19 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>Solar Portal — Painel do Integrador</title>
+    <title>SunCheck — Painel do Integrador</title>
+    <link rel="icon" type="image/png" sizes="64x64" href="favicon-64.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', sans-serif; color: #333; }
+        body { font-family: 'Nunito', sans-serif; color: #0B2C48; }
 
         /* ===== HEADER ===== */
         header {
-            background: linear-gradient(135deg, #0f172a, #1e293b);
+            background: linear-gradient(135deg, #0F3E63, #0B2C48);
             color: white;
             padding: 8px 12px;
             display: flex;
@@ -326,7 +330,7 @@
         <div class="card">
             <div style="text-align:center; margin-bottom:24px;">
                 <div style="font-size:44px;">☀️</div>
-                <h1 style="font-size:22px; margin-top:8px; color:#1e293b;">Solar Portal</h1>
+                <h1 style="font-size:22px; margin-top:8px; color:#1e293b;">SunCheck</h1>
                 <p style="color:#94a3b8; font-size:13px; margin-top:4px;">Painel do Integrador</p>
             </div>
             <div class="auth-tabs">
@@ -2692,7 +2696,7 @@ function _htmlRelatorioConta(nomeCliente, c, rateioMes, tarifa) {
 
     <div class="rodape">
         <span>Relatório gerado por <strong>${nomeUsuario || 'seu integrador'}</strong> em ${hoje}</span>
-        <span>☀️ Solar Portal</span>
+        <span>☀️ SunCheck</span>
     </div>
 </body></html>`;
 }
