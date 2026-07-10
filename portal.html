@@ -1133,17 +1133,22 @@
     let _contaRateiAtualId = null; // Armazenar ID da conta para exclusão
 
     async function excluirContaRateio(contaId) {
+        if (!contaId) {
+            alert('❌ Erro: Conta não identificada');
+            return;
+        }
         try {
+            const tokenSalvo = localStorage.getItem("token_cliente");
             const resp = await fetch(`${API}/contas-beneficiario/${contaId}`, {
                 method: 'DELETE',
-                headers: {"Authorization": `Bearer ${token}`}
+                headers: {"Authorization": `Bearer ${tokenSalvo}`}
             });
             const data = await resp.json();
             if (resp.ok) {
                 alert('✅ Conta de rateio excluída com sucesso!');
                 document.getElementById('modal-rateio-detalhe').style.display = 'none';
                 // Recarregar a seção de rateio
-                buscarSaldoCreditos();
+                carregarDashboard();
             } else {
                 alert('❌ Erro ao excluir: ' + (data.detail || 'Tente novamente'));
             }
