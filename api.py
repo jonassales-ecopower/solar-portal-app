@@ -578,8 +578,10 @@ CAMPOS A EXTRAIR:
 3. CONSUMO BRUTO (kWh): Resultado da conta: (Leitura_Atual − Leitura_Anterior) × Constante.
    NUNCA use Leitura_Atual ou Leitura_Anterior diretamente — esses são os acumulados do medidor.
    Use somente a diferença calculada (tipicamente entre 100 e 600 kWh para uma residência).
+   ESTE É O VALOR USADO PARA CALCULAR RATEIO — é o consumo real do beneficiário.
 
 4. CONSUMO FATURADO (kWh): Consumo após dedução dos créditos GD. Valor final cobrado.
+   Este é apenas informativo — NÃO é usado para rateio. Serve só para análise.
 
 5. SALDO ANTERIOR (kWh): Saldo de créditos trazido do mês anterior. Se não houver, 0.
 
@@ -3124,6 +3126,11 @@ async def upload_conta_beneficiario(beneficiario_id: int, arquivo: UploadFile = 
 
         conn = conectar_banco()
         cur = conn.cursor()
+
+        # Usar APENAS consumo_bruto (regex extraído, confiável)
+        # IGNORAR consumo_kwh (IA pode extrair campo errado)
+        consumo_kwh = dados.get("consumo_bruto_kwh")  # Usar consumo bruto, não faturado
+
         cur.execute("""
             INSERT INTO contas_beneficiario
                 (beneficiario_id, mes_referencia, creditos_recebidos_kwh, consumo_kwh,
@@ -3138,7 +3145,7 @@ async def upload_conta_beneficiario(beneficiario_id: int, arquivo: UploadFile = 
                 valor_fatura = EXCLUDED.valor_fatura
             RETURNING id
         """, (beneficiario_id, dados.get("mes_referencia"),
-              dados.get("creditos_recebidos_kwh"), dados.get("consumo_kwh"),
+              dados.get("creditos_recebidos_kwh"), consumo_kwh,
               dados.get("consumo_bruto_kwh"), dados.get("saldo_anterior_kwh"),
               dados.get("saldo_resultante_kwh"), dados.get("valor_fatura")))
         conta_id = cur.fetchone()[0]
