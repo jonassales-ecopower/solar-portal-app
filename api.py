@@ -3077,17 +3077,25 @@ def resumo_rateio(cliente_id: int, integrador: dict = Depends(obter_integrador_a
                 ORDER BY criado_em DESC LIMIT 1
             """, (b["id"], mes_ref))
             conta_ben = cur.fetchone()
+            # Criar objeto conta com ID para permitir exclusão
+            conta_obj = None
+            if conta_ben:
+                conta_obj = {
+                    "id": conta_ben[0],
+                    "creditos_recebidos_kwh": float(conta_ben[1] or 0),
+                    "consumo_kwh": float(conta_ben[2] or 0),
+                    "saldo_resultante_kwh": float(conta_ben[3] or 0),
+                    "valor_fatura": float(conta_ben[4] or 0),
+                }
+
             dist.append({
                 "beneficiario_id": b["id"],
                 "nome": b["nome"],
                 "percentual": b["percentual"],
                 "creditos_calculados_kwh": kwh,
                 "tem_conta": conta_ben is not None,
-                "conta_id": conta_ben[0] if conta_ben else None,
-                "creditos_conta_kwh": float(conta_ben[1] or 0) if conta_ben else None,
-                "consumo_kwh": float(conta_ben[2] or 0) if conta_ben else None,
-                "saldo_resultante_kwh": float(conta_ben[3] or 0) if conta_ben else None,
-                "valor_fatura": float(conta_ben[4] or 0) if conta_ben else None,
+                "conta": conta_obj,
+                "status": _calcular_status_rateio(kwh, conta_ben[1] if conta_ben else None),
             })
         meses.append({
             "mes_referencia": mes_ref,

@@ -1044,7 +1044,7 @@
                     const delta = rec - m.creditos_calculados_kwh;
                     const deltaStr = delta >= 0 ? `+${delta.toFixed(1)}` : delta.toFixed(1);
                     colConta = `<strong style="color:${m.status==='compensado'?'#059669':m.status==='parcial'?'#d97706':'#dc2626'};">${rec.toFixed(1)} kWh</strong><span class="rt-delta">(${deltaStr})</span>`;
-                    colAcao = `<button class="rt-btn rt-btn-ver" onclick="rateioVerDetalhes(${JSON.stringify(m).replace(/"/g,'&quot;')}, '${b.nome}', '${m.mes_referencia}', ${m.creditos_calculados_kwh}, '${m.status}')">Ver</button>`;
+                    colAcao = `<button class="rt-btn rt-btn-ver" onclick="rateioVerDetalhes(${JSON.stringify(m.conta).replace(/"/g,'&quot;')}, '${b.nome}', '${m.mes_referencia}', ${m.creditos_calculados_kwh}, '${m.status}')">Ver</button>`;
                 } else if (m.status === 'aguardando') {
                     colAcao = `<button class="rt-btn rt-btn-enviar" onclick="rateioIniciarUpload(${b.id}, '${m.mes_referencia}', '${b.nome}')">📤 Enviar</button>`;
                 }
@@ -1157,9 +1157,8 @@
         }
     }
 
-    function rateioVerDetalhes(mes_obj, nome, mes, calculado, status) {
-        _contaRateiAtualId = mes_obj.conta_id; // Guardar ID da conta
-        const conta = mes_obj.conta || mes_obj; // Compatibilidade
+    function rateioVerDetalhes(conta, nome, mes, calculado, status) {
+        _contaRateiAtualId = conta?.id || null; // Guardar ID da conta
         const stObj = _rateioStatus[status] || _rateioStatus.aguardando;
         const rec = conta?.creditos_recebidos_kwh ?? 0;
         const delta = rec - (calculado ?? 0);
