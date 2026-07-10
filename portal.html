@@ -1130,7 +1130,30 @@
         }
     }
 
+    let _contaRateiAtualId = null; // Armazenar ID da conta para exclusão
+
+    async function excluirContaRateio(contaId) {
+        try {
+            const resp = await fetch(`${API}/contas-beneficiario/${contaId}`, {
+                method: 'DELETE',
+                headers: {"Authorization": `Bearer ${token}`}
+            });
+            const data = await resp.json();
+            if (resp.ok) {
+                alert('✅ Conta de rateio excluída com sucesso!');
+                document.getElementById('modal-rateio-detalhe').style.display = 'none';
+                // Recarregar a seção de rateio
+                buscarSaldoCreditos();
+            } else {
+                alert('❌ Erro ao excluir: ' + (data.detail || 'Tente novamente'));
+            }
+        } catch(e) {
+            alert('❌ Erro de conexão: ' + e.message);
+        }
+    }
+
     function rateioVerDetalhes(conta, nome, mes, calculado, status) {
+        _contaRateiAtualId = conta.id; // Guardar ID da conta
         const stObj = _rateioStatus[status] || _rateioStatus.aguardando;
         const rec = conta.creditos_recebidos_kwh ?? 0;
         const delta = rec - (calculado ?? 0);
@@ -1732,7 +1755,10 @@
         <div id="modal-rateio-comparacao" style="padding:20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;"></div>
         <div id="modal-rateio-detalhes" style="padding:16px 20px;"></div>
         <div style="padding:12px 20px;border-top:1px solid #f1f5f9;text-align:right;">
-            <button onclick="document.getElementById('modal-rateio-detalhe').style.display='none'" style="background:linear-gradient(135deg,#1e293b,#334155);color:white;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">Fechar</button>
+            <div style="display:flex;gap:8px;">
+                <button onclick="if(confirm('Deseja excluir esta conta de rateio? Esta ação não pode ser desfeita.')) excluirContaRateio(_contaRateiAtualId)" style="background:#dc2626;color:white;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">🗑️ Excluir</button>
+                <button onclick="document.getElementById('modal-rateio-detalhe').style.display='none'" style="background:linear-gradient(135deg,#1e293b,#334155);color:white;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">Fechar</button>
+            </div>
         </div>
     </div>
 </div>

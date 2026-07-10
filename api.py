@@ -3161,6 +3161,24 @@ async def upload_conta_beneficiario(beneficiario_id: int, arquivo: UploadFile = 
         except Exception:
             pass
 
+@app.delete("/contas-beneficiario/{conta_id}")
+def deletar_conta_beneficiario(conta_id: int):
+    """Deleta uma conta de beneficiário (rateio)"""
+    conn = conectar_banco()
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM contas_beneficiario WHERE id=%s", (conta_id,))
+        deleted = cur.rowcount
+        conn.commit()
+        if deleted == 0:
+            raise HTTPException(status_code=404, detail="Conta não encontrada")
+        return {"sucesso": True, "mensagem": "Conta de rateio excluída com sucesso"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
 def _calcular_status_rateio(calculado: float, recebido) -> str:
     if calculado <= 0:
         return "sem_excedente"
