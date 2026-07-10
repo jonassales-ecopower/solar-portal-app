@@ -3072,7 +3072,7 @@ def resumo_rateio(cliente_id: int, integrador: dict = Depends(obter_integrador_a
         for b in beneficiarios:
             kwh = round(surplus * b["percentual"] / 100, 2)
             cur.execute("""
-                SELECT creditos_recebidos_kwh, consumo_kwh, saldo_resultante_kwh, valor_fatura
+                SELECT id, creditos_recebidos_kwh, consumo_kwh, saldo_resultante_kwh, valor_fatura
                 FROM contas_beneficiario WHERE beneficiario_id=%s AND mes_referencia=%s
                 ORDER BY criado_em DESC LIMIT 1
             """, (b["id"], mes_ref))
@@ -3083,10 +3083,11 @@ def resumo_rateio(cliente_id: int, integrador: dict = Depends(obter_integrador_a
                 "percentual": b["percentual"],
                 "creditos_calculados_kwh": kwh,
                 "tem_conta": conta_ben is not None,
-                "creditos_conta_kwh": float(conta_ben[0] or 0) if conta_ben else None,
-                "consumo_kwh": float(conta_ben[1] or 0) if conta_ben else None,
-                "saldo_resultante_kwh": float(conta_ben[2] or 0) if conta_ben else None,
-                "valor_fatura": float(conta_ben[3] or 0) if conta_ben else None,
+                "conta_id": conta_ben[0] if conta_ben else None,
+                "creditos_conta_kwh": float(conta_ben[1] or 0) if conta_ben else None,
+                "consumo_kwh": float(conta_ben[2] or 0) if conta_ben else None,
+                "saldo_resultante_kwh": float(conta_ben[3] or 0) if conta_ben else None,
+                "valor_fatura": float(conta_ben[4] or 0) if conta_ben else None,
             })
         meses.append({
             "mes_referencia": mes_ref,
