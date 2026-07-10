@@ -2144,7 +2144,21 @@ async def upload_conta(cliente_id: int, arquivo: UploadFile = File(...)):
 
         conta_id = salvar_no_banco(dados, cliente_id)
         dados["id"] = conta_id
-        return {"sucesso": True, "conta": dados}
+
+        # Verificar se cliente tem rateio cadastrado
+        conn_check = conectar_banco()
+        cur_check = conn_check.cursor()
+        cur_check.execute("SELECT COUNT(*) FROM rateio_beneficiarios WHERE cliente_id=%s", (cliente_id,))
+        tem_rateio = cur_check.fetchone()[0] > 0
+        cur_check.close()
+        conn_check.close()
+
+        return {
+            "sucesso": True,
+            "conta": dados,
+            "tem_rateio": tem_rateio,
+            "mensagem_rateio": "Você tem contas de rateio cadastradas. Deseja importar os dados delas agora?" if tem_rateio else None
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:

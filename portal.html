@@ -1604,6 +1604,19 @@
             const sup = c.status_sistema === "SUPERAVITÁRIO";
             document.getElementById("conta-status-badge").innerHTML = `<span class="conta-status ${sup?'super':'defi'}">${sup?'✅ SUPERAVITÁRIO — seu sistema injetou mais do que consumiu!':'⚠️ DEFICITÁRIO — seu sistema consumiu mais do que injetou.'}</span>`;
 
+            // Verificar se cliente tem rateio
+            if (d.tem_rateio) {
+                setTimeout(() => {
+                    const importarRateio = confirm("📊 Você tem contas de rateio cadastradas.\n\nDeseja importar os dados delas agora?\n\n[OK] Importar agora\n[Cancelar] Importar depois");
+                    if (importarRateio) {
+                        document.getElementById("pag-rateio").style.display = "block";
+                        document.getElementById("pag-contas").style.display = "none";
+                        document.querySelectorAll(".nav-tabs button").forEach(b => b.classList.remove("ativa"));
+                        document.querySelector("[onclick*=\"mostrarPagina.*rateio\"]")?.classList.add("ativa");
+                    }
+                }, 500);
+            }
+
             if (c.leitura_por_media) document.getElementById("badge-media").style.display = "block";
 
             const gt = parseFloat(c.geracao_total_kwh||0);
