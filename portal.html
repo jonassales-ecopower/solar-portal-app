@@ -1133,8 +1133,9 @@
     let _contaRateiAtualId = null; // Armazenar ID da conta para exclusão
 
     async function excluirContaRateio(contaId) {
-        if (!contaId) {
-            alert('❌ Erro: Conta não identificada');
+        console.log('Delete called with ID:', contaId, 'Type:', typeof contaId);
+        if (!contaId || contaId === 'null' || contaId === null) {
+            alert('❌ Erro: Conta não identificada. Debug: ID=' + contaId);
             return;
         }
         try {
@@ -1158,7 +1159,11 @@
     }
 
     function rateioVerDetalhes(conta, nome, mes, calculado, status) {
+        console.log('rateioVerDetalhes called:', { conta, nome, mes, calculado, status });
+        console.log('Conta object:', conta);
+        console.log('Conta ID:', conta?.id);
         _contaRateiAtualId = conta?.id || null; // Guardar ID da conta
+        console.log('_contaRateiAtualId set to:', _contaRateiAtualId);
         const stObj = _rateioStatus[status] || _rateioStatus.aguardando;
         const rec = conta?.creditos_recebidos_kwh ?? 0;
         const delta = rec - (calculado ?? 0);
