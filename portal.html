@@ -1149,7 +1149,7 @@
                 alert('✅ Conta de rateio excluída com sucesso!');
                 document.getElementById('modal-rateio-detalhe').style.display = 'none';
                 // Recarregar a seção de rateio
-                carregarDashboard();
+                buscarRateio();
             } else {
                 alert('❌ Erro ao excluir: ' + (data.detail || 'Tente novamente'));
             }
