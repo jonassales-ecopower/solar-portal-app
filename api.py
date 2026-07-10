@@ -3234,7 +3234,7 @@ def rateio_publico(cliente_id: int):
         for b in beneficiarios:
             calculado = round(surplus * b["percentual"] / 100, 2)
             cur.execute("""
-                SELECT creditos_recebidos_kwh, consumo_kwh, consumo_bruto_kwh,
+                SELECT id, creditos_recebidos_kwh, consumo_kwh, consumo_bruto_kwh,
                        saldo_anterior_kwh, saldo_resultante_kwh, valor_fatura
                 FROM contas_beneficiario
                 WHERE beneficiario_id=%s AND mes_referencia=%s
@@ -3244,12 +3244,13 @@ def rateio_publico(cliente_id: int):
             conta_b = None
             if row:
                 conta_b = {
-                    "creditos_recebidos_kwh": float(row[0] or 0),
-                    "consumo_kwh": float(row[1] or 0),
-                    "consumo_bruto_kwh": float(row[2] or 0),
-                    "saldo_anterior_kwh": float(row[3] or 0),
-                    "saldo_resultante_kwh": float(row[4] or 0),
-                    "valor_fatura": float(row[5] or 0),
+                    "id": row[0],
+                    "creditos_recebidos_kwh": float(row[1] or 0),
+                    "consumo_kwh": float(row[2] or 0),
+                    "consumo_bruto_kwh": float(row[3] or 0),
+                    "saldo_anterior_kwh": float(row[4] or 0),
+                    "saldo_resultante_kwh": float(row[5] or 0),
+                    "valor_fatura": float(row[6] or 0),
                 }
             status = _calcular_status_rateio(calculado, conta_b["creditos_recebidos_kwh"] if conta_b else None)
             dist.append({
