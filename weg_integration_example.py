@@ -4,7 +4,8 @@ WEG/SunWEG API Integration for FastAPI Backend
 Provides endpoints for managing WEG accounts and monitoring solar plants.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body
+from pydantic import BaseModel
 import aiohttp
 from weg_api import WEGClient, parse_numeric, WEGAuthError, WEGAPIError
 import logging
@@ -12,6 +13,11 @@ import psycopg2
 import os
 
 _LOGGER = logging.getLogger(__name__)
+
+# Request models
+class WEGLoginRequest(BaseModel):
+    email: str
+    senha: str
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
@@ -51,14 +57,13 @@ weg_router = APIRouter(prefix="/weg", tags=["weg"])
 # 2. AUTHENTICATE WITH WEG
 # ============================================================================
 @weg_router.post("/clientes/{cliente_id}/weg/login")
-async def weg_login(cliente_id: int, email: str, senha: str):
+async def weg_login(cliente_id: int, request: WEGLoginRequest):
     """
     Authenticate a client with WEG and store the token.
 
     Args:
         cliente_id: Client ID in your system
-        email: WEG account email
-        senha: WEG account password
+        request: WEG login credentials (email, senha)
 
     Returns:
         Success status and list of available plants
@@ -69,7 +74,7 @@ async def weg_login(cliente_id: int, email: str, senha: str):
     try:
         # Create WEG client and authenticate
         async with aiohttp.ClientSession() as session:
-            weg = WEGClient(session, email=email, password=senha)
+            weg = WEGClient(session, email=request.email, password=request.senha)
             await weg.async_login()
 
             # Fetch available plants to verify access
@@ -83,7 +88,7 @@ async def weg_login(cliente_id: int, email: str, senha: str):
                 UPDATE contas
                 SET weg_email = %s, weg_senha = %s, weg_token = %s, weg_ativo = TRUE
                 WHERE id = %s
-            """, (email, senha, weg.token, cliente_id))
+            """, (request.email, request.senha, weg.token, cliente_id))
             conn.commit()
 
             return {
