@@ -1,16 +1,33 @@
 """
-Example: How to integrate WEG API into your FastAPI backend
+WEG/SunWEG API Integration for FastAPI Backend
 
-This file shows how to add WEG solar monitoring to your existing API.
-Copy the relevant parts into your api.py file.
+Provides endpoints for managing WEG accounts and monitoring solar plants.
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 import aiohttp
 from weg_api import WEGClient, parse_numeric, WEGAuthError, WEGAPIError
 import logging
+import psycopg2
+import os
 
 _LOGGER = logging.getLogger(__name__)
+
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+
+def conectar_banco():
+    """Connect to PostgreSQL database"""
+    if DATABASE_URL:
+        url = DATABASE_URL
+        if "channel_binding=" in url:
+            url = url.split("channel_binding=")[0].rstrip("&?")
+        try:
+            return psycopg2.connect(url)
+        except psycopg2.Error as e:
+            _LOGGER.error(f"Database connection error: {e}")
+            raise
+    else:
+        raise RuntimeError("DATABASE_URL environment variable not set")
 
 # Create a router for WEG endpoints
 weg_router = APIRouter(prefix="/weg", tags=["weg"])

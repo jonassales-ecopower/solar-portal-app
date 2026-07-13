@@ -8,6 +8,7 @@ import secrets
 import asyncio
 import psycopg2
 import requests
+import aiohttp
 import io
 import PyPDF2
 from contextlib import asynccontextmanager
@@ -20,6 +21,7 @@ from openai import OpenAI
 from auth import criptografar_senha, verificar_senha, criar_token, verificar_token
 from extracao import (extrair_medicoes_medidor, normalizar_mes_referencia,
                       extrair_mes_referencia, extrair_datas_leitura, somar_geracao_periodo)
+from weg_integration_example import weg_router
 import PyPDF2
 
 try:
@@ -51,6 +53,12 @@ def inicializar_banco():
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS reset_token_exp TIMESTAMP")
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS tarifa_kwh DECIMAL(6,4)")
         cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS consumo_medio_antes_kwh DECIMAL(8,2)")
+        # WEG Integration columns
+        cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS weg_email TEXT")
+        cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS weg_senha TEXT")
+        cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS weg_token TEXT")
+        cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS weg_ultimo_sincronismo TIMESTAMP")
+        cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS weg_ativo BOOLEAN DEFAULT FALSE")
         cur.execute("ALTER TABLE integradores ADD COLUMN IF NOT EXISTS alertas_diario_ativo BOOLEAN DEFAULT TRUE")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS rateio_beneficiarios (
@@ -405,6 +413,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Solar Portal API", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], allow_credentials=False)
+app.include_router(weg_router)
 security = HTTPBearer()
 
 # ==================== BANCO ====================
