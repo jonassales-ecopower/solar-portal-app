@@ -588,6 +588,7 @@
             <button class="mc-tab"        id="mctab-inversor" onclick="mcTab('inversor')">🔌 Inversor</button>
             <button class="mc-tab"        id="mctab-acesso"   onclick="mcTab('acesso')">🔑 Acesso</button>
             <button class="mc-tab"        id="mctab-rateio"   onclick="mcTab('rateio')">🔀 Rateio</button>
+            <button class="mc-tab"        id="mctab-weg"      onclick="mcTab('weg')">⚡ WEG</button>
         </div>
 
         <!-- Tab: Cliente -->
@@ -792,6 +793,46 @@
                 <div id="rateio-resumo-conteudo"></div>
             </div>
             <p class="info" id="rateio-loading" style="display:none;">🔄 Carregando...</p>
+        </div>
+
+        <!-- WEG Integration Panel -->
+        <div class="mc-panel" id="mcpanel-weg">
+            <div class="dica" style="margin-bottom:12px; background:linear-gradient(135deg,#fffbeb,#fef3c7); border-left-color:#F7A81B;">
+                ⚡ <strong>WEG Solar Monitoring</strong> — Conecte a conta WEG deste cliente para monitorar geração em tempo real. Dados atualizados a cada 5 minutos.
+            </div>
+
+            <!-- WEG Status -->
+            <div id="weg-status-box" style="display:none; background:#f0fdf4; border:1px solid #86efac; border-radius:8px; padding:12px; margin-bottom:12px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:20px;">✅</span>
+                    <div>
+                        <div style="font-weight:700; color:#059669;">Conectado com WEG</div>
+                        <div id="weg-status-email" style="font-size:12px; color:#666; margin-top:2px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- WEG Login Form -->
+            <div id="weg-login-box">
+                <p style="font-size:12px; color:#666; margin-bottom:10px;">
+                    Faça login com a conta WEG para vincular o monitoramento de suas usinas solares. As credenciais são salvas de forma segura.
+                </p>
+                <div class="grid-2">
+                    <div class="campo"><label>Email WEG *</label><input type="email" id="weg-email" placeholder="seu.email@weg.com"></div>
+                    <div class="campo"><label>Senha WEG *</label><input type="password" id="weg-senha" placeholder="••••••••"></div>
+                </div>
+                <button class="azul pequeno" onclick="configurarWEG()" style="width:auto;">🔗 Conectar com WEG</button>
+                <button class="vermelho pequeno" id="weg-btn-desconectar" onclick="desconectarWEG()" style="width:auto; display:none;">❌ Desconectar</button>
+                <p class="erro" id="weg-erro" style="margin-top:8px;"></p>
+            </div>
+
+            <!-- WEG Plants Status -->
+            <div id="weg-plantas-status" style="display:none; margin-top:12px;">
+                <p style="font-size:12px; font-weight:700; margin-bottom:8px;">📊 Plantas Conectadas</p>
+                <div id="weg-plantas-lista" style="font-size:12px; background:#f8fafc; padding:10px; border-radius:6px; max-height:150px; overflow-y:auto;"></div>
+            </div>
+
+            <p class="info" id="weg-loading" style="display:none; margin-top:8px;">🔄 Conectando com WEG...</p>
         </div>
 
         <div class="modal-acoes" style="margin-top:20px;">
@@ -1848,6 +1889,8 @@ async function editarCliente(clienteId) {
             document.getElementById('mc-link-box').style.display = 'block';
             document.getElementById('mc-link-txt').textContent = `${base}portal.html?token_acesso=${d.token_acesso}&nome=${nomeEnc}`;
         }
+        // Load WEG data
+        await mcCarregarWEG(clienteId);
     } catch(e) { document.getElementById('mc-erro').textContent = 'Erro de conexão'; }
 }
 
@@ -2988,6 +3031,113 @@ async function rateioExcluirBeneficiario(id) {
         });
         await mcCarregarRateio(mcClienteId);
     } catch(e) { alert('Erro ao remover'); }
+}
+
+// ============== WEG INTEGRATION ==============
+
+async function configurarWEG() {
+    const email = document.getElementById('weg-email').value.trim();
+    const senha = document.getElementById('weg-senha').value;
+    const errEl = document.getElementById('weg-erro');
+    const loadEl = document.getElementById('weg-loading');
+
+    if (!email || !senha) {
+        errEl.textContent = 'Preencha email e senha';
+        return;
+    }
+
+    loadEl.style.display = 'block';
+    errEl.textContent = '';
+
+    try {
+        const resp = await fetch(`${API}/weg/clientes/${mcClienteId}/weg/login`, {
+            method: 'POST',
+            headers: {"Authorization":`Bearer ${token}`, "Content-Type":"application/json"},
+            body: JSON.stringify({ email, senha })
+        });
+
+        const data = await resp.json();
+        loadEl.style.display = 'none';
+
+        if (resp.ok) {
+            alert(`✅ Conectado! ${data.plantas?.length || 0} usina(s) encontrada(s).`);
+            document.getElementById('weg-email').value = '';
+            document.getElementById('weg-senha').value = '';
+            await mcCarregarWEG(mcClienteId);
+        } else {
+            errEl.textContent = `Erro: ${data.detail || 'Falha na autenticação'}`;
+        }
+    } catch(e) {
+        loadEl.style.display = 'none';
+        errEl.textContent = `Erro de conexão: ${e.message}`;
+    }
+}
+
+async function mcCarregarWEG(clienteId) {
+    try {
+        const resp = await fetch(`${API}/weg/clientes/${clienteId}/weg/plantas`, {
+            headers: {"Authorization":`Bearer ${token}`}
+        });
+        const data = await resp.json();
+
+        const loginBox = document.getElementById('weg-login-box');
+        const statusBox = document.getElementById('weg-status-box');
+        const plantasBox = document.getElementById('weg-plantas-status');
+        const plantasList = document.getElementById('weg-plantas-lista');
+        const desconectarBtn = document.getElementById('weg-btn-desconectar');
+
+        if (!data.sucesso || !data.plantas || data.plantas.length === 0) {
+            loginBox.style.display = 'block';
+            statusBox.style.display = 'none';
+            plantasBox.style.display = 'none';
+            desconectarBtn.style.display = 'none';
+            return;
+        }
+
+        // Show connection status
+        loginBox.style.display = 'none';
+        statusBox.style.display = 'block';
+        plantasBox.style.display = 'block';
+        desconectarBtn.style.display = 'inline-block';
+        document.getElementById('weg-status-email').textContent = `Email: ${data.plantas[0].nome || 'conectado'}`;
+
+        // List plants
+        plantasList.innerHTML = data.plantas.map(p => `
+            <div style="padding:8px 0; border-bottom:1px solid #e2e8f0;">
+                <div style="font-weight:600; color:#0F3E63;">${p.nome}</div>
+                <div style="font-size:11px; color:#666; margin-top:2px;">
+                    Hoje: ${(p.energiaDia || 0).toFixed(2)} kWh • Potência: ${(p.potencia || 0).toFixed(2)} kW
+                </div>
+            </div>
+        `).join('');
+    } catch(e) {
+        console.error('Erro ao carregar WEG:', e);
+    }
+}
+
+async function desconectarWEG() {
+    if (!confirm('Desconectar WEG? O cliente perderá acesso ao monitoramento em tempo real.')) return;
+
+    try {
+        const resp = await fetch(`${API}/weg/clientes/${mcClienteId}/weg/desconectar`, {
+            method: 'DELETE',
+            headers: {"Authorization":`Bearer ${token}`}
+        });
+
+        if (resp.ok) {
+            alert('✅ Desconectado');
+            document.getElementById('weg-login-box').style.display = 'block';
+            document.getElementById('weg-status-box').style.display = 'none';
+            document.getElementById('weg-plantas-status').style.display = 'none';
+            document.getElementById('weg-btn-desconectar').style.display = 'none';
+            document.getElementById('weg-email').value = '';
+            document.getElementById('weg-senha').value = '';
+        } else {
+            alert('Erro ao desconectar');
+        }
+    } catch(e) {
+        alert('Erro: ' + e.message);
+    }
 }
 </script>
 </body>
