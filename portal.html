@@ -1803,6 +1803,7 @@
         }
 
         const idCliente = new URLSearchParams(window.location.search).get("cliente_id");
+        const token = localStorage.getItem("token_cliente");
         try {
             const resp = await fetch(WEG_ENDPOINTS.login(idCliente), {
                 method: "POST",
@@ -1827,6 +1828,9 @@
 
     async function carregarWEG(idCliente) {
         try {
+            const token = localStorage.getItem("token_cliente");
+            if (!token) return;
+
             const plantas = await fetch(WEG_ENDPOINTS.plants(idCliente), {
                 headers: { "Authorization": `Bearer ${token}` }
             }).then(r => r.json()).catch(() => ({}));
@@ -1874,7 +1878,7 @@
 
             // Load totals
             const totals = await fetch(WEG_ENDPOINTS.totals(idCliente), {
-                headers: { "Authorization": `Bearer ${token}` }
+                headers: { "Authorization": `Bearer ${token}` } // token already defined above
             }).then(r => r.json()).catch(() => ({}));
 
             if (totals.sucesso && totals.totalizadores) {
@@ -1903,6 +1907,7 @@
 
     async function abrirPlantaWEG(plantaId, plantaNome) {
         const idCliente = new URLSearchParams(window.location.search).get("cliente_id");
+        const token = localStorage.getItem("token_cliente");
         try {
             const resp = await fetch(WEG_ENDPOINTS.plant(idCliente, plantaId), {
                 headers: { "Authorization": `Bearer ${token}` }
@@ -1962,6 +1967,7 @@
         if (!confirm("Desconectar conta WEG? Você perderá o acesso ao monitoramento em tempo real.")) return;
 
         const idCliente = new URLSearchParams(window.location.search).get("cliente_id");
+        const token = localStorage.getItem("token_cliente");
         try {
             const resp = await fetch(WEG_ENDPOINTS.disconnect(idCliente), {
                 method: "DELETE",
