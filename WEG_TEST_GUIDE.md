@@ -12,12 +12,17 @@
 2. **Portal Atualizado**
    - Fez pull das alterações mais recentes
    - Database migrations foram executadas
-   - Backend está rodando
+   - Backend está rodando no Render
 
 3. **Ambiente Configurado**
-   - `DATABASE_URL` está correto no `.env`
-   - API backend acessível
+   - `DATABASE_URL` está correto no Render
+   - API backend acessível em seu Render URL
    - Portal carregando normalmente
+
+### 📌 IMPORTANTE: URLs de Teste
+**Substitua `https://your-app.onrender.com` pela sua URL real do Render**
+
+Exemplo: `https://solar-portal-api.onrender.com`
 
 ---
 
@@ -29,7 +34,20 @@ Verificar se o backend consegue autenticar com a WEG API
 ### Passo 1: Testar endpoint de login via cURL
 
 ```bash
-curl -X POST http://localhost:8000/weg/clientes/1/weg/login \
+curl -X POST https://your-app.onrender.com/weg/clientes/1/weg/login \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer SEU_TOKEN_AQUI" \
+  -d '{
+    "email": "seu.email@weg.com",
+    "senha": "sua.senha"
+  }'
+```
+
+**⚠️ Substitua `https://your-app.onrender.com` pela sua URL real do Render**
+
+Exemplo:
+```bash
+curl -X POST https://solar-portal-api.onrender.com/weg/clientes/1/weg/login \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer SEU_TOKEN_AQUI" \
   -d '{
@@ -72,9 +90,11 @@ Verificar se conseguimos listar todas as plantas cadastradas
 ### Passo 2: Testar endpoint de plantas
 
 ```bash
-curl -X GET http://localhost:8000/weg/clientes/1/weg/plantas \
+curl -X GET https://your-app.onrender.com/weg/clientes/1/weg/plantas \
   -H "Authorization: Bearer SEU_TOKEN_AQUI"
 ```
+
+**⚠️ Substitua `https://your-app.onrender.com` pela sua URL real do Render**
 
 **Resultado esperado:**
 ```json
@@ -113,9 +133,11 @@ Verificar dados agregados de todas as plantas
 ### Passo 1: Testar endpoint de totalizadores
 
 ```bash
-curl -X GET http://localhost:8000/weg/clientes/1/weg/totalizadores \
+curl -X GET https://your-app.onrender.com/weg/clientes/1/weg/totalizadores \
   -H "Authorization: Bearer SEU_TOKEN_AQUI"
 ```
+
+**⚠️ Substitua `https://your-app.onrender.com` pela sua URL real do Render**
 
 **Resultado esperado:**
 ```json
@@ -152,9 +174,13 @@ Testar a integração visual no portal do cliente
 
 ### Passo 1: Abrir Portal
 ```
+https://jonassales-ecopower.github.io/solar-portal-app/portal.html?cliente_id=1
+```
+
+**Nota:** Se estiver testando localmente:
+```
 http://localhost:3000/portal.html?cliente_id=1
 ```
-(ou seu domínio real)
 
 ### Passo 2: Procurar pela seção WEG
 - Scroll down até encontrar "⚡ Monitoramento WEG"
@@ -214,6 +240,11 @@ Senha: sua.senha
 Testar gerenciamento de WEG para clientes
 
 ### Passo 1: Abrir Painel
+```
+https://jonassales-ecopower.github.io/solar-portal-app/painel.html
+```
+
+**Nota:** Se estiver testando localmente:
 ```
 http://localhost:3000/painel.html
 ```
