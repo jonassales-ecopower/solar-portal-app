@@ -617,6 +617,36 @@
             </p>
         </div>
 
+        <!-- WEG Monitoring Section -->
+        <div class="card" style="border-left: 4px solid #F7A81B; background: linear-gradient(135deg, #fffbeb, #fef3c7);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <div class="card-titulo" style="color:#F7A81B; margin:0;">⚡ Monitoramento WEG</div>
+                <button id="weg-btn-conectar" onclick="mostrarLoginWEG()" style="background:#F7A81B; color:#0F3E63; border:none; border-radius:6px; padding:8px 16px; cursor:pointer; font-weight:600; font-size:13px; display:none;">
+                    🔗 Conectar WEG
+                </button>
+                <button id="weg-btn-desconectar" onclick="desconectarWEG()" style="background:#dc2626; color:white; border:none; border-radius:6px; padding:8px 16px; cursor:pointer; font-weight:600; font-size:13px; display:none;">
+                    ❌ Desconectar
+                </button>
+            </div>
+
+            <!-- WEG Status -->
+            <div id="weg-status" style="display:none; background:white; padding:12px; border-radius:8px; margin-bottom:16px; font-size:13px;">
+                <span style="color:#059669; font-weight:600;">✅ Conectado com WEG</span>
+                <span id="weg-status-email" style="color:#666; margin-left:10px; font-size:12px;"></span>
+            </div>
+
+            <!-- WEG Plants List -->
+            <div id="weg-plantas-container" style="display:none;"></div>
+
+            <!-- WEG Totals Dashboard -->
+            <div id="weg-totalizadores-container" style="display:none; display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px; margin-top:12px;"></div>
+
+            <!-- No WEG configured message -->
+            <p id="weg-info-empty" style="color:#92400e; font-size:13px; margin:0;">
+                📊 Monitore sua geração solar em tempo real através da plataforma WEG. Conecte sua conta para visualizar dados atualizados a cada 5 minutos.
+            </p>
+        </div>
+
         <!-- Card orientação leitura pela média -->
         <div class="card" style="border-left: 4px solid #8b5cf6; background: linear-gradient(135deg, #faf5ff, #f5f3ff);">
             <div class="card-titulo" style="color:#7c3aed;">📋 Dica Importante — Leitura do Medidor</div>
@@ -1749,6 +1779,227 @@
         }
     }
 
+    // ============== WEG INTEGRATION ==============
+
+    const WEG_ENDPOINTS = {
+        login: (id) => `${API}/weg/clientes/${id}/weg/login`,
+        plants: (id) => `${API}/weg/clientes/${id}/weg/plantas`,
+        plant: (id, plantaId) => `${API}/weg/clientes/${id}/weg/planta/${plantaId}`,
+        totals: (id) => `${API}/weg/clientes/${id}/weg/totalizadores`,
+        disconnect: (id) => `${API}/weg/clientes/${id}/weg/desconectar`,
+    };
+
+    async function mostrarLoginWEG() {
+        document.getElementById("modal-weg-login").style.display = "flex";
+    }
+
+    async function autenticarWEGModal() {
+        const email = document.getElementById("weg-email-modal").value.trim();
+        const senha = document.getElementById("weg-senha-modal").value;
+
+        if (!email || !senha) {
+            alert("Por favor preencha email e senha");
+            return;
+        }
+
+        const idCliente = new URLSearchParams(window.location.search).get("cliente_id");
+        try {
+            const resp = await fetch(WEG_ENDPOINTS.login(idCliente), {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ email, senha })
+            });
+
+            const data = await resp.json();
+            if (resp.ok) {
+                alert(`✅ Autenticado com WEG! ${data.plantas?.length || 0} usina(s) encontrada(s).`);
+                document.getElementById("modal-weg-login").style.display = "none";
+                document.getElementById("weg-email-modal").value = "";
+                document.getElementById("weg-senha-modal").value = "";
+                await carregarWEG(idCliente);
+            } else {
+                alert(`❌ Erro: ${data.detail || 'Falha na autenticação'}`);
+            }
+        } catch(e) {
+            alert(`❌ Erro de conexão: ${e.message}`);
+        }
+    }
+
+    async function carregarWEG(idCliente) {
+        try {
+            const plantas = await fetch(WEG_ENDPOINTS.plants(idCliente), {
+                headers: { "Authorization": `Bearer ${token}` }
+            }).then(r => r.json()).catch(() => ({}));
+
+            if (!plantas.sucesso) {
+                document.getElementById("weg-btn-conectar").style.display = "block";
+                document.getElementById("weg-btn-desconectar").style.display = "none";
+                document.getElementById("weg-status").style.display = "none";
+                document.getElementById("weg-plantas-container").style.display = "none";
+                document.getElementById("weg-totalizadores-container").style.display = "none";
+                document.getElementById("weg-info-empty").style.display = "block";
+                return;
+            }
+
+            document.getElementById("weg-btn-conectar").style.display = "none";
+            document.getElementById("weg-btn-desconectar").style.display = "block";
+            document.getElementById("weg-status").style.display = "block";
+            document.getElementById("weg-info-empty").style.display = "none";
+
+            // Render plants
+            const html = plantas.plantas.map(p => `
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px; margin-bottom:12px; cursor:pointer;" onclick="abrirPlantaWEG('${p.id}', '${p.nome}')">
+                    <div style="display:flex; justify-content:space-between; align-items:start;">
+                        <div style="flex:1;">
+                            <div style="font-weight:700; color:#0F3E63; margin-bottom:4px;">${p.nome}</div>
+                            <div style="font-size:12px; color:#666; margin-bottom:8px;">${p.numerUC || '—'}</div>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                                <div style="background:white; padding:8px; border-radius:6px; text-align:center;">
+                                    <div style="font-size:11px; color:#666;">Hoje</div>
+                                    <div style="font-size:14px; font-weight:700; color:#F7A81B;">${(p.energiaDia || 0).toFixed(2)} kWh</div>
+                                </div>
+                                <div style="background:white; padding:8px; border-radius:6px; text-align:center;">
+                                    <div style="font-size:11px; color:#666;">Potência</div>
+                                    <div style="font-size:14px; font-weight:700; color:#0F3E63;">${(p.potencia || 0).toFixed(2)} kW</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="color:#94a3b8; font-size:20px;">→</div>
+                    </div>
+                </div>
+            `).join("");
+
+            document.getElementById("weg-plantas-container").innerHTML = html;
+            document.getElementById("weg-plantas-container").style.display = "block";
+
+            // Load totals
+            const totals = await fetch(WEG_ENDPOINTS.totals(idCliente), {
+                headers: { "Authorization": `Bearer ${token}` }
+            }).then(r => r.json()).catch(() => ({}));
+
+            if (totals.sucesso && totals.totalizadores) {
+                const t = totals.totalizadores;
+                const totalsHtml = `
+                    <div style="background:linear-gradient(135deg,#0F3E63,#0B2C48); color:white; padding:12px; border-radius:8px; text-align:center;">
+                        <div style="font-size:11px; opacity:0.8;">Energia Hoje</div>
+                        <div style="font-size:18px; font-weight:700;">${(t.energiaHoje?.valor || 0).toFixed(1)} kWh</div>
+                    </div>
+                    <div style="background:linear-gradient(135deg,#0F3E63,#0B2C48); color:white; padding:12px; border-radius:8px; text-align:center;">
+                        <div style="font-size:11px; opacity:0.8;">Energia Mês</div>
+                        <div style="font-size:18px; font-weight:700;">${(t.energiaMes?.valor || 0).toFixed(1)} kWh</div>
+                    </div>
+                    <div style="background:linear-gradient(135deg,#F7A81B,#F5821F); color:white; padding:12px; border-radius:8px; text-align:center;">
+                        <div style="font-size:11px; opacity:0.8;">Economia</div>
+                        <div style="font-size:18px; font-weight:700;">R$ ${(t.economiaTotal?.valor || 0).toFixed(2)}</div>
+                    </div>
+                `;
+                document.getElementById("weg-totalizadores-container").innerHTML = totalsHtml;
+                document.getElementById("weg-totalizadores-container").style.display = "grid";
+            }
+        } catch(e) {
+            console.error("Erro ao carregar WEG:", e);
+        }
+    }
+
+    async function abrirPlantaWEG(plantaId, plantaNome) {
+        const idCliente = new URLSearchParams(window.location.search).get("cliente_id");
+        try {
+            const resp = await fetch(WEG_ENDPOINTS.plant(idCliente, plantaId), {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const data = await resp.json();
+
+            if (!data.sucesso) {
+                alert("Erro ao carregar dados da planta");
+                return;
+            }
+
+            const p = data.planta;
+            const html = `
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+                    <div style="background:#f0f4f8; padding:14px; border-radius:8px; text-align:center;">
+                        <div style="font-size:12px; color:#666; margin-bottom:6px;">Energia Hoje</div>
+                        <div style="font-size:22px; font-weight:700; color:#F7A81B;">${(p.energiaDia?.valor || 0).toFixed(2)}</div>
+                        <div style="font-size:11px; color:#94a3b8;">kWh</div>
+                    </div>
+                    <div style="background:#f0f4f8; padding:14px; border-radius:8px; text-align:center;">
+                        <div style="font-size:12px; color:#666; margin-bottom:6px;">Energia Mês</div>
+                        <div style="font-size:22px; font-weight:700; color:#0F3E63;">${(p.energiaMes?.valor || 0).toFixed(1)}</div>
+                        <div style="font-size:11px; color:#94a3b8;">kWh</div>
+                    </div>
+                    <div style="background:#f0f4f8; padding:14px; border-radius:8px; text-align:center;">
+                        <div style="font-size:12px; color:#666; margin-bottom:6px;">Potência Atual</div>
+                        <div style="font-size:22px; font-weight:700; color:#22c55e;">${(p.potencia?.valor || 0).toFixed(2)}</div>
+                        <div style="font-size:11px; color:#94a3b8;">kW</div>
+                    </div>
+                    <div style="background:#f0f4f8; padding:14px; border-radius:8px; text-align:center;">
+                        <div style="font-size:12px; color:#666; margin-bottom:6px;">Capacidade</div>
+                        <div style="font-size:22px; font-weight:700; color:#0F3E63;">${(p.capacidade?.valor || 0).toFixed(2)}</div>
+                        <div style="font-size:11px; color:#94a3b8;">kW</div>
+                    </div>
+                </div>
+                <div style="background:#f0f4f8; padding:12px; border-radius:8px; display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div style="text-align:center;">
+                        <div style="font-size:11px; color:#666;">Yield Hoje</div>
+                        <div style="font-size:16px; font-weight:700; color:#0F3E63;">${p.yieldDia || '—'}</div>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="font-size:11px; color:#666;">Yield Mês</div>
+                        <div style="font-size:16px; font-weight:700; color:#0F3E63;">${p.yieldMes || '—'}</div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById("modal-weg-planta-nome").textContent = plantaNome;
+            document.getElementById("modal-weg-planta-conteudo").innerHTML = html;
+            document.getElementById("modal-weg-planta").style.display = "flex";
+        } catch(e) {
+            alert("Erro ao carregar dados: " + e.message);
+        }
+    }
+
+    async function desconectarWEG() {
+        if (!confirm("Desconectar conta WEG? Você perderá o acesso ao monitoramento em tempo real.")) return;
+
+        const idCliente = new URLSearchParams(window.location.search).get("cliente_id");
+        try {
+            const resp = await fetch(WEG_ENDPOINTS.disconnect(idCliente), {
+                method: "DELETE",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+
+            if (resp.ok) {
+                alert("✅ Conta WEG desconectada");
+                document.getElementById("weg-btn-conectar").style.display = "block";
+                document.getElementById("weg-btn-desconectar").style.display = "none";
+                document.getElementById("weg-status").style.display = "none";
+                document.getElementById("weg-plantas-container").style.display = "none";
+                document.getElementById("weg-totalizadores-container").style.display = "none";
+                document.getElementById("weg-info-empty").style.display = "block";
+            } else {
+                alert("Erro ao desconectar");
+            }
+        } catch(e) {
+            alert("Erro: " + e.message);
+        }
+    }
+
+    // Load WEG data on page load
+    document.addEventListener("DOMContentLoaded", async function() {
+        const idCliente = new URLSearchParams(window.location.search).get("cliente_id");
+        if (idCliente) {
+            await carregarWEG(idCliente);
+        }
+    });
+
+    // Refresh WEG data every 5 minutes
+    setInterval(async function() {
+        const idCliente = new URLSearchParams(window.location.search).get("cliente_id");
+        if (idCliente) {
+            await carregarWEG(idCliente);
+        }
+    }, 5 * 60 * 1000);
+
     inicializar();
 </script>
 
@@ -1769,6 +2020,60 @@
                 <button onclick="if(confirm('Deseja excluir esta conta de rateio? Esta ação não pode ser desfeita.')) excluirContaRateio(_contaRateiAtualId)" style="background:#dc2626;color:white;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">🗑️ Excluir</button>
                 <button onclick="document.getElementById('modal-rateio-detalhe').style.display='none'" style="background:linear-gradient(135deg,#1e293b,#334155);color:white;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">Fechar</button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- WEG Login Modal -->
+<div id="modal-weg-login" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)this.style.display='none'">
+    <div style="background:white;border-radius:14px;max-width:400px;width:100%;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+            <h2 style="margin:0;font-size:18px;font-weight:700;color:#0F3E63;">⚡ Conectar com WEG</h2>
+            <button onclick="document.getElementById('modal-weg-login').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:#94a3b8;">✕</button>
+        </div>
+
+        <p style="color:#666;font-size:13px;line-height:1.6;margin-bottom:16px;">
+            Faça login com sua conta WEG para monitorar sua geração solar em tempo real com dados atualizados a cada 5 minutos.
+        </p>
+
+        <div style="margin-bottom:12px;">
+            <label style="font-size:12px;color:#475569;font-weight:600;display:block;margin-bottom:6px;">Email WEG</label>
+            <input type="email" id="weg-email-modal" placeholder="seu.email@example.com" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+        </div>
+
+        <div style="margin-bottom:16px;">
+            <label style="font-size:12px;color:#475569;font-weight:600;display:block;margin-bottom:6px;">Senha WEG</label>
+            <input type="password" id="weg-senha-modal" placeholder="••••••••" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+        </div>
+
+        <button onclick="autenticarWEGModal()" style="width:100%;background:linear-gradient(135deg,#F7A81B,#F5821F);color:white;border:none;border-radius:8px;padding:11px;cursor:pointer;font-weight:600;font-size:13px;margin-bottom:10px;">
+            🔗 Conectar
+        </button>
+
+        <button onclick="document.getElementById('modal-weg-login').style.display='none'" style="width:100%;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;padding:11px;cursor:pointer;font-weight:600;font-size:13px;color:#475569;">
+            Cancelar
+        </button>
+
+        <p style="font-size:11px;color:#94a3b8;text-align:center;margin-top:12px;margin-bottom:0;">
+            Suas credenciais são salvas com segurança no servidor.
+        </p>
+    </div>
+</div>
+
+<!-- WEG Plant Detail Modal -->
+<div id="modal-weg-planta" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)this.style.display='none'">
+    <div style="background:white;border-radius:14px;max-width:500px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+        <div style="padding:20px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;">
+            <h2 id="modal-weg-planta-nome" style="margin:0;font-size:18px;font-weight:700;color:#0F3E63;">Usina Solar</h2>
+            <button onclick="document.getElementById('modal-weg-planta').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:#94a3b8;">✕</button>
+        </div>
+
+        <div id="modal-weg-planta-conteudo" style="padding:20px;"></div>
+
+        <div style="padding:20px;border-top:1px solid #f1f5f9;">
+            <button onclick="document.getElementById('modal-weg-planta').style.display='none'" style="width:100%;background:linear-gradient(135deg,#1e293b,#334155);color:white;border:none;border-radius:8px;padding:11px;cursor:pointer;font-weight:600;font-size:13px;">
+                Fechar
+            </button>
         </div>
     </div>
 </div>
