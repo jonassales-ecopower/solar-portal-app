@@ -1792,7 +1792,7 @@ async function salvarInversor() {
 let mcClienteId = null;
 
 function mcTab(aba) {
-    ['info','projeto','inversor','acesso','rateio'].forEach(a => {
+    ['info','projeto','inversor','acesso','rateio','weg'].forEach(a => {
         document.getElementById(`mctab-${a}`).classList.toggle('ativa', a === aba);
         document.getElementById(`mcpanel-${a}`).classList.toggle('ativa', a === aba);
     });
