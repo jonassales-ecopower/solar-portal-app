@@ -85,7 +85,7 @@ async def weg_login(cliente_id: int, request: WEGLoginRequest):
 
             # Store token in database
             cur.execute("""
-                UPDATE contas
+                UPDATE clientes
                 SET weg_email = %s, weg_senha = %s, weg_token = %s, weg_ativo = TRUE
                 WHERE id = %s
             """, (request.email, request.senha, weg.token, cliente_id))
@@ -149,7 +149,7 @@ async def weg_validate_token(cliente_id: int):
                 return {"sucesso": True, "valido": True}
             else:
                 # Mark as invalid
-                cur.execute("UPDATE contas SET weg_ativo = FALSE WHERE id = %s", (cliente_id,))
+                cur.execute("UPDATE clientes SET weg_ativo = FALSE WHERE id = %s", (cliente_id,))
                 conn.commit()
                 raise HTTPException(status_code=401, detail="Token expirado")
 
@@ -178,7 +178,7 @@ async def weg_get_plant_data(cliente_id: int, planta_id: str):
 
     try:
         # Get stored token
-        cur.execute("SELECT weg_token FROM contas WHERE id = %s AND weg_ativo = TRUE", (cliente_id,))
+        cur.execute("SELECT weg_token FROM clientes WHERE id = %s AND weg_ativo = TRUE", (cliente_id,))
         result = cur.fetchone()
 
         if not result:
@@ -249,7 +249,7 @@ async def weg_get_totals(cliente_id: int):
 
     try:
         # Get stored token
-        cur.execute("SELECT weg_token FROM contas WHERE id = %s AND weg_ativo = TRUE", (cliente_id,))
+        cur.execute("SELECT weg_token FROM clientes WHERE id = %s AND weg_ativo = TRUE", (cliente_id,))
         result = cur.fetchone()
 
         if not result:
@@ -339,7 +339,7 @@ async def weg_list_plants(cliente_id: int):
 
     try:
         # Get stored token
-        cur.execute("SELECT weg_token FROM contas WHERE id = %s AND weg_ativo = TRUE", (cliente_id,))
+        cur.execute("SELECT weg_token FROM clientes WHERE id = %s AND weg_ativo = TRUE", (cliente_id,))
         result = cur.fetchone()
 
         if not result:
@@ -396,7 +396,7 @@ async def weg_disconnect(cliente_id: int):
 
     try:
         cur.execute("""
-            UPDATE contas
+            UPDATE clientes
             SET weg_email = NULL, weg_senha = NULL, weg_token = NULL, weg_ativo = FALSE
             WHERE id = %s
         """, (cliente_id,))
