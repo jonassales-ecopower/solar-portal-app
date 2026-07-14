@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SunCheck — pacote de marca</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#0F3E63;--sun:#F7A81B;--cloud:#F7F4EE;}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:Nunito,sans-serif;color:var(--ink);background:#EFEBE3;padding:56px 48px 96px;}
+  .wrap{max-width:1080px;margin:0 auto;}
+  .kicker{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:3px;text-transform:uppercase;color:#B98A3C;margin-bottom:6px;}
+  h1{font-size:38px;font-weight:900;letter-spacing:-1px;margin:0 0 6px;}
+  .sub{font-size:15px;color:#5C6E7E;font-weight:600;margin:0 0 40px;}
+  .card{background:#fff;border-radius:22px;padding:32px;box-shadow:0 24px 60px -32px rgba(11,44,72,.4);margin-bottom:24px;}
+  .lbl{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#A9B4BD;margin-bottom:20px;}
+  .row{display:flex;flex-wrap:wrap;gap:18px;align-items:center;}
+  .tile{border-radius:16px;padding:26px;display:flex;flex-direction:column;align-items:center;gap:12px;flex:1;min-width:200px;}
+  .cap{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8A97A2;}
+  .light{background:var(--cloud);}
+  .dark{background:#0B2C48;}
+  .lockup{width:100%;max-width:520px;height:auto;}
+  img.asset{display:block;}
+  .swatch{height:60px;border-radius:12px;margin-bottom:8px;}
+  .files{font-family:'IBM Plex Mono',monospace;font-size:12px;color:#5C6E7E;line-height:1.9;}
+  .files b{color:var(--ink);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kicker">SunCheck — usinas solares</div>
+  <h1>Pacote de marca · Anel-C</h1>
+  <p class="sub">Arquivos prontos para uso: SVG vetorial (escalável) e PNG de alta resolução.</p>
+
+  <div class="card">
+    <div class="lbl">Logo principal</div>
+    <div class="row">
+      <div class="tile light"><img class="asset lockup" src="png/suncheck-lockup-color.png" alt="SunCheck"><div class="cap">fundo claro</div></div>
+      <div class="tile dark"><img class="asset lockup" src="png/suncheck-lockup-white.png" alt="SunCheck"><div class="cap">fundo escuro</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="lbl">Ícone · variações</div>
+    <div class="row">
+      <div class="tile light"><img class="asset" width="96" src="png/suncheck-icon-color-256.png"><div class="cap">solar</div></div>
+      <div class="tile light"><img class="asset" width="96" src="png/suncheck-icon-blue-1024.png"><div class="cap">azul</div></div>
+      <div class="tile dark"><img class="asset" width="96" src="png/suncheck-icon-white-1024.png"><div class="cap">negativo</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="lbl">Ícones de app &amp; favicon</div>
+    <div class="row">
+      <div class="tile light"><img class="asset" width="104" src="app-icons/app-icon-ios-1024.png"><div class="cap">iOS · 1024</div></div>
+      <div class="tile light"><img class="asset" width="104" src="app-icons/app-icon-android-1024.png"><div class="cap">Android · 1024</div></div>
+      <div class="tile light"><img class="asset" width="64" src="favicons/favicon-64.png"><div class="cap">favicon · 64/32/16</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="lbl">Paleta</div>
+    <div class="row">
+      <div style="flex:1;min-width:120px"><div class="swatch" style="background:#F7A81B"></div><b>Solar</b><div class="cap">#F7A81B</div></div>
+      <div style="flex:1;min-width:120px"><div class="swatch" style="background:#F5821F"></div><b>Âmbar</b><div class="cap">#F5821F</div></div>
+      <div style="flex:1;min-width:120px"><div class="swatch" style="background:#0F3E63"></div><b>Azul</b><div class="cap">#0F3E63</div></div>
+      <div style="flex:1;min-width:120px"><div class="swatch" style="background:#0B2C48"></div><b>Tinta</b><div class="cap">#0B2C48</div></div>
+      <div style="flex:1;min-width:120px"><div class="swatch" style="background:#F7F4EE;border:1px solid #E7E1D5"></div><b>Nuvem</b><div class="cap">#F7F4EE</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="lbl">Conteúdo do pacote</div>
+    <div class="files">
+      <b>svg/</b> — icon (solar · azul · negativo · preto) + lockup (color · white)<br>
+      <b>png/</b> — icon 1024/512/256 + lockup color/white (alta resolução)<br>
+      <b>app-icons/</b> — iOS 1024 · Android 1024<br>
+      <b>favicons/</b> — 64 · 32 · 16<br>
+      <span class="cap">Tipografia: Nunito 800 · Fonte gratuita (Google Fonts)</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>
