@@ -3080,13 +3080,25 @@ async function mcCarregarWEG(clienteId) {
     const plantasList = document.getElementById('weg-plantas-lista');
     const desconectarBtn = document.getElementById('weg-btn-desconectar');
 
+    // Always show login box initially
+    loginBox.style.display = 'block';
+    statusBox.style.display = 'none';
+    plantasBox.style.display = 'none';
+    desconectarBtn.style.display = 'none';
+
     try {
         const resp = await fetch(`${API}/weg/clientes/${clienteId}/weg/plantas`, {
             headers: {"Authorization":`Bearer ${token}`}
         });
+
+        if (!resp.ok) {
+            // 404 or other error means WEG not configured - show login form
+            return;
+        }
+
         const data = await resp.json();
 
-        if (resp.ok && data.sucesso && data.plantas && data.plantas.length > 0) {
+        if (data.sucesso && data.plantas && data.plantas.length > 0) {
             // Show connection status
             loginBox.style.display = 'none';
             statusBox.style.display = 'block';
@@ -3103,20 +3115,9 @@ async function mcCarregarWEG(clienteId) {
                     </div>
                 </div>
             `).join('');
-        } else {
-            // Show login form
-            loginBox.style.display = 'block';
-            statusBox.style.display = 'none';
-            plantasBox.style.display = 'none';
-            desconectarBtn.style.display = 'none';
         }
     } catch(e) {
         console.error('Erro ao carregar WEG:', e);
-        // Show login form on error
-        loginBox.style.display = 'block';
-        statusBox.style.display = 'none';
-        plantasBox.style.display = 'none';
-        desconectarBtn.style.display = 'none';
     }
 }
 
