@@ -3074,44 +3074,49 @@ async function configurarWEG() {
 }
 
 async function mcCarregarWEG(clienteId) {
+    const loginBox = document.getElementById('weg-login-box');
+    const statusBox = document.getElementById('weg-status-box');
+    const plantasBox = document.getElementById('weg-plantas-status');
+    const plantasList = document.getElementById('weg-plantas-lista');
+    const desconectarBtn = document.getElementById('weg-btn-desconectar');
+
     try {
         const resp = await fetch(`${API}/weg/clientes/${clienteId}/weg/plantas`, {
             headers: {"Authorization":`Bearer ${token}`}
         });
         const data = await resp.json();
 
-        const loginBox = document.getElementById('weg-login-box');
-        const statusBox = document.getElementById('weg-status-box');
-        const plantasBox = document.getElementById('weg-plantas-status');
-        const plantasList = document.getElementById('weg-plantas-lista');
-        const desconectarBtn = document.getElementById('weg-btn-desconectar');
+        if (resp.ok && data.sucesso && data.plantas && data.plantas.length > 0) {
+            // Show connection status
+            loginBox.style.display = 'none';
+            statusBox.style.display = 'block';
+            plantasBox.style.display = 'block';
+            desconectarBtn.style.display = 'inline-block';
+            document.getElementById('weg-status-email').textContent = `Email: ${data.plantas[0].nome || 'conectado'}`;
 
-        if (!data.sucesso || !data.plantas || data.plantas.length === 0) {
+            // List plants
+            plantasList.innerHTML = data.plantas.map(p => `
+                <div style="padding:8px 0; border-bottom:1px solid #e2e8f0;">
+                    <div style="font-weight:600; color:#0F3E63;">${p.nome}</div>
+                    <div style="font-size:11px; color:#666; margin-top:2px;">
+                        Hoje: ${(p.energiaDia || 0).toFixed(2)} kWh • Potência: ${(p.potencia || 0).toFixed(2)} kW
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            // Show login form
             loginBox.style.display = 'block';
             statusBox.style.display = 'none';
             plantasBox.style.display = 'none';
             desconectarBtn.style.display = 'none';
-            return;
         }
-
-        // Show connection status
-        loginBox.style.display = 'none';
-        statusBox.style.display = 'block';
-        plantasBox.style.display = 'block';
-        desconectarBtn.style.display = 'inline-block';
-        document.getElementById('weg-status-email').textContent = `Email: ${data.plantas[0].nome || 'conectado'}`;
-
-        // List plants
-        plantasList.innerHTML = data.plantas.map(p => `
-            <div style="padding:8px 0; border-bottom:1px solid #e2e8f0;">
-                <div style="font-weight:600; color:#0F3E63;">${p.nome}</div>
-                <div style="font-size:11px; color:#666; margin-top:2px;">
-                    Hoje: ${(p.energiaDia || 0).toFixed(2)} kWh • Potência: ${(p.potencia || 0).toFixed(2)} kW
-                </div>
-            </div>
-        `).join('');
     } catch(e) {
         console.error('Erro ao carregar WEG:', e);
+        // Show login form on error
+        loginBox.style.display = 'block';
+        statusBox.style.display = 'none';
+        plantasBox.style.display = 'none';
+        desconectarBtn.style.display = 'none';
     }
 }
 
