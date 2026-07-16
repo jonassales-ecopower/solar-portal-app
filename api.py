@@ -2365,7 +2365,7 @@ def obter_monitoramento_offline(cliente_id: int, marca: str, serial: str):
         conn.close()
 
 @app.get("/clientes/{cliente_id}/monitoramento")
-def monitoramento(cliente_id: int):
+async def monitoramento(cliente_id: int):
     # Verificar horário de geração (7h-18h BRT)
     hora_brt = (datetime.utcnow() - timedelta(hours=3)).hour
     fora_horario = hora_brt < 7 or hora_brt >= 18
@@ -2378,29 +2378,19 @@ def monitoramento(cliente_id: int):
     weg_result = cur.fetchone()
     if weg_result and weg_result[0] and weg_result[1]:  # WEG ativo e token existe
         try:
-            import aiohttp
-            import asyncio
-            from weg_api import WEGClient
-
-            # Executar função async em contexto síncrono
-            async def get_weg_data():
-                async with aiohttp.ClientSession() as session:
-                    weg = WEGClient(session, token=weg_result[1])
-                    totals = await weg.async_get_totalizadores()
-                    return totals
-
-            totals = asyncio.run(get_weg_data())
-            if totals:
-                cur.close()
-                conn.close()
-                # Extrair potência atual (potencia_ativa_total)
-                potencia_str = totals.get("potencia_ativa_total", "0 kW")
-                potencia_kw = float(potencia_str.split()[0].replace(",", ".")) if isinstance(potencia_str, str) else float(potencia_str)
-
-                return {
-                    "geracao_atual_kw": potencia_kw,
-                    "sistema": "WEG"
-                }
+            async with aiohttp.ClientSession() as session:
+                weg = WEGClient(session, token=weg_result[1])
+                totals = await weg.async_get_totalizadores()
+                if totals:
+                    cur.close()
+                    conn.close()
+                    # Extrair potência atual (potencia_ativa_total)
+                    potencia_str = totals.get("potencia_ativa_total", "0 kW")
+                    potencia_kw = float(potencia_str.split()[0].replace(",", ".")) if isinstance(potencia_str, str) else float(potencia_str)
+                    return {
+                        "geracao_atual_kw": potencia_kw,
+                        "sistema": "WEG"
+                    }
         except Exception as e:
             _LOGGER.error(f"Erro ao buscar dados WEG: {e}")
 
