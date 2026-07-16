@@ -409,6 +409,31 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(verificar_offline_loop())
     yield
 
+# ==================== DEBUG ====================
+
+@app.get("/debug/cliente/{cliente_id}/weg")
+def debug_weg(cliente_id: int):
+    """Debug endpoint to check WEG status"""
+    conn = conectar_banco()
+    cur = conn.cursor()
+    cur.execute("SELECT nome, weg_email, weg_ativo, weg_token FROM clientes WHERE id=%s", (cliente_id,))
+    result = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if not result:
+        return {"erro": "Cliente não encontrado"}
+
+    nome, email, ativo, token = result
+    return {
+        "cliente_id": cliente_id,
+        "nome": nome,
+        "weg_email": email,
+        "weg_ativo": ativo,
+        "weg_token": "***" if token else None,
+        "weg_configurado": bool(ativo and token)
+    }
+
 # ==================== APP ====================
 
 app = FastAPI(title="Solar Portal API", lifespan=lifespan)
