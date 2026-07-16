@@ -2372,6 +2372,38 @@ def monitoramento(cliente_id: int):
 
     conn = conectar_banco()
     cur = conn.cursor()
+
+    # Verificar se cliente tem WEG configurado
+    cur.execute("SELECT weg_ativo, weg_token FROM clientes WHERE id=%s", (cliente_id,))
+    weg_result = cur.fetchone()
+    if weg_result and weg_result[0] and weg_result[1]:  # WEG ativo e token existe
+        try:
+            import aiohttp
+            import asyncio
+            from weg_api import WEGClient
+
+            # Executar função async em contexto síncrono
+            async def get_weg_data():
+                async with aiohttp.ClientSession() as session:
+                    weg = WEGClient(session, token=weg_result[1])
+                    totals = await weg.async_get_totalizadores()
+                    return totals
+
+            totals = asyncio.run(get_weg_data())
+            if totals:
+                cur.close()
+                conn.close()
+                # Extrair potência atual (potencia_ativa_total)
+                potencia_str = totals.get("potencia_ativa_total", "0 kW")
+                potencia_kw = float(potencia_str.split()[0].replace(",", ".")) if isinstance(potencia_str, str) else float(potencia_str)
+
+                return {
+                    "geracao_atual_kw": potencia_kw,
+                    "sistema": "WEG"
+                }
+        except Exception as e:
+            _LOGGER.error(f"Erro ao buscar dados WEG: {e}")
+
     cur.execute("SELECT marca_inversor,serial_inversor,api_key_inversor,inversor_usuario,inversor_senha FROM clientes WHERE id=%s", (cliente_id,))
     c = cur.fetchone()
     cur.close()
