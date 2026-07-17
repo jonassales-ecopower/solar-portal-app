@@ -2391,7 +2391,7 @@ def obter_monitoramento_offline(cliente_id: int, marca: str, serial: str):
         conn.close()
 
 @app.get("/clientes/{cliente_id}/monitoramento")
-async def monitoramento(cliente_id: int):
+def monitoramento(cliente_id: int):
     # Verificar horário de geração (7h-18h BRT)
     hora_brt = (datetime.utcnow() - timedelta(hours=3)).hour
     fora_horario = hora_brt < 7 or hora_brt >= 18
@@ -2402,28 +2402,24 @@ async def monitoramento(cliente_id: int):
     # Verificar se cliente tem WEG configurado
     cur.execute("SELECT weg_ativo, weg_token FROM clientes WHERE id=%s", (cliente_id,))
     weg_result = cur.fetchone()
-    _LOGGER.info(f"WEG check para cliente {cliente_id}: {weg_result}")
 
     if weg_result and weg_result[0] and weg_result[1]:  # WEG ativo e token existe
-        _LOGGER.info(f"Cliente {cliente_id} tem WEG ativo, buscando dados...")
         try:
-            async with aiohttp.ClientSession() as session:
-                weg = WEGClient(session, token=weg_result[1])
-                totals = await weg.async_get_totalizadores()
-                _LOGGER.info(f"Totalizadores WEG recebidos: {totals}")
-                if totals:
-                    cur.close()
-                    conn.close()
-                    # Extrair potência atual (potencia_ativa_total)
-                    potencia_str = totals.get("potencia_ativa_total", "0 kW")
-                    potencia_kw = float(potencia_str.split()[0].replace(",", ".")) if isinstance(potencia_str, str) else float(potencia_str)
-                    _LOGGER.info(f"Retornando potência WEG: {potencia_kw} kW")
-                    return {
-                        "geracao_atual_kw": potencia_kw,
-                        "sistema": "WEG"
-                    }
+            # Chamada síncrona à API WEG
+            r = requests.get(
+                "https://api.sunweg.net/v2/GetTotalizadores",
+                headers={"Authorization": f"Bearer {weg_result[1]}"},
+                timeout=10
+            )
+            if r.status_code == 200:
+                data = r.json()
+                potencia_str = data.get("potencia_ativa_total", "0 kW")
+                potencia_kw = float(str(potencia_str).split()[0].replace(",", "."))
+                cur.close()
+                conn.close()
+                return {"geracao_atual_kw": potencia_kw, "sistema": "WEG"}
         except Exception as e:
-            _LOGGER.error(f"Erro ao buscar dados WEG para cliente {cliente_id}: {e}", exc_info=True)
+            _LOGGER.error(f"Erro ao buscar dados WEG: {e}")
 
     cur.execute("SELECT marca_inversor,serial_inversor,api_key_inversor,inversor_usuario,inversor_senha FROM clientes WHERE id=%s", (cliente_id,))
     c = cur.fetchone()
