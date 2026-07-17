@@ -22,6 +22,7 @@ from auth import criptografar_senha, verificar_senha, criar_token, verificar_tok
 from extracao import (extrair_medicoes_medidor, normalizar_mes_referencia,
                       extrair_mes_referencia, extrair_datas_leitura, somar_geracao_periodo)
 from weg_integration_example import weg_router
+from weg_api import WEGClient
 import PyPDF2
 
 try:
