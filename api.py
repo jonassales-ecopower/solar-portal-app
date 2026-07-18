@@ -2426,7 +2426,8 @@ def monitoramento(cliente_id: int):
     cur.close()
     conn.close()
     if not c or (not c[2] and not c[3]):
-        raise HTTPException(status_code=404, detail="Inversor não configurado")
+        # Se nenhum inversor configurado, retornar dados offline (0.0 kW)
+        return {"geracao_atual_kw": 0.0, "sistema": "offline"}
     marca, serial, api_key, inv_usuario, inv_senha = c
     marca_lower = marca.lower()
 
