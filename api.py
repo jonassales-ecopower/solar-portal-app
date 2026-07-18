@@ -2398,29 +2398,6 @@ def monitoramento(cliente_id: int):
 
     conn = conectar_banco()
     cur = conn.cursor()
-
-    # Verificar se cliente tem WEG configurado
-    cur.execute("SELECT weg_ativo, weg_token FROM clientes WHERE id=%s", (cliente_id,))
-    weg_result = cur.fetchone()
-
-    if weg_result and weg_result[0] and weg_result[1]:  # WEG ativo e token existe
-        try:
-            # Chamada síncrona à API WEG
-            r = requests.get(
-                "https://api.sunweg.net/v2/GetTotalizadores",
-                headers={"Authorization": f"Bearer {weg_result[1]}"},
-                timeout=10
-            )
-            if r.status_code == 200:
-                data = r.json()
-                potencia_str = data.get("potencia_ativa_total", "0 kW")
-                potencia_kw = float(str(potencia_str).split()[0].replace(",", "."))
-                cur.close()
-                conn.close()
-                return {"geracao_atual_kw": potencia_kw, "sistema": "WEG"}
-        except Exception as e:
-            _LOGGER.error(f"Erro ao buscar dados WEG: {e}")
-
     cur.execute("SELECT marca_inversor,serial_inversor,api_key_inversor,inversor_usuario,inversor_senha FROM clientes WHERE id=%s", (cliente_id,))
     c = cur.fetchone()
     cur.close()
