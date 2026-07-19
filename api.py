@@ -411,28 +411,36 @@ async def lifespan(app: FastAPI):
 
 # ==================== DEBUG ====================
 
+@app.get("/test")
+def test():
+    """Simple test endpoint"""
+    return {"status": "ok", "message": "API is working"}
+
 @app.get("/debug/cliente/{cliente_id}/weg")
 def debug_weg(cliente_id: int):
     """Debug endpoint to check WEG status"""
-    conn = conectar_banco()
-    cur = conn.cursor()
-    cur.execute("SELECT nome, weg_email, weg_ativo, weg_token FROM clientes WHERE id=%s", (cliente_id,))
-    result = cur.fetchone()
-    cur.close()
-    conn.close()
+    try:
+        conn = conectar_banco()
+        cur = conn.cursor()
+        cur.execute("SELECT nome, weg_email, weg_ativo, weg_token FROM clientes WHERE id=%s", (cliente_id,))
+        result = cur.fetchone()
+        cur.close()
+        conn.close()
 
-    if not result:
-        return {"erro": "Cliente não encontrado"}
+        if not result:
+            return {"erro": "Cliente não encontrado"}
 
-    nome, email, ativo, token = result
-    return {
-        "cliente_id": cliente_id,
-        "nome": nome,
-        "weg_email": email,
-        "weg_ativo": ativo,
-        "weg_token": "***" if token else None,
-        "weg_configurado": bool(ativo and token)
-    }
+        nome, email, ativo, token = result
+        return {
+            "cliente_id": cliente_id,
+            "nome": nome,
+            "weg_email": email,
+            "weg_ativo": ativo,
+            "weg_token": "***" if token else None,
+            "weg_configurado": bool(ativo and token)
+        }
+    except Exception as e:
+        return {"erro": str(e)}
 
 # ==================== APP ====================
 
