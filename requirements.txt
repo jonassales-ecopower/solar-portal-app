@@ -8,3 +8,4 @@ python-multipart
 requests
 python-dotenv
 aiohttp
+# Force rebuild 2026-07-18
